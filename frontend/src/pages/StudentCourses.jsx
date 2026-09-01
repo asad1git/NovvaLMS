@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { listCourses, getMaterials, downloadMaterial } from "../api/courses";
+import { listQuizzesForCourse } from "../api/quizzes";
 
 export default function StudentCourses() {
+  const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [materials, setMaterials] = useState([]);
+  const [quizzes, setQuizzes] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -24,7 +28,9 @@ export default function StudentCourses() {
     setSelectedCourse(course);
     setError("");
     setMaterials([]); // clear immediately so a course switch never shows the previous course's list
+    setQuizzes([]);
     setMaterials(await getMaterials(course._id));
+    setQuizzes(await listQuizzesForCourse(course._id));
   }
 
   if (loading) return <div className="text-sm text-gray-500">Loading courses…</div>;
@@ -81,6 +87,29 @@ export default function StudentCourses() {
               </div>
             ))}
             {materials.length === 0 && <p className="text-xs text-gray-500">No materials uploaded yet.</p>}
+          </div>
+        </div>
+      )}
+
+      {selectedCourse && (
+        <div className="bg-white border border-gray-200 rounded-card p-5">
+          <h2 className="text-sm font-medium text-gray-900 mb-3">Quizzes — {selectedCourse.code}</h2>
+          <div className="space-y-1">
+            {quizzes.map((q) => (
+              <div key={q._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
+                <div>
+                  <div className="text-gray-900 font-medium">{q.title}</div>
+                  <div className="text-[11px] text-gray-400">{q.durationMinutes} min</div>
+                </div>
+                <button
+                  onClick={() => navigate(`/quiz/${q._id}`)}
+                  className="bg-navy text-white text-xs font-medium rounded px-3 py-1.5"
+                >
+                  Open
+                </button>
+              </div>
+            ))}
+            {quizzes.length === 0 && <p className="text-xs text-gray-500">No quizzes available yet.</p>}
           </div>
         </div>
       )}
