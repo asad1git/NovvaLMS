@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
+import QuizAttempt from "./pages/QuizAttempt";
 
 function RootRedirect() {
   const { auth } = useAuth();
@@ -42,6 +43,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["student"]}>
                 <StudentDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quiz/:quizId"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <QuizAttempt />
               </ProtectedRoute>
             }
           />
