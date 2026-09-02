@@ -112,7 +112,7 @@ passwordHash via `toJSON` transform) for every new model.
 | US-02 | JWT login, role-based redirect | EP01 | 2 | 2 ✅ |
 | US-03 | Admin creates courses, CSV bulk enrollment | EP02 | 3 | 3 ✅ |
 | US-04 | Teacher uploads lecture files (PDF/PPTX, 20MB max) | EP03 | 3 | 3 ✅ |
-| US-05 | Teacher generates AI quiz via RAG | EP04 | 8 | 4-5 (code complete, untested live — see Current Status) |
+| US-05 | Teacher generates AI quiz via RAG | EP04 | 8 | 4-5 ✅ |
 | US-06 | Teacher reviews/approves AI grades (HITL) | EP05 | 5 | 6 (workflow done ahead of schedule; AI drafting still pending) |
 | US-07 | Student uses context-aware AI chatbot | EP06 | 8 | 7 |
 | US-08 | Student attempts timed quiz, 30s auto-save | EP06 | 5 | 7 ✅ |
@@ -203,14 +203,22 @@ quiz generation currently feeds the AI the full extracted text, capped at 30,000
 since a lecture-PDF-sized document fits a modern context window without needing
 relevance-based chunk selection).
 
-**US-05's code is complete and verified end-to-end EXCEPT the actual AI call** — RBAC,
-validation, PDF extraction, and the "not configured" graceful-failure path are all tested
-via curl and Playwright. What's NOT yet tested: a real Gemini API response, because no
-`GEMINI_API_KEY` has been provided yet. `POST /api/courses/:id/quizzes/generate` drafts
-questions into the same shape `createQuiz` already expects and returns them WITHOUT
-saving — the teacher reviews/edits in the same question-builder UI as manual creation
-(a "Generate with AI" panel next to it) before anything is persisted, keeping the teacher
-in control the same way HITL keeps them in control of grades.
+**US-05 is fully verified end-to-end, including a real live Gemini call.** RBAC,
+validation, PDF extraction, the "not configured" graceful-failure path, AND a real
+`GEMINI_API_KEY` generating actual questions from a real PDF were all tested (curl +
+Playwright). The generated MCQs were accurate and correctly answer-keyed against the
+source material. `POST /api/courses/:id/quizzes/generate` drafts questions into the same
+shape `createQuiz` already expects and returns them WITHOUT saving — the teacher
+reviews/edits in the same question-builder UI as manual creation (a "Generate with AI"
+panel next to it) before anything is persisted, keeping the teacher in control the same
+way HITL keeps them in control of grades.
+
+**Gemini's free tier takes ~20-26 seconds per generation call in practice** — not a bug,
+just a real latency characteristic worth knowing before assuming something hung. The
+default model is `gemini-3.6-flash` (`gemini-2.0-flash`, an earlier guess, was already
+retired by the time this was live-tested — Gemini's own error response named the
+replacement). If a future model retirement breaks this again, it's a `GEMINI_MODEL` env
+var change, not a code change.
 
 **Not started:** AI grade *drafting* specifically (the HITL review/approve workflow from
 US-06 is done — when this is picked up, add a `gradeSubjective(answer, rubric)` function
