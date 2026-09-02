@@ -10,7 +10,7 @@ const {
   getEnrollments,
 } = require("../controllers/courseController");
 const { uploadMaterial, getMaterials } = require("../controllers/materialController");
-const { createQuiz, getQuizzesForCourse } = require("../controllers/quizController");
+const { createQuiz, generateQuizQuestions, getQuizzesForCourse } = require("../controllers/quizController");
 
 const router = express.Router();
 
@@ -35,6 +35,7 @@ router.post(
 router.get("/:id/materials", getMaterials);
 
 router.post("/:id/quizzes", authorize("admin", "teacher"), createQuiz);
+router.post("/:id/quizzes/generate", authorize("admin", "teacher"), generateQuizQuestions);
 router.get("/:id/quizzes", getQuizzesForCourse);
 
 module.exports = router;

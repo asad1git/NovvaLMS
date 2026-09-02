@@ -1,3 +1,4 @@
+const path = require("path");
 const asyncHandler = require("express-async-handler");
 const Course = require("../models/Course");
 const Enrollment = require("../models/Enrollment");
@@ -5,7 +6,13 @@ const Quiz = require("../models/Quiz");
 const Question = require("../models/Question");
 const QuizAttempt = require("../models/QuizAttempt");
 const Answer = require("../models/Answer");
+const Material = require("../models/Material");
 const { assertCourseManager } = require("../utils/courseAccess");
+const { MATERIALS_DIR } = require("../middleware/uploadMiddleware");
+const { extractTextFromPdf } = require("../services/ragEngine");
+const { getAIProvider } = require("../services/ai");
+
+const MAX_SOURCE_CHARS = 30000; // keeps the prompt size sane regardless of provider
 
 function isManagerOf(user, course) {
   return user.role === "admin" || (user.role === "teacher" && String(course.teacher) === String(user._id));
@@ -196,8 +203,84 @@ const getAttemptsForQuiz = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: attempts });
 });
 
+/**
+ * US-05 — POST /api/courses/:id/quizzes/generate (Admin or the course's Teacher)
+ * Drafts MCQ questions from an uploaded PDF via the configured AI provider
+ * (AI_PROVIDER env var) and returns them WITHOUT saving anything — the
+ * teacher reviews/edits the draft in the same question-builder UI used for
+ * manual creation, and nothing exists until they call the existing
+ * `createQuiz` endpoint. This keeps the teacher in control of quiz content,
+ * in the same spirit as CLAUDE.md's HITL rule for grades.
+ */
+const generateQuizQuestions = asyncHandler(async (req, res) => {
+  const course = await Course.findById(req.params.id);
+  if (!course) {
+    res.status(404);
+    throw new Error("Course not found");
+  }
+  assertCourseManager(req.user, res, course);
+
+  const { materialId, numQuestions } = req.body;
+  if (!materialId || !numQuestions || Number(numQuestions) < 1) {
+    res.status(400);
+    throw new Error("materialId and a positive numQuestions are required");
+  }
+
+  const material = await Material.findOne({ _id: materialId, course: course._id });
+  if (!material) {
+    res.status(404);
+    throw new Error("Material not found in this course");
+  }
+  if (material.fileType !== "pdf") {
+    res.status(400);
+    throw new Error("AI quiz generation currently supports PDF materials only");
+  }
+
+  const filePath = path.join(MATERIALS_DIR, material.fileUrl);
+  const text = await extractTextFromPdf(filePath);
+  if (!text || text.trim().length < 100) {
+    res.status(400);
+    throw new Error("Could not extract enough text from this material to generate a quiz");
+  }
+  const truncated = text.length > MAX_SOURCE_CHARS ? text.slice(0, MAX_SOURCE_CHARS) : text;
+
+  const provider = getAIProvider();
+  let result;
+  try {
+    result = await provider.generateQuiz({ text: truncated, numQuestions: Number(numQuestions) });
+  } catch (err) {
+    res.status(502);
+    throw new Error(`AI quiz generation failed: ${err.message}`);
+  }
+
+  // Never trust external AI output blindly, even with JSON-schema
+  // enforcement upstream — validate shape before it ever reaches the
+  // question-builder UI or (later) the DB.
+  const questions = (result.questions || [])
+    .filter(
+      (q) =>
+        q &&
+        typeof q.text === "string" &&
+        Array.isArray(q.options) &&
+        q.options.length === 4 &&
+        q.options.every((o) => typeof o === "string" && o.trim().length > 0) &&
+        Number.isInteger(q.correctOptionIndex) &&
+        q.correctOptionIndex >= 0 &&
+        q.correctOptionIndex <= 3
+    )
+    .map((q) => ({ type: "mcq", text: q.text, options: q.options, correctOptionIndex: q.correctOptionIndex }));
+
+  if (questions.length === 0) {
+    res.status(502);
+    throw new Error("AI did not return any usable questions — try again");
+  }
+
+  res.status(200).json({ success: true, data: { questions } });
+});
+
 module.exports = {
   createQuiz,
+  generateQuizQuestions,
   getQuizzesForCourse,
   getQuizById,
   publishQuiz,

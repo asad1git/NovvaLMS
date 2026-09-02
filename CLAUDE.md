@@ -30,7 +30,8 @@ in full control of final grades.
 - **File Storage:** AWS S3 / Cloudinary (target); local disk (`backend/uploads/`) for
   now — vendor decision deliberately deferred, see Current Status (lecture materials,
   max 20MB, PDF/PPTX/DOCX)
-- **AI:** OpenAI GPT-4o (primary) + Google Gemini (fallback), via RAG
+- **AI:** Google Gemini (primary, `AI_PROVIDER=gemini`) + OpenAI GPT-4o (swap-ready via
+  `AI_PROVIDER=openai`), via RAG — see Current Status for `services/ai/`
 - **Auth:** JWT (7-day expiry) + bcrypt (salt rounds: 10) + RBAC middleware
 
 ---
@@ -111,7 +112,7 @@ passwordHash via `toJSON` transform) for every new model.
 | US-02 | JWT login, role-based redirect | EP01 | 2 | 2 ✅ |
 | US-03 | Admin creates courses, CSV bulk enrollment | EP02 | 3 | 3 ✅ |
 | US-04 | Teacher uploads lecture files (PDF/PPTX, 20MB max) | EP03 | 3 | 3 ✅ |
-| US-05 | Teacher generates AI quiz via RAG | EP04 | 8 | 4-5 |
+| US-05 | Teacher generates AI quiz via RAG | EP04 | 8 | 4-5 (code complete, untested live — see Current Status) |
 | US-06 | Teacher reviews/approves AI grades (HITL) | EP05 | 5 | 6 (workflow done ahead of schedule; AI drafting still pending) |
 | US-07 | Student uses context-aware AI chatbot | EP06 | 8 | 7 |
 | US-08 | Student attempts timed quiz, 30s auto-save | EP06 | 5 | 7 ✅ |
@@ -123,7 +124,7 @@ passwordHash via `toJSON` transform) for every new model.
 
 ---
 
-## Current Status (Sprint 1-3 + Quiz Core / HITL Grading Complete)
+## Current Status (Sprint 1-3 + Quiz Core / HITL Grading / AI Quiz Gen Code-Complete)
 
 **Verified end-to-end against a real local MongoDB (not mocked) and a real
 browser (Playwright click-through, zero console errors), covering every
@@ -187,13 +188,41 @@ in shape.
 an authenticated `GET /api/materials/:id/download` route — deliberately not a static
 mount, since that would bypass `protect` and leak lecture material to anyone with the
 URL). `Material.fileUrl` stores just the local filename today; the field is named to
-survive a later swap to a real S3/Cloudinary URL without a migration. The AI vendor
-(OpenAI vs Gemini) is also deliberately undecided — see `docs/` or ask the user if a
-memory file isn't enough context on why.
+survive a later swap to a real S3/Cloudinary URL without a migration.
 
-**Not started:** RAG engine, AI quiz *generation* specifically (manual creation is done),
-AI grade *drafting* specifically (the review/approve workflow is done), chatbot, analytics,
+**AI vendor decided: Gemini primary, OpenAI swap-ready.** `backend/services/ai/` is the
+External AI Service Layer from CLAUDE.md's own architecture diagram — `index.js` picks
+`geminiProvider.js` or `openaiProvider.js` based on the `AI_PROVIDER` env var (default
+`gemini`), both implementing the identical `generateQuiz({text, numQuestions})` contract
+via native `fetch` (no new HTTP-client dependency) with JSON-schema-enforced structured
+output (Sprint 5's "JSON enforcement" goal). Switching providers is an env var + restart,
+never a code change. `backend/services/ragEngine.js` extracts PDF text (`pdf-parse` v2 —
+its API is class-based, `new PDFParse({data: buffer}).getText()`, not the v1 function
+export most docs/examples show) and chunks it (US-07's chatbot will consume the chunking;
+quiz generation currently feeds the AI the full extracted text, capped at 30,000 chars,
+since a lecture-PDF-sized document fits a modern context window without needing
+relevance-based chunk selection).
+
+**US-05's code is complete and verified end-to-end EXCEPT the actual AI call** — RBAC,
+validation, PDF extraction, and the "not configured" graceful-failure path are all tested
+via curl and Playwright. What's NOT yet tested: a real Gemini API response, because no
+`GEMINI_API_KEY` has been provided yet. `POST /api/courses/:id/quizzes/generate` drafts
+questions into the same shape `createQuiz` already expects and returns them WITHOUT
+saving — the teacher reviews/edits in the same question-builder UI as manual creation
+(a "Generate with AI" panel next to it) before anything is persisted, keeping the teacher
+in control the same way HITL keeps them in control of grades.
+
+**Not started:** AI grade *drafting* specifically (the HITL review/approve workflow from
+US-06 is done — when this is picked up, add a `gradeSubjective(answer, rubric)` function
+to each `services/ai/` provider alongside `generateQuiz`, following the same pattern),
+chatbot (US-07 — will reuse `services/ai/` and `ragEngine.js`'s chunking, which quiz
+generation doesn't need but chat's query-driven relevance selection does), analytics,
 PDF generation.
+
+**Pre-existing, unrelated npm audit finding:** `qs` (transitive via `express`→`body-parser`)
+has a moderate DoS advisory with no patched version published yet as of this writing —
+confirmed present before any work in this session touched dependencies; `npm audit fix`
+has nothing to apply. Not introduced by `pdf-parse`.
 
 ---
 

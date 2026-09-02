@@ -3,6 +3,7 @@ import { listCourses, getMaterials, uploadMaterial, deleteMaterial, downloadMate
 import {
   listQuizzesForCourse,
   createQuiz,
+  generateQuizQuestions,
   setQuizPublished,
   getAttemptsForQuiz,
 } from "../api/quizzes";
@@ -34,6 +35,10 @@ export default function TeacherCourses() {
   const [creatingQuiz, setCreatingQuiz] = useState(false);
   const [resultsQuiz, setResultsQuiz] = useState(null);
   const [results, setResults] = useState([]);
+
+  const [generateMaterialId, setGenerateMaterialId] = useState("");
+  const [generateNumQuestions, setGenerateNumQuestions] = useState(5);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -119,6 +124,20 @@ export default function TeacherCourses() {
       setError(err.response?.data?.message || "Failed to create quiz");
     } finally {
       setCreatingQuiz(false);
+    }
+  }
+
+  async function handleGenerate() {
+    if (!generateMaterialId) return;
+    setError("");
+    setGenerating(true);
+    try {
+      const drafted = await generateQuizQuestions(selectedCourse._id, generateMaterialId, Number(generateNumQuestions));
+      setQuestions(drafted.map((q) => ({ ...q, maxScore: q.maxScore || 1 })));
+    } catch (err) {
+      setError(err.response?.data?.message || "AI quiz generation failed");
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -234,6 +253,44 @@ export default function TeacherCourses() {
 
           {showQuizForm && (
             <form onSubmit={handleCreateQuiz} className="border border-gray-200 rounded p-3 mb-4 space-y-3">
+              <div className="bg-badge-blue-bg border border-navy-light/20 rounded p-3 flex items-center gap-2">
+                <select
+                  className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs bg-white"
+                  value={generateMaterialId}
+                  onChange={(e) => setGenerateMaterialId(e.target.value)}
+                >
+                  <option value="">Generate from material…</option>
+                  {materials
+                    .filter((m) => m.fileType === "pdf")
+                    .map((m) => (
+                      <option key={m._id} value={m._id}>
+                        {m.title}
+                      </option>
+                    ))}
+                </select>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  className="w-16 border border-gray-300 rounded px-2 py-1.5 text-xs"
+                  value={generateNumQuestions}
+                  onChange={(e) => setGenerateNumQuestions(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={generating || !generateMaterialId}
+                  className="bg-navy-light text-white text-xs font-medium rounded px-3 py-1.5 disabled:opacity-50"
+                >
+                  {generating ? "Generating…" : "Generate with AI"}
+                </button>
+              </div>
+              {materials.filter((m) => m.fileType === "pdf").length === 0 && (
+                <p className="text-[10px] text-gray-400 -mt-2">
+                  Upload a PDF material above to enable AI generation.
+                </p>
+              )}
+
               <div className="flex gap-2">
                 <input
                   className="flex-1 border border-gray-300 rounded px-3 py-2 text-xs"

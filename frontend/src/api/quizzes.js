@@ -8,6 +8,12 @@ export function createQuiz(courseId, payload) {
   return api.post(`/courses/${courseId}/quizzes`, payload).then((r) => r.data.data);
 }
 
+export function generateQuizQuestions(courseId, materialId, numQuestions) {
+  return api
+    .post(`/courses/${courseId}/quizzes/generate`, { materialId, numQuestions })
+    .then((r) => r.data.data.questions);
+}
+
 export function getQuiz(quizId) {
   return api.get(`/quizzes/${quizId}`).then((r) => r.data.data);
 }
