@@ -46,9 +46,11 @@ const createQuiz = asyncHandler(async (req, res) => {
     await Question.insertMany(
       questions.map((q, i) => ({
         quiz: quiz._id,
+        type: q.type === "subjective" ? "subjective" : "mcq",
         text: q.text,
-        options: q.options,
-        correctOptionIndex: q.correctOptionIndex,
+        options: q.type === "subjective" ? undefined : q.options,
+        correctOptionIndex: q.type === "subjective" ? undefined : q.correctOptionIndex,
+        maxScore: q.type === "subjective" ? q.maxScore || 5 : 1,
         order: i,
       })),
       { ordered: true }

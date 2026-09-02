@@ -11,6 +11,7 @@ const courseRoutes = require("./routes/courseRoutes");
 const materialRoutes = require("./routes/materialRoutes");
 const quizRoutes = require("./routes/quizRoutes");
 const attemptRoutes = require("./routes/attemptRoutes");
+const gradingRoutes = require("./routes/gradingRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -39,6 +40,7 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/materials", materialRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/attempts", attemptRoutes);
+app.use("/api/grading", gradingRoutes);
 
 // ─── Error handling (must be last) ───
 app.use(notFound);

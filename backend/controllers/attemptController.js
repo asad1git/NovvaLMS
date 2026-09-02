@@ -3,6 +3,7 @@ const Quiz = require("../models/Quiz");
 const Question = require("../models/Question");
 const QuizAttempt = require("../models/QuizAttempt");
 const Answer = require("../models/Answer");
+const { recomputeAttemptScore } = require("../utils/scoring");
 
 async function loadOwnInProgressAttempt(req, res) {
   const attempt = await QuizAttempt.findById(req.params.id);
@@ -25,6 +26,8 @@ async function loadOwnInProgressAttempt(req, res) {
  * US-08 — PUT /api/attempts/:id/answers (Student, own attempt only)
  * The frontend calls this every 30s (plus once more right before submit)
  * rather than on every click — this is the "30s auto-save" from the story.
+ * Branches on question type: an MCQ answer is a selectedOptionIndex, a
+ * subjective answer is free-text.
  */
 const autosaveAnswer = asyncHandler(async (req, res) => {
   const attempt = await loadOwnInProgressAttempt(req, res);
@@ -36,16 +39,18 @@ const autosaveAnswer = asyncHandler(async (req, res) => {
     throw new Error("Time limit exceeded");
   }
 
-  const { questionId, selectedOptionIndex } = req.body;
+  const { questionId, selectedOptionIndex, textAnswer } = req.body;
   const question = await Question.findOne({ _id: questionId, quiz: attempt.quiz });
   if (!question) {
     res.status(400);
     throw new Error("Question does not belong to this quiz");
   }
 
+  const update = question.type === "subjective" ? { textAnswer } : { selectedOptionIndex };
+
   const answer = await Answer.findOneAndUpdate(
     { attempt: attempt._id, question: question._id },
-    { selectedOptionIndex },
+    update,
     { upsert: true, new: true, runValidators: true }
   );
 
@@ -53,28 +58,33 @@ const autosaveAnswer = asyncHandler(async (req, res) => {
 });
 
 /**
- * US-08 — POST /api/attempts/:id/submit (Student, own attempt only)
- * Grades by comparing every Answer against Question.correctOptionIndex.
- * An unanswered question just counts as wrong — no special-casing needed.
+ * US-08 / HITL — POST /api/attempts/:id/submit (Student, own attempt only)
+ * MCQ answers are graded immediately. Subjective answers can't be — they're
+ * marked "pending" here and picked up in `recomputeAttemptScore` once a
+ * Teacher grades them (see gradingController.js). An unanswered MCQ just
+ * counts as wrong; an unanswered subjective question still goes to
+ * "pending" review with an empty textAnswer.
  */
 const submitAttempt = asyncHandler(async (req, res) => {
   const attempt = await loadOwnInProgressAttempt(req, res);
 
-  const questions = await Question.find({ quiz: attempt.quiz }).select("+correctOptionIndex");
-  const answers = await Answer.find({ attempt: attempt._id });
-  const selectedByQuestion = new Map(answers.map((a) => [String(a.question), a.selectedOptionIndex]));
+  const questions = await Question.find({ quiz: attempt.quiz });
+  const subjectiveQuestions = questions.filter((q) => q.type === "subjective");
 
-  let score = 0;
-  for (const q of questions) {
-    if (selectedByQuestion.get(String(q._id)) === q.correctOptionIndex) score++;
+  for (const q of subjectiveQuestions) {
+    await Answer.findOneAndUpdate(
+      { attempt: attempt._id, question: q._id },
+      { gradeStatus: "pending" },
+      { upsert: true, setDefaultsOnInsert: true }
+    );
   }
 
-  attempt.score = score;
-  attempt.totalQuestions = questions.length;
   attempt.submittedAt = new Date();
   await attempt.save();
 
-  res.status(200).json({ success: true, data: attempt });
+  const finalAttempt = await recomputeAttemptScore(attempt._id);
+
+  res.status(200).json({ success: true, data: finalAttempt });
 });
 
 module.exports = { autosaveAnswer, submitAttempt };

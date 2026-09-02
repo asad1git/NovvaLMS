@@ -42,13 +42,19 @@ export default function QuizAttempt() {
         attemptData.answers.forEach((a) => {
           if (a.selectedOptionIndex !== null && a.selectedOptionIndex !== undefined) {
             initial[a.question] = a.selectedOptionIndex;
+          } else if (a.textAnswer) {
+            initial[a.question] = a.textAnswer;
           }
         });
         setSelections(initial);
 
         if (attemptData.attempt.submittedAt) {
           submittedRef.current = true;
-          setResult({ score: attemptData.attempt.score, totalQuestions: attemptData.attempt.totalQuestions });
+          setResult({
+            score: attemptData.attempt.score,
+            maxScore: attemptData.attempt.maxScore,
+            gradingComplete: attemptData.attempt.gradingComplete,
+          });
         }
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load quiz");
@@ -74,7 +80,11 @@ export default function QuizAttempt() {
     try {
       await flushAnswers(attempt._id);
       const finalAttempt = await submitAttempt(attempt._id);
-      setResult({ score: finalAttempt.score, totalQuestions: finalAttempt.totalQuestions });
+      setResult({
+        score: finalAttempt.score,
+        maxScore: finalAttempt.maxScore,
+        gradingComplete: finalAttempt.gradingComplete,
+      });
     } catch (err) {
       setError(err.response?.data?.message || "Failed to submit quiz");
       submittedRef.current = false;
@@ -112,8 +122,8 @@ export default function QuizAttempt() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempt, result]);
 
-  function selectOption(questionId, optionIndex) {
-    setSelections((prev) => ({ ...prev, [questionId]: optionIndex }));
+  function setAnswer(questionId, value) {
+    setSelections((prev) => ({ ...prev, [questionId]: value }));
   }
 
   if (loading) return <div className="p-5 text-sm text-gray-500">Loading quiz…</div>;
@@ -158,8 +168,13 @@ export default function QuizAttempt() {
             <div className="text-center py-8">
               <p className="text-sm text-gray-600 mb-1">Quiz submitted.</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {result.score} / {result.totalQuestions}
+                {result.score} / {result.maxScore}
               </p>
+              {!result.gradingComplete && (
+                <p className="text-xs text-badge-amber-text mt-2">
+                  One or more answers are still awaiting your teacher's review — this score may change.
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-5">
@@ -167,20 +182,33 @@ export default function QuizAttempt() {
                 <div key={q._id} className="border border-gray-100 rounded p-4">
                   <p className="text-xs font-medium text-gray-900 mb-3">
                     {i + 1}. {q.text}
+                    {q.type === "subjective" && (
+                      <span className="text-gray-400 font-normal"> ({q.maxScore} pts, graded by teacher)</span>
+                    )}
                   </p>
-                  <div className="space-y-2">
-                    {q.options.map((opt, oi) => (
-                      <label key={oi} className="flex items-center gap-2 text-xs cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`q-${q._id}`}
-                          checked={selections[q._id] === oi}
-                          onChange={() => selectOption(q._id, oi)}
-                        />
-                        {opt}
-                      </label>
-                    ))}
-                  </div>
+                  {q.type === "subjective" ? (
+                    <textarea
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-xs"
+                      rows={4}
+                      placeholder="Type your answer…"
+                      value={selections[q._id] || ""}
+                      onChange={(e) => setAnswer(q._id, e.target.value)}
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      {q.options.map((opt, oi) => (
+                        <label key={oi} className="flex items-center gap-2 text-xs cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`q-${q._id}`}
+                            checked={selections[q._id] === oi}
+                            onChange={() => setAnswer(q._id, oi)}
+                          />
+                          {opt}
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
 

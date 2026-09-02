@@ -7,7 +7,13 @@ import {
   getAttemptsForQuiz,
 } from "../api/quizzes";
 
-const BLANK_QUESTION = () => ({ text: "", options: ["", "", "", ""], correctOptionIndex: 0 });
+const BLANK_QUESTION = () => ({
+  type: "mcq",
+  text: "",
+  options: ["", "", "", ""],
+  correctOptionIndex: 0,
+  maxScore: 5,
+});
 
 export default function TeacherCourses() {
   const [courses, setCourses] = useState([]);
@@ -250,6 +256,14 @@ export default function TeacherCourses() {
               {questions.map((q, qi) => (
                 <div key={qi} className="border border-gray-100 rounded p-3 space-y-2 bg-gray-50">
                   <div className="flex items-center gap-2">
+                    <select
+                      className="border border-gray-300 rounded px-2 py-1.5 text-xs bg-white"
+                      value={q.type}
+                      onChange={(e) => updateQuestion(qi, { type: e.target.value })}
+                    >
+                      <option value="mcq">Multiple choice</option>
+                      <option value="subjective">Subjective (manually graded)</option>
+                    </select>
                     <input
                       className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-xs"
                       placeholder={`Question ${qi + 1}`}
@@ -267,26 +281,46 @@ export default function TeacherCourses() {
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {q.options.map((opt, oi) => (
-                      <label key={oi} className="flex items-center gap-2 text-xs">
-                        <input
-                          type="radio"
-                          name={`correct-${qi}`}
-                          checked={q.correctOptionIndex === oi}
-                          onChange={() => updateQuestion(qi, { correctOptionIndex: oi })}
-                        />
-                        <input
-                          className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs"
-                          placeholder={`Option ${oi + 1}`}
-                          value={opt}
-                          onChange={(e) => updateOption(qi, oi, e.target.value)}
-                          required
-                        />
-                      </label>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-gray-400">Select the radio button next to the correct option.</p>
+
+                  {q.type === "subjective" ? (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-600">Max score:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        className="w-20 border border-gray-300 rounded px-2 py-1 text-xs"
+                        value={q.maxScore}
+                        onChange={(e) => updateQuestion(qi, { maxScore: Number(e.target.value) })}
+                        required
+                      />
+                      <p className="text-[10px] text-gray-400">
+                        The student types a free-text answer; you'll grade it under Grade Approvals.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-2">
+                        {q.options.map((opt, oi) => (
+                          <label key={oi} className="flex items-center gap-2 text-xs">
+                            <input
+                              type="radio"
+                              name={`correct-${qi}`}
+                              checked={q.correctOptionIndex === oi}
+                              onChange={() => updateQuestion(qi, { correctOptionIndex: oi })}
+                            />
+                            <input
+                              className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs"
+                              placeholder={`Option ${oi + 1}`}
+                              value={opt}
+                              onChange={(e) => updateOption(qi, oi, e.target.value)}
+                              required
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-gray-400">Select the radio button next to the correct option.</p>
+                    </>
+                  )}
                 </div>
               ))}
 
@@ -341,7 +375,11 @@ export default function TeacherCourses() {
                   <div key={r._id} className="flex justify-between text-xs border-b border-gray-100 py-1">
                     <span>{r.student?.name}</span>
                     <span className="text-gray-500">
-                      {r.submittedAt ? `${r.score}/${r.totalQuestions}` : "In progress"}
+                      {!r.submittedAt
+                        ? "In progress"
+                        : r.gradingComplete
+                        ? `${r.score}/${r.maxScore}`
+                        : `${r.score}/${r.maxScore} (pending review)`}
                     </span>
                   </div>
                 ))}
