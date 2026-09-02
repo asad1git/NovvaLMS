@@ -11,6 +11,7 @@ const {
 } = require("../controllers/courseController");
 const { uploadMaterial, getMaterials } = require("../controllers/materialController");
 const { createQuiz, generateQuizQuestions, getQuizzesForCourse } = require("../controllers/quizController");
+const { getMessages, sendMessage } = require("../controllers/chatController");
 
 const router = express.Router();
 
@@ -37,5 +38,8 @@ router.get("/:id/materials", getMaterials);
 router.post("/:id/quizzes", authorize("admin", "teacher"), createQuiz);
 router.post("/:id/quizzes/generate", authorize("admin", "teacher"), generateQuizQuestions);
 router.get("/:id/quizzes", getQuizzesForCourse);
+
+router.get("/:id/chat/messages", authorize("student"), getMessages);
+router.post("/:id/chat/messages", authorize("student"), sendMessage);
 
 module.exports = router;

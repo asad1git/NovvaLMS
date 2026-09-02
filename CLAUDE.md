@@ -114,7 +114,7 @@ passwordHash via `toJSON` transform) for every new model.
 | US-04 | Teacher uploads lecture files (PDF/PPTX, 20MB max) | EP03 | 3 | 3 ✅ |
 | US-05 | Teacher generates AI quiz via RAG | EP04 | 8 | 4-5 ✅ |
 | US-06 | Teacher reviews/approves AI grades (HITL) | EP05 | 5 | 6 (workflow done ahead of schedule; AI drafting still pending) |
-| US-07 | Student uses context-aware AI chatbot | EP06 | 8 | 7 |
+| US-07 | Student uses context-aware AI chatbot | EP06 | 8 | 7 ✅ |
 | US-08 | Student attempts timed quiz, 30s auto-save | EP06 | 5 | 7 ✅ |
 | US-09 | Admin generates fee challan PDF | EP07 | 3 | 8 |
 | US-10 | Admin generates salary slip PDF | EP07 | 3 | 8 |
@@ -124,7 +124,7 @@ passwordHash via `toJSON` transform) for every new model.
 
 ---
 
-## Current Status (Sprint 1-3 + Quiz Core / HITL Grading / AI Quiz Gen Code-Complete)
+## Current Status (Sprints 1-5, 7 Done; US-06 Workflow Substrate Done — see backlog table)
 
 **Verified end-to-end against a real local MongoDB (not mocked) and a real
 browser (Playwright click-through, zero console errors), covering every
@@ -133,13 +133,17 @@ student, no-token, cross-student attempt tampering):**
 - `backend/models/User.js`, `Course.js`, `Enrollment.js`, `Material.js`,
   `Quiz.js`, `Question.js` (now has `type: "mcq"|"subjective"` + `maxScore`),
   `QuizAttempt.js` (now has `maxScore` + `gradingComplete`), `Answer.js`
-  (now has `textAnswer`, `gradeStatus`, `score`, `feedback`, `gradedBy`, `gradedAt`)
+  (now has `textAnswer`, `gradeStatus`, `score`, `feedback`, `gradedBy`, `gradedAt`),
+  `ChatSession.js` (one continuous thread per student+course, unique pair, auto-created —
+  no session-switching UI, matching QuizAttempt's start-or-resume pattern), `Message.js`
+  (role: user/assistant, `sources: [Material]` for citation display)
 - `authController.js` (`login`, `getMe`, `createUser`), `courseController.js`
   (`createCourse`, `getCourses`, `getCourseById`, `bulkEnrollFromCSV`, `getEnrollments`),
   `materialController.js` (`uploadMaterial`, `getMaterials`, `downloadMaterial`, `deleteMaterial`),
-  `quizController.js` (`createQuiz`, `getQuizzesForCourse`, `getQuizById`, `publishQuiz`,
-  `startOrResumeAttempt`, `getAttemptsForQuiz`), `attemptController.js`
-  (`autosaveAnswer`, `submitAttempt`), `gradingController.js` (`getPendingGrades`, `gradeAnswer`)
+  `quizController.js` (`createQuiz`, `generateQuizQuestions`, `getQuizzesForCourse`, `getQuizById`,
+  `publishQuiz`, `startOrResumeAttempt`, `getAttemptsForQuiz`), `attemptController.js`
+  (`autosaveAnswer`, `submitAttempt`), `gradingController.js` (`getPendingGrades`, `gradeAnswer`),
+  `chatController.js` (`getMessages`, `sendMessage`)
 - `backend/utils/courseAccess.js` — shared `assertCourseAccess` / `assertCourseManager`
   RBAC helpers, reused by courses, materials, quizzes, AND grading
 - `backend/utils/scoring.js` — `recomputeAttemptScore`, shared by `submitAttempt` and
@@ -154,14 +158,17 @@ student, no-token, cross-student attempt tampering):**
   MCQ/subjective type picker + publish/results) + `GradeApprovals.jsx` (the "Grade Approvals"
   nav item that sat unused since Sprint 1 — now lists every pending subjective answer across
   the teacher's courses with an inline score+feedback form),
-  `StudentDashboard.jsx` + `StudentCourses.jsx` (materials + quiz list), `QuizAttempt.jsx`
-  (dedicated timed quiz-taking screen: countdown, resume support, 30s autosave, auto-submit at
-  zero, renders a textarea for subjective questions, shows "awaiting teacher review" when the
-  score is still provisional)
+  `StudentDashboard.jsx` + `StudentCourses.jsx` (materials + quiz list) + `ChatBot.jsx` (the
+  "AI Chatbot" nav item that sat unused since Sprint 1 — course picker, message thread,
+  source citations under grounded answers, optimistic send with a "Thinking…" state for
+  Gemini's latency), `QuizAttempt.jsx` (dedicated timed quiz-taking screen: countdown,
+  resume support, 30s autosave, auto-submit at zero, renders a textarea for subjective
+  questions, shows "awaiting teacher review" when the score is still provisional)
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
 - `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,
-  since JWT is header-based — a plain `<a href>` can't carry it), `api/users.js`, `api/quizzes.js`
+  since JWT is header-based — a plain `<a href>` can't carry it), `api/users.js`,
+  `api/quizzes.js`, `api/chat.js`
 
 **Question.correctOptionIndex is `select: false`** — mirrors `User.passwordHash`'s pattern
 exactly, so a student attempting a quiz can never read the answer key out of the API
@@ -198,10 +205,29 @@ via native `fetch` (no new HTTP-client dependency) with JSON-schema-enforced str
 output (Sprint 5's "JSON enforcement" goal). Switching providers is an env var + restart,
 never a code change. `backend/services/ragEngine.js` extracts PDF text (`pdf-parse` v2 —
 its API is class-based, `new PDFParse({data: buffer}).getText()`, not the v1 function
-export most docs/examples show) and chunks it (US-07's chatbot will consume the chunking;
-quiz generation currently feeds the AI the full extracted text, capped at 30,000 chars,
-since a lecture-PDF-sized document fits a modern context window without needing
-relevance-based chunk selection).
+export most docs/examples show) and chunks it. Quiz generation feeds the AI the full
+extracted text (capped at 30,000 chars), since a lecture-PDF-sized document fits a modern
+context window and the goal is coverage, not narrow relevance. The chatbot (US-07) is
+different — a student's specific question genuinely needs relevance-ranked retrieval, so
+`ragEngine.selectRelevantChunks(chunksWithSource, query, topK)` does real RAG step-3
+selection: keyword/term-overlap scoring (no embeddings) since this project's local
+MongoDB has no vector search index and a full embeddings pipeline (generate + store +
+cosine-similarity) is a much bigger lift than this scale needs. Chunks scoring zero are
+dropped rather than padded in, so a genuinely off-topic question yields zero context.
+
+**US-07 (AI chatbot) is fully built and live-verified**, including real Gemini calls.
+`POST /api/courses/:id/chat/messages` — RAG steps 1-5 per CLAUDE.md, end to end: extract
+every PDF material in the course → chunk → select the top 5 relevant chunks for the
+question → inject as context → strict system prompt ("answer only from context, else
+reply exactly '[refusal]'"). **If no chunk scores above zero, the refusal is returned
+without ever calling the AI** — correctness by construction, not by hoping the model
+complies with an empty-context instruction. Confirmed live: an off-topic question got the
+exact required refusal string instantly (no AI call, no latency); an in-context question
+got an accurate answer grounded in the real PDF content, correctly citing which
+Material(s) it drew from (`Message.sources`, shown in the UI). One conversation thread per
+(student, course) — auto-created, no session list/switcher UI, matching `QuizAttempt`'s
+start-or-resume pattern. The system prompt explicitly forbids markdown formatting (no
+`**`, `#`, bullets) since this is a plain-text chat window, not a markdown renderer.
 
 **US-05 is fully verified end-to-end, including a real live Gemini call.** RBAC,
 validation, PDF extraction, the "not configured" graceful-failure path, AND a real
@@ -222,10 +248,9 @@ var change, not a code change.
 
 **Not started:** AI grade *drafting* specifically (the HITL review/approve workflow from
 US-06 is done — when this is picked up, add a `gradeSubjective(answer, rubric)` function
-to each `services/ai/` provider alongside `generateQuiz`, following the same pattern),
-chatbot (US-07 — will reuse `services/ai/` and `ragEngine.js`'s chunking, which quiz
-generation doesn't need but chat's query-driven relevance selection does), analytics,
-PDF generation.
+to each `services/ai/` provider alongside `generateQuiz`/`chat`, following the same
+pattern), fee challan / salary slip PDF generation (US-09/10), performance analytics
+(US-11 — now unblocked, real QuizAttempt data exists to power it).
 
 **Pre-existing, unrelated npm audit finding:** `qs` (transitive via `express`→`body-parser`)
 has a moderate DoS advisory with no patched version published yet as of this writing —
@@ -265,7 +290,7 @@ exact system — match them pixel-for-pixel when building out each dashboard.
 | 4 | RAG Engine core (pdf-parse, chunking, OpenAI API) | 🔲 |
 | 5 | AI quiz generation, JSON enforcement, publish | 🔲 |
 | 6 | AI grading + HITL approval panel | 🔲 (approval panel done ahead of schedule as US-06 substrate; AI drafting still pending) |
-| 7 | AI chatbot + timed quiz + auto-save | 🔲 (quiz + auto-save done ahead of schedule as US-08; chatbot/US-07 still pending) |
+| 7 | AI chatbot + timed quiz + auto-save | ✅ Done |
 | 8 | Fee challan / salary slip PDF generation | 🔲 |
 | 9 | Analytics dashboard, regression testing, polish | 🔲 |
 

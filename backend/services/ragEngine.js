@@ -40,4 +40,54 @@ function chunkText(text, chunkSize = 500, overlap = 50) {
   return chunks;
 }
 
-module.exports = { extractTextFromPdf, chunkText };
+const STOPWORDS = new Set([
+  "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "of", "in", "on",
+  "to", "for", "and", "or", "but", "with", "as", "at", "by", "from", "that", "this",
+  "it", "its", "what", "which", "who", "how", "why", "when", "where", "do", "does",
+  "did", "can", "could", "would", "should", "will", "shall", "i", "you", "we", "they",
+  "he", "she", "them", "their", "our", "your", "my", "me", "us",
+]);
+
+function tokenize(text) {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w && !STOPWORDS.has(w));
+}
+
+/**
+ * RAG step 3 — select the most relevant chunks for the query, per CLAUDE.md.
+ * Keyword-overlap scoring rather than embeddings: this project's local
+ * MongoDB has no vector search index, and adding a whole embeddings
+ * pipeline (generate + store + cosine-similarity search) is a much bigger
+ * lift than a lecture-material chatbot at this scale actually needs. This
+ * is a real, classic retrieval strategy (TF-style term overlap), not a
+ * placeholder — it can be swapped for embedding-based ranking later behind
+ * the same function signature if that ever becomes worth the complexity.
+ *
+ * `chunksWithSource` is [{ text, materialId, materialTitle }, ...]. Returns
+ * the top `topK` by score, each score > 0 — chunks with zero keyword
+ * overlap are dropped rather than padded in, so a genuinely unrelated
+ * question yields no context at all (and the caller can short-circuit to
+ * the "not enough context" refusal instead of guessing).
+ */
+function selectRelevantChunks(chunksWithSource, query, topK = 5) {
+  const queryWords = tokenize(query);
+  if (queryWords.length === 0) return [];
+
+  const scored = chunksWithSource.map((c) => {
+    const chunkWords = new Set(tokenize(c.text));
+    let score = 0;
+    for (const w of queryWords) {
+      if (chunkWords.has(w)) score++;
+    }
+    return { ...c, score };
+  });
+
+  return scored
+    .filter((c) => c.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
+}
+
+module.exports = { extractTextFromPdf, chunkText, selectRelevantChunks };

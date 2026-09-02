@@ -86,4 +86,53 @@ async function generateQuiz({ text, numQuestions }) {
   return parsed;
 }
 
-module.exports = { generateQuiz };
+const CHAT_SYSTEM_PROMPT =
+  "You are a helpful teaching assistant for a university course. Answer the student's " +
+  "question using ONLY the context below, extracted from the course's lecture materials. " +
+  "Do not use any outside knowledge, even if you know the answer. If the answer is not " +
+  'contained in the context, reply exactly: "I do not have enough context from the ' +
+  'uploaded material." Keep answers clear and concise. Reply in plain text only — no ' +
+  "markdown formatting (no **, #, or bullet characters), since this is a plain-text " +
+  "chat window. Use plain sentences or simple numbered lines instead.\n\nCONTEXT:\n";
+
+/**
+ * chat({ context, question, history }) -> { answer }
+ * Same contract as geminiProvider.chat — never receives student PII, only
+ * the retrieved context, the raw question, and prior turn content.
+ */
+async function chat({ context, question, history = [] }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("AI generation is not configured — set OPENAI_API_KEY in .env");
+  }
+
+  const messages = [
+    { role: "system", content: CHAT_SYSTEM_PROMPT + context },
+    ...history.map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
+    { role: "user", content: question },
+  ];
+
+  const response = await fetch(ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ model: MODEL, messages }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`OpenAI API error (${response.status}): ${detail.slice(0, 300)}`);
+  }
+
+  const data = await response.json();
+  const answer = data?.choices?.[0]?.message?.content;
+  if (!answer) {
+    throw new Error("OpenAI returned no content");
+  }
+
+  return { answer };
+}
+
+module.exports = { generateQuiz, chat };

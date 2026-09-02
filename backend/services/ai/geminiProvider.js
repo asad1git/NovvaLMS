@@ -80,4 +80,57 @@ async function generateQuiz({ text, numQuestions }) {
   return parsed;
 }
 
-module.exports = { generateQuiz };
+const CHAT_SYSTEM_PROMPT =
+  "You are a helpful teaching assistant for a university course. Answer the student's " +
+  "question using ONLY the context below, extracted from the course's lecture materials. " +
+  "Do not use any outside knowledge, even if you know the answer. If the answer is not " +
+  'contained in the context, reply exactly: "I do not have enough context from the ' +
+  'uploaded material." Keep answers clear and concise. Reply in plain text only — no ' +
+  "markdown formatting (no **, #, or bullet characters), since this is a plain-text " +
+  "chat window. Use plain sentences or simple numbered lines instead.\n\nCONTEXT:\n";
+
+/**
+ * chat({ context, question, history }) -> { answer }
+ * RAG steps 4-5 (per CLAUDE.md): the caller has already selected the
+ * relevant chunks (`context`) — this only ever injects that + the raw
+ * question + prior turns, never student PII (no name/email is ever part
+ * of `history`/`question`, by construction of the caller).
+ */
+async function chat({ context, question, history = [] }) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("AI generation is not configured — set GEMINI_API_KEY in .env");
+  }
+
+  const contents = [
+    ...history.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    })),
+    { role: "user", parts: [{ text: question }] },
+  ];
+
+  const response = await fetch(`${ENDPOINT}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents,
+      systemInstruction: { parts: [{ text: CHAT_SYSTEM_PROMPT + context }] },
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Gemini API error (${response.status}): ${detail.slice(0, 300)}`);
+  }
+
+  const data = await response.json();
+  const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!answer) {
+    throw new Error("Gemini returned no content");
+  }
+
+  return { answer };
+}
+
+module.exports = { generateQuiz, chat };
