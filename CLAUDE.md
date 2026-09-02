@@ -112,7 +112,7 @@ passwordHash via `toJSON` transform) for every new model.
 | US-03 | Admin creates courses, CSV bulk enrollment | EP02 | 3 | 3 ✅ |
 | US-04 | Teacher uploads lecture files (PDF/PPTX, 20MB max) | EP03 | 3 | 3 ✅ |
 | US-05 | Teacher generates AI quiz via RAG | EP04 | 8 | 4-5 |
-| US-06 | Teacher reviews/approves AI grades (HITL) | EP05 | 5 | 6 |
+| US-06 | Teacher reviews/approves AI grades (HITL) | EP05 | 5 | 6 (workflow done ahead of schedule; AI drafting still pending) |
 | US-07 | Student uses context-aware AI chatbot | EP06 | 8 | 7 |
 | US-08 | Student attempts timed quiz, 30s auto-save | EP06 | 5 | 7 ✅ |
 | US-09 | Admin generates fee challan PDF | EP07 | 3 | 8 |
@@ -123,31 +123,40 @@ passwordHash via `toJSON` transform) for every new model.
 
 ---
 
-## Current Status (Sprint 1-3 + Quiz Core / US-08 Complete)
+## Current Status (Sprint 1-3 + Quiz Core / HITL Grading Complete)
 
 **Verified end-to-end against a real local MongoDB (not mocked) and a real
 browser (Playwright click-through, zero console errors), covering every
 role (admin/teacher/student) and RBAC boundary (cross-teacher, non-enrolled
 student, no-token, cross-student attempt tampering):**
 - `backend/models/User.js`, `Course.js`, `Enrollment.js`, `Material.js`,
-  `Quiz.js`, `Question.js`, `QuizAttempt.js`, `Answer.js`
+  `Quiz.js`, `Question.js` (now has `type: "mcq"|"subjective"` + `maxScore`),
+  `QuizAttempt.js` (now has `maxScore` + `gradingComplete`), `Answer.js`
+  (now has `textAnswer`, `gradeStatus`, `score`, `feedback`, `gradedBy`, `gradedAt`)
 - `authController.js` (`login`, `getMe`, `createUser`), `courseController.js`
   (`createCourse`, `getCourses`, `getCourseById`, `bulkEnrollFromCSV`, `getEnrollments`),
   `materialController.js` (`uploadMaterial`, `getMaterials`, `downloadMaterial`, `deleteMaterial`),
   `quizController.js` (`createQuiz`, `getQuizzesForCourse`, `getQuizById`, `publishQuiz`,
   `startOrResumeAttempt`, `getAttemptsForQuiz`), `attemptController.js`
-  (`autosaveAnswer`, `submitAttempt`)
+  (`autosaveAnswer`, `submitAttempt`), `gradingController.js` (`getPendingGrades`, `gradeAnswer`)
 - `backend/utils/courseAccess.js` — shared `assertCourseAccess` / `assertCourseManager`
-  RBAC helpers, reused by courses, materials, AND quizzes
+  RBAC helpers, reused by courses, materials, quizzes, AND grading
+- `backend/utils/scoring.js` — `recomputeAttemptScore`, shared by `submitAttempt` and
+  `gradeAnswer` so an attempt's score/maxScore/gradingComplete is always derived the same way
 - `backend/middleware/authMiddleware.js` (`protect`), `rbacMiddleware.js` (`authorize`),
   `uploadMiddleware.js` (multer: disk storage for materials, memory storage for CSV)
 - `backend/middleware/errorMiddleware.js` (now also maps Multer errors to 400),
   `backend/config/db.js` (graceful DB-down handling)
 - `backend/scripts/seedAdmin.js` — bootstraps the first admin
 - `frontend/src/pages/Login.jsx`, `AdminDashboard.jsx` + `AdminCourses.jsx` + `AdminUsers.jsx`,
-  `TeacherDashboard.jsx` + `TeacherCourses.jsx` (materials + quiz creation/publish/results),
+  `TeacherDashboard.jsx` + `TeacherCourses.jsx` (materials + quiz creation with a per-question
+  MCQ/subjective type picker + publish/results) + `GradeApprovals.jsx` (the "Grade Approvals"
+  nav item that sat unused since Sprint 1 — now lists every pending subjective answer across
+  the teacher's courses with an inline score+feedback form),
   `StudentDashboard.jsx` + `StudentCourses.jsx` (materials + quiz list), `QuizAttempt.jsx`
-  (dedicated timed quiz-taking screen: countdown, resume support, 30s autosave, auto-submit at zero)
+  (dedicated timed quiz-taking screen: countdown, resume support, 30s autosave, auto-submit at
+  zero, renders a textarea for subjective questions, shows "awaiting teacher review" when the
+  score is still provisional)
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
 - `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,
@@ -161,9 +170,18 @@ server-side when grading. **The quiz time limit is enforced server-side** (in
 student can't bypass it via devtools.
 
 **Quiz generation is manual for now** (a teacher builds the quiz directly in
-`TeacherCourses.jsx`) — this is intentional, per the AI-vendor-sequencing decision: build
-the full traditional workflow first, plug in AI generation (US-05) behind the same
-`Quiz`/`Question` schema later, once an AI vendor is chosen.
+`TeacherCourses.jsx`, choosing MCQ or subjective per question) — this is intentional, per the
+AI-vendor-sequencing decision: build the full traditional workflow first, plug in AI generation
+(US-05) behind the same `Quiz`/`Question` schema later, once an AI vendor is chosen.
+
+**HITL grading is a manual approve-only step for now** — a subjective answer goes straight to
+`gradeStatus: "pending"` at submission (nothing drafts a score yet), and a Teacher's entry in
+Grade Approvals IS the final grade, not a review of an AI draft. This is deliberate: it builds
+the exact `pending → graded` state machine and `recomputeAttemptScore` seam that Sprint 6's AI
+grading needs, without inventing a fake "approve your own draft" step that has no AI yet to be
+meaningful. When AI grading arrives, it populates `score`/`feedback` at submission time instead
+of leaving them null — Grade Approvals then becomes a real approve/override screen, unchanged
+in shape.
 
 **File storage is local disk for now** (`backend/uploads/materials/`, served only via
 an authenticated `GET /api/materials/:id/download` route — deliberately not a static
@@ -174,7 +192,8 @@ survive a later swap to a real S3/Cloudinary URL without a migration. The AI ven
 memory file isn't enough context on why.
 
 **Not started:** RAG engine, AI quiz *generation* specifically (manual creation is done),
-HITL grading, chatbot, analytics, PDF generation.
+AI grade *drafting* specifically (the review/approve workflow is done), chatbot, analytics,
+PDF generation.
 
 ---
 
@@ -208,7 +227,7 @@ exact system — match them pixel-for-pixel when building out each dashboard.
 | 3 | Courses, CSV enrollment, file upload (local disk for now) | ✅ Done |
 | 4 | RAG Engine core (pdf-parse, chunking, OpenAI API) | 🔲 |
 | 5 | AI quiz generation, JSON enforcement, publish | 🔲 |
-| 6 | AI grading + HITL approval panel | 🔲 |
+| 6 | AI grading + HITL approval panel | 🔲 (approval panel done ahead of schedule as US-06 substrate; AI drafting still pending) |
 | 7 | AI chatbot + timed quiz + auto-save | 🔲 (quiz + auto-save done ahead of schedule as US-08; chatbot/US-07 still pending) |
 | 8 | Fee challan / salary slip PDF generation | 🔲 |
 | 9 | Analytics dashboard, regression testing, polish | 🔲 |
