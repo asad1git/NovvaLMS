@@ -114,7 +114,7 @@ passwordHash via `toJSON` transform) for every new model.
 | US-05 | Teacher generates AI quiz via RAG | EP04 | 8 | 4-5 |
 | US-06 | Teacher reviews/approves AI grades (HITL) | EP05 | 5 | 6 |
 | US-07 | Student uses context-aware AI chatbot | EP06 | 8 | 7 |
-| US-08 | Student attempts timed quiz, 30s auto-save | EP06 | 5 | 7 |
+| US-08 | Student attempts timed quiz, 30s auto-save | EP06 | 5 | 7 ✅ |
 | US-09 | Admin generates fee challan PDF | EP07 | 3 | 8 |
 | US-10 | Admin generates salary slip PDF | EP07 | 3 | 8 |
 | US-11 | Student views performance analytics | EP08 | 5 | 9 |
@@ -123,29 +123,47 @@ passwordHash via `toJSON` transform) for every new model.
 
 ---
 
-## Current Status (Sprint 1-3 Complete)
+## Current Status (Sprint 1-3 + Quiz Core / US-08 Complete)
 
 **Verified end-to-end against a real local MongoDB (not mocked) and a real
 browser (Playwright click-through, zero console errors), covering every
 role (admin/teacher/student) and RBAC boundary (cross-teacher, non-enrolled
-student, no-token):**
-- `backend/models/User.js`, `Course.js`, `Enrollment.js`, `Material.js`
+student, no-token, cross-student attempt tampering):**
+- `backend/models/User.js`, `Course.js`, `Enrollment.js`, `Material.js`,
+  `Quiz.js`, `Question.js`, `QuizAttempt.js`, `Answer.js`
 - `authController.js` (`login`, `getMe`, `createUser`), `courseController.js`
   (`createCourse`, `getCourses`, `getCourseById`, `bulkEnrollFromCSV`, `getEnrollments`),
-  `materialController.js` (`uploadMaterial`, `getMaterials`, `downloadMaterial`, `deleteMaterial`)
+  `materialController.js` (`uploadMaterial`, `getMaterials`, `downloadMaterial`, `deleteMaterial`),
+  `quizController.js` (`createQuiz`, `getQuizzesForCourse`, `getQuizById`, `publishQuiz`,
+  `startOrResumeAttempt`, `getAttemptsForQuiz`), `attemptController.js`
+  (`autosaveAnswer`, `submitAttempt`)
 - `backend/utils/courseAccess.js` — shared `assertCourseAccess` / `assertCourseManager`
-  RBAC helpers used by both controllers
+  RBAC helpers, reused by courses, materials, AND quizzes
 - `backend/middleware/authMiddleware.js` (`protect`), `rbacMiddleware.js` (`authorize`),
   `uploadMiddleware.js` (multer: disk storage for materials, memory storage for CSV)
 - `backend/middleware/errorMiddleware.js` (now also maps Multer errors to 400),
   `backend/config/db.js` (graceful DB-down handling)
 - `backend/scripts/seedAdmin.js` — bootstraps the first admin
-- `frontend/src/pages/Login.jsx`, `AdminDashboard.jsx` + `AdminCourses.jsx`,
-  `TeacherDashboard.jsx` + `TeacherCourses.jsx`, `StudentDashboard.jsx` + `StudentCourses.jsx`
+- `frontend/src/pages/Login.jsx`, `AdminDashboard.jsx` + `AdminCourses.jsx` + `AdminUsers.jsx`,
+  `TeacherDashboard.jsx` + `TeacherCourses.jsx` (materials + quiz creation/publish/results),
+  `StudentDashboard.jsx` + `StudentCourses.jsx` (materials + quiz list), `QuizAttempt.jsx`
+  (dedicated timed quiz-taking screen: countdown, resume support, 30s autosave, auto-submit at zero)
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
-- `frontend/src/api/axios.js`, `api/courses.js` (includes blob-based authenticated
-  file download, since JWT is header-based — a plain `<a href>` can't carry it)
+- `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,
+  since JWT is header-based — a plain `<a href>` can't carry it), `api/users.js`, `api/quizzes.js`
+
+**Question.correctOptionIndex is `select: false`** — mirrors `User.passwordHash`'s pattern
+exactly, so a student attempting a quiz can never read the answer key out of the API
+response. Only explicitly `.select("+correctOptionIndex")` for the owning teacher/admin, or
+server-side when grading. **The quiz time limit is enforced server-side** (in
+`attemptController.autosaveAnswer`), not just by the frontend countdown — a determined
+student can't bypass it via devtools.
+
+**Quiz generation is manual for now** (a teacher builds the quiz directly in
+`TeacherCourses.jsx`) — this is intentional, per the AI-vendor-sequencing decision: build
+the full traditional workflow first, plug in AI generation (US-05) behind the same
+`Quiz`/`Question` schema later, once an AI vendor is chosen.
 
 **File storage is local disk for now** (`backend/uploads/materials/`, served only via
 an authenticated `GET /api/materials/:id/download` route — deliberately not a static
@@ -155,8 +173,8 @@ survive a later swap to a real S3/Cloudinary URL without a migration. The AI ven
 (OpenAI vs Gemini) is also deliberately undecided — see `docs/` or ask the user if a
 memory file isn't enough context on why.
 
-**Not started:** RAG engine, quiz generation, grading, chatbot, analytics, PDF
-generation — i.e. everything from Sprint 4 onward.
+**Not started:** RAG engine, AI quiz *generation* specifically (manual creation is done),
+HITL grading, chatbot, analytics, PDF generation.
 
 ---
 
@@ -191,7 +209,7 @@ exact system — match them pixel-for-pixel when building out each dashboard.
 | 4 | RAG Engine core (pdf-parse, chunking, OpenAI API) | 🔲 |
 | 5 | AI quiz generation, JSON enforcement, publish | 🔲 |
 | 6 | AI grading + HITL approval panel | 🔲 |
-| 7 | AI chatbot + timed quiz + auto-save | 🔲 |
+| 7 | AI chatbot + timed quiz + auto-save | 🔲 (quiz + auto-save done ahead of schedule as US-08; chatbot/US-07 still pending) |
 | 8 | Fee challan / salary slip PDF generation | 🔲 |
 | 9 | Analytics dashboard, regression testing, polish | 🔲 |
 
