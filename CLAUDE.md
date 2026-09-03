@@ -118,20 +118,22 @@ passwordHash via `toJSON` transform) for every new model.
 | US-08 | Student attempts timed quiz, 30s auto-save | EP06 | 5 | 7 ✅ |
 | US-09 | Admin generates fee challan PDF | EP07 | 3 | 8 ✅ |
 | US-10 | Admin generates salary slip PDF | EP07 | 3 | 8 ✅ |
-| US-11 | Student views performance analytics | EP08 | 5 | 9 |
+| US-11 | Student views performance analytics | EP08 | 5 | 9 ✅ |
 
-**✅ = already built and tested.** Everything else is not started yet.
+**✅ = already built and tested. The full 11-story, 47-point backlog is now complete.**
 
 ---
 
-## Current Status (Sprints 1-8 Done — only Analytics/US-11 remains)
+## Current Status (Full 47-point backlog complete — Sprints 1-9 all done)
 
 **Verified end-to-end against a real local MongoDB (not mocked) and a real
 browser (Playwright click-through, zero console errors), covering every
 role (admin/teacher/student) and RBAC boundary (cross-teacher, non-enrolled
 student, no-token, cross-student attempt tampering):**
 - `backend/models/User.js`, `Course.js`, `Enrollment.js`, `Material.js`,
-  `Quiz.js`, `Question.js` (now has `type: "mcq"|"subjective"` + `maxScore`),
+  `Quiz.js`, `Question.js` (now has `type: "mcq"|"subjective"` + `maxScore` + optional
+  `topic` free-text tag, powering US-11's weak-topic analytics — blank on older
+  questions, grouped under "Untagged" there),
   `QuizAttempt.js` (now has `maxScore` + `gradingComplete`), `Answer.js`
   (now has `textAnswer`, `gradeStatus`, `score`, `feedback`, `gradedBy`, `gradedAt`,
   `aiDraftScore`, `aiDraftJustification`),
@@ -149,7 +151,8 @@ student, no-token, cross-student attempt tampering):**
   (`autosaveAnswer`, `submitAttempt`), `gradingController.js` (`getPendingGrades`, `gradeAnswer`),
   `chatController.js` (`getMessages`, `sendMessage`), `feeChallanController.js` (`createFeeChallan`,
   `getFeeChallans`, `setFeeChallanStatus`, `downloadFeeChallanPdf`), `salarySlipController.js`
-  (`createSalarySlip`, `getSalarySlips`, `downloadSalarySlipPdf`)
+  (`createSalarySlip`, `getSalarySlips`, `downloadSalarySlipPdf`), `analyticsController.js`
+  (`getMyAnalytics` — US-11, `GET /api/analytics/me`)
 - `backend/utils/courseAccess.js` — shared `assertCourseAccess` / `assertCourseManager`
   RBAC helpers, reused by courses, materials, quizzes, AND grading
 - `backend/utils/scoring.js` — `recomputeAttemptScore`, shared by `submitAttempt` and
@@ -164,7 +167,8 @@ student, no-token, cross-student attempt tampering):**
   items that sat unused since Sprint 1 — create form + list + PDF download, paid/unpaid
   toggle for challans),
   `TeacherDashboard.jsx` + `TeacherCourses.jsx` (materials + quiz creation with a per-question
-  MCQ/subjective type picker + publish/results) + `GradeApprovals.jsx` (the "Grade Approvals"
+  MCQ/subjective type picker + optional free-text Topic tag, editable on both manually-created
+  and AI-generated questions + publish/results) + `GradeApprovals.jsx` (the "Grade Approvals"
   nav item that sat unused since Sprint 1 — now lists every pending subjective answer across
   the teacher's courses with an inline score+feedback form),
   `StudentDashboard.jsx` + `StudentCourses.jsx` (materials + quiz list) + `ChatBot.jsx` (the
@@ -172,12 +176,15 @@ student, no-token, cross-student attempt tampering):**
   source citations under grounded answers, optimistic send with a "Thinking…" state for
   Gemini's latency), `QuizAttempt.jsx` (dedicated timed quiz-taking screen: countdown,
   resume support, 30s autosave, auto-submit at zero, renders a textarea for subjective
-  questions, shows "awaiting teacher review" when the score is still provisional)
+  questions, shows "awaiting teacher review" when the score is still provisional),
+  `MyResults.jsx` + `Analytics.jsx` (the "My Results"/"Analytics" nav items that sat unused
+  since Sprint 1 — per-quiz score list with pending-review/percentage badges, and a
+  per-topic breakdown with a weak-topics callout for anything scoring below 60%)
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
 - `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,
   since JWT is header-based — a plain `<a href>` can't carry it), `api/users.js`,
-  `api/quizzes.js`, `api/chat.js`
+  `api/quizzes.js`, `api/chat.js`, `api/finance.js`, `api/analytics.js`
 
 **Question.correctOptionIndex is `select: false`** — mirrors `User.passwordHash`'s pattern
 exactly, so a student attempting a quiz can never read the answer key out of the API
@@ -276,8 +283,20 @@ with UCP as the default, so the PDF templates (the single most likely place to
 accidentally hardcode "University of Central Punjab") stay swappable per the
 white-label decision.
 
-**Not started:** performance analytics (US-11 — unblocked, real QuizAttempt data exists
-to power it). This is the only remaining backlog item.
+**US-11 (performance analytics) is now complete — the full 47-point backlog is done.**
+`GET /api/analytics/me` (Student only) walks every one of the student's submitted
+`QuizAttempt`s, cross-references each attempt's `Question`s/`Answer`s using the exact
+same resolution rules as `utils/scoring.js`'s `recomputeAttemptScore` (MCQ always
+resolved inline; a subjective question only contributes once a Teacher has set
+`gradeStatus: "graded"`, so a topic's accuracy is never skewed by an answer still
+awaiting HITL review), and returns three things: a per-quiz results list, a per-topic
+points-earned/points-possible breakdown (grouped under "Untagged" for any question with
+no topic tag — expected for every pre-existing quiz, since `Question.topic` is a new,
+optional field), and an `overall.weakTopics` list (topics scoring below 60%, capped at 5)
+that both `MyResults.jsx` ("My Results" nav item) and `Analytics.jsx` ("Analytics" nav
+item) render — nav items that, like Grade Approvals/AI Chatbot/Fee Challans/Salary Slips
+before them, sat unused since Sprint 1 until now. Live-verified via Playwright against
+real submitted-quiz data (7 attempts, one real topic bucket) with zero console errors.
 
 **Pre-existing, unrelated npm audit finding:** `qs` (transitive via `express`→`body-parser`)
 has a moderate DoS advisory with no patched version published yet as of this writing —
@@ -319,7 +338,7 @@ exact system — match them pixel-for-pixel when building out each dashboard.
 | 6 | AI grading + HITL approval panel | ✅ Done |
 | 7 | AI chatbot + timed quiz + auto-save | ✅ Done |
 | 8 | Fee challan / salary slip PDF generation | ✅ Done |
-| 9 | Analytics dashboard, regression testing, polish | 🔲 |
+| 9 | Analytics dashboard, regression testing, polish | ✅ Done (analytics dashboard shipped; regression/polish pass still open-ended) |
 
 ---
 

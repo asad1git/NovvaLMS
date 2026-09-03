@@ -59,6 +59,7 @@ const createQuiz = asyncHandler(async (req, res) => {
         correctOptionIndex: q.type === "subjective" ? undefined : q.correctOptionIndex,
         maxScore: q.type === "subjective" ? q.maxScore || 5 : 1,
         order: i,
+        topic: q.topic || "",
       })),
       { ordered: true }
     );
@@ -268,7 +269,13 @@ const generateQuizQuestions = asyncHandler(async (req, res) => {
         q.correctOptionIndex >= 0 &&
         q.correctOptionIndex <= 3
     )
-    .map((q) => ({ type: "mcq", text: q.text, options: q.options, correctOptionIndex: q.correctOptionIndex }));
+    .map((q) => ({
+      type: "mcq",
+      text: q.text,
+      options: q.options,
+      correctOptionIndex: q.correctOptionIndex,
+      topic: typeof q.topic === "string" ? q.topic.trim().slice(0, 60) : "",
+    }));
 
   if (questions.length === 0) {
     res.status(502);

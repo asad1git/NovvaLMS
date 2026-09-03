@@ -15,8 +15,9 @@ const QUIZ_SCHEMA = {
           text: { type: "string" },
           options: { type: "array", items: { type: "string" } },
           correctOptionIndex: { type: "integer" },
+          topic: { type: "string" },
         },
-        required: ["text", "options", "correctOptionIndex"],
+        required: ["text", "options", "correctOptionIndex", "topic"],
         additionalProperties: false,
       },
     },
@@ -30,6 +31,8 @@ function buildPrompt(text, numQuestions) {
     `You are helping a university teacher create a multiple-choice quiz from their lecture material.\n` +
     `Generate exactly ${numQuestions} multiple-choice questions that test understanding of the material below.\n` +
     `Each question must have exactly 4 options and exactly one correct answer (correctOptionIndex, 0-3).\n` +
+    `For each question, also include a short "topic" tag (1-3 words, e.g. "Arrays", "Recursion") ` +
+    `naming the specific concept it tests — this powers weak-topic analytics for students.\n` +
     `Base every question strictly on the material — do not invent facts not present in it.\n\n` +
     `LECTURE MATERIAL:\n${text}`
   );

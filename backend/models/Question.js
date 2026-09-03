@@ -56,6 +56,15 @@ const questionSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  // Optional free-text tag (e.g. "Arrays", "Recursion") — powers US-11's
+  // weak-topic analytics. Blank on older questions and grouped under
+  // "Untagged" there; never required, so existing quizzes keep working.
+  topic: {
+    type: String,
+    trim: true,
+    maxlength: [60, "Topic cannot exceed 60 characters"],
+    default: "",
+  },
 });
 
 module.exports = mongoose.model("Question", questionSchema);

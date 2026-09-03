@@ -14,6 +14,7 @@ const BLANK_QUESTION = () => ({
   options: ["", "", "", ""],
   correctOptionIndex: 0,
   maxScore: 5,
+  topic: "",
 });
 
 export default function TeacherCourses() {
@@ -338,6 +339,14 @@ export default function TeacherCourses() {
                       </button>
                     )}
                   </div>
+
+                  <input
+                    className="w-48 border border-gray-300 rounded px-2 py-1 text-[11px]"
+                    placeholder="Topic (optional, e.g. Arrays)"
+                    value={q.topic || ""}
+                    onChange={(e) => updateQuestion(qi, { topic: e.target.value })}
+                    maxLength={60}
+                  />
 
                   {q.type === "subjective" ? (
                     <div className="flex items-center gap-2">
