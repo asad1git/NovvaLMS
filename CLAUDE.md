@@ -178,10 +178,11 @@ server-side when grading. **The quiz time limit is enforced server-side** (in
 `attemptController.autosaveAnswer`), not just by the frontend countdown — a determined
 student can't bypass it via devtools.
 
-**Quiz generation is manual for now** (a teacher builds the quiz directly in
-`TeacherCourses.jsx`, choosing MCQ or subjective per question) — this is intentional, per the
-AI-vendor-sequencing decision: build the full traditional workflow first, plug in AI generation
-(US-05) behind the same `Quiz`/`Question` schema later, once an AI vendor is chosen.
+**Quiz creation supports both manual and AI-generated paths into the same schema** — a
+teacher can build questions directly in `TeacherCourses.jsx` (choosing MCQ or subjective
+per question), or click "Generate with AI" to draft MCQ questions from an uploaded PDF
+(US-05) into that same question-builder form for review/editing before anything is saved.
+Neither path is more canonical than the other; AI generation is additive, not a replacement.
 
 **US-06 (HITL AI grading) is fully built and live-verified.** When a quiz is submitted,
 `attemptController.submitAttempt` responds to the student immediately (no added latency —
