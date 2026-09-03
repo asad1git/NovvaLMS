@@ -116,15 +116,15 @@ passwordHash via `toJSON` transform) for every new model.
 | US-06 | Teacher reviews/approves AI grades (HITL) | EP05 | 5 | 6 ✅ |
 | US-07 | Student uses context-aware AI chatbot | EP06 | 8 | 7 ✅ |
 | US-08 | Student attempts timed quiz, 30s auto-save | EP06 | 5 | 7 ✅ |
-| US-09 | Admin generates fee challan PDF | EP07 | 3 | 8 |
-| US-10 | Admin generates salary slip PDF | EP07 | 3 | 8 |
+| US-09 | Admin generates fee challan PDF | EP07 | 3 | 8 ✅ |
+| US-10 | Admin generates salary slip PDF | EP07 | 3 | 8 ✅ |
 | US-11 | Student views performance analytics | EP08 | 5 | 9 |
 
 **✅ = already built and tested.** Everything else is not started yet.
 
 ---
 
-## Current Status (Sprints 1-7 Done — see backlog table)
+## Current Status (Sprints 1-8 Done — only Analytics/US-11 remains)
 
 **Verified end-to-end against a real local MongoDB (not mocked) and a real
 browser (Playwright click-through, zero console errors), covering every
@@ -137,14 +137,19 @@ student, no-token, cross-student attempt tampering):**
   `aiDraftScore`, `aiDraftJustification`),
   `ChatSession.js` (one continuous thread per student+course, unique pair, auto-created —
   no session-switching UI, matching QuizAttempt's start-or-resume pattern), `Message.js`
-  (role: user/assistant, `sources: [Material]` for citation display)
+  (role: user/assistant, `sources: [Material]` for citation display), `FeeChallan.js`
+  (auto-numbered `CH-<year>-<seq>`, `status: unpaid|paid`), `SalarySlip.js` (`netSalary`
+  is a virtual derived from basicSalary+allowances-deductions, never stored, so it can't
+  drift out of sync)
 - `authController.js` (`login`, `getMe`, `createUser`), `courseController.js`
   (`createCourse`, `getCourses`, `getCourseById`, `bulkEnrollFromCSV`, `getEnrollments`),
   `materialController.js` (`uploadMaterial`, `getMaterials`, `downloadMaterial`, `deleteMaterial`),
   `quizController.js` (`createQuiz`, `generateQuizQuestions`, `getQuizzesForCourse`, `getQuizById`,
   `publishQuiz`, `startOrResumeAttempt`, `getAttemptsForQuiz`), `attemptController.js`
   (`autosaveAnswer`, `submitAttempt`), `gradingController.js` (`getPendingGrades`, `gradeAnswer`),
-  `chatController.js` (`getMessages`, `sendMessage`)
+  `chatController.js` (`getMessages`, `sendMessage`), `feeChallanController.js` (`createFeeChallan`,
+  `getFeeChallans`, `setFeeChallanStatus`, `downloadFeeChallanPdf`), `salarySlipController.js`
+  (`createSalarySlip`, `getSalarySlips`, `downloadSalarySlipPdf`)
 - `backend/utils/courseAccess.js` — shared `assertCourseAccess` / `assertCourseManager`
   RBAC helpers, reused by courses, materials, quizzes, AND grading
 - `backend/utils/scoring.js` — `recomputeAttemptScore`, shared by `submitAttempt` and
@@ -154,7 +159,10 @@ student, no-token, cross-student attempt tampering):**
 - `backend/middleware/errorMiddleware.js` (now also maps Multer errors to 400),
   `backend/config/db.js` (graceful DB-down handling)
 - `backend/scripts/seedAdmin.js` — bootstraps the first admin
-- `frontend/src/pages/Login.jsx`, `AdminDashboard.jsx` + `AdminCourses.jsx` + `AdminUsers.jsx`,
+- `frontend/src/pages/Login.jsx`, `AdminDashboard.jsx` + `AdminCourses.jsx` + `AdminUsers.jsx`
+  + `AdminFeeChallans.jsx` + `AdminSalarySlips.jsx` (the "Fee Challans"/"Salary Slips" nav
+  items that sat unused since Sprint 1 — create form + list + PDF download, paid/unpaid
+  toggle for challans),
   `TeacherDashboard.jsx` + `TeacherCourses.jsx` (materials + quiz creation with a per-question
   MCQ/subjective type picker + publish/results) + `GradeApprovals.jsx` (the "Grade Approvals"
   nav item that sat unused since Sprint 1 — now lists every pending subjective answer across
@@ -255,8 +263,21 @@ retired by the time this was live-tested — Gemini's own error response named t
 replacement). If a future model retirement breaks this again, it's a `GEMINI_MODEL` env
 var change, not a code change.
 
-**Not started:** fee challan / salary slip PDF generation (US-09/10), performance
-analytics (US-11 — unblocked, real QuizAttempt data exists to power it).
+**US-09/US-10 (fee challan / salary slip PDFs) are fully built and verified**, including
+a real access-check bug caught by live testing: the RBAC check compared a populated
+Mongoose ref (`challan.student` after `.populate()`) directly against a raw ObjectId,
+which never matches — always falsy for anyone but an admin. Fixed by unwrapping `._id`
+first (`challan.student._id || challan.student`, so the same helper works whether the
+caller populated the field or not). PDFs are generated with `pdfkit` (pure JS, no
+headless-browser dependency) and streamed through an authenticated route — never a
+static mount — so only an admin or the owning student/employee can fetch one.
+`backend/config/institution.js` reads the institution name/address/contact from env vars
+with UCP as the default, so the PDF templates (the single most likely place to
+accidentally hardcode "University of Central Punjab") stay swappable per the
+white-label decision.
+
+**Not started:** performance analytics (US-11 — unblocked, real QuizAttempt data exists
+to power it). This is the only remaining backlog item.
 
 **Pre-existing, unrelated npm audit finding:** `qs` (transitive via `express`→`body-parser`)
 has a moderate DoS advisory with no patched version published yet as of this writing —
@@ -297,7 +318,7 @@ exact system — match them pixel-for-pixel when building out each dashboard.
 | 5 | AI quiz generation, JSON enforcement, publish | ✅ Done |
 | 6 | AI grading + HITL approval panel | ✅ Done |
 | 7 | AI chatbot + timed quiz + auto-save | ✅ Done |
-| 8 | Fee challan / salary slip PDF generation | 🔲 |
+| 8 | Fee challan / salary slip PDF generation | ✅ Done |
 | 9 | Analytics dashboard, regression testing, polish | 🔲 |
 
 ---
