@@ -47,6 +47,8 @@ const getPendingGrades = asyncHandler(async (req, res) => {
       courseCode: course.code,
       studentName: a.attempt.student.name,
       studentEmail: a.attempt.student.email,
+      aiDraftScore: a.aiDraftScore,
+      aiDraftJustification: a.aiDraftJustification,
     };
   });
 
@@ -55,10 +57,11 @@ const getPendingGrades = asyncHandler(async (req, res) => {
 
 /**
  * HITL — PUT /api/grading/:id (Admin or the course's Teacher)
- * The Teacher's grade IS the approval here — there's no separate AI draft
- * to review yet. When Sprint 5/6 add AI grading, the AI's draft fills in
- * score/feedback at submission time instead of leaving them null, and this
- * same endpoint becomes the Teacher's approve/override step.
+ * This is the approve/override step: the frontend pre-fills score/feedback
+ * from aiDraftScore/aiDraftJustification (see getPendingGrades), but
+ * whatever the Teacher actually submits here — accepted as-is or edited —
+ * becomes the one and only final grade. The AI's draft never counts on
+ * its own, no matter how confident it was.
  */
 const gradeAnswer = asyncHandler(async (req, res) => {
   const answer = await Answer.findById(req.params.id);

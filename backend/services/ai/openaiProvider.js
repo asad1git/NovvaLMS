@@ -135,4 +135,72 @@ async function chat({ context, question, history = [] }) {
   return { answer };
 }
 
-module.exports = { generateQuiz, chat };
+const GRADE_SCHEMA = {
+  type: "object",
+  properties: {
+    score: { type: "number" },
+    justification: { type: "string" },
+  },
+  required: ["score", "justification"],
+  additionalProperties: false,
+};
+
+function buildGradingPrompt(question, maxScore, answer) {
+  return (
+    `You are drafting a grade for a university student's short-answer response. A teacher\n` +
+    `will review this draft before it counts as the final grade, so be fair and explain your reasoning.\n\n` +
+    `Question: ${question}\n` +
+    `Maximum possible score: ${maxScore}\n` +
+    `Student's answer: ${answer || "(no answer provided)"}\n\n` +
+    `Award a score from 0 to ${maxScore} based on how well the answer addresses the question. ` +
+    `Provide a brief (1-2 sentence) justification for the score.`
+  );
+}
+
+/**
+ * gradeSubjective({ question, maxScore, answer }) -> { score, justification }
+ * Same contract and HITL caveat as geminiProvider.gradeSubjective.
+ */
+async function gradeSubjective({ question, maxScore, answer }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("AI generation is not configured — set OPENAI_API_KEY in .env");
+  }
+
+  const response = await fetch(ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [{ role: "user", content: buildGradingPrompt(question, maxScore, answer) }],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "grade", schema: GRADE_SCHEMA, strict: true },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`OpenAI API error (${response.status}): ${detail.slice(0, 300)}`);
+  }
+
+  const data = await response.json();
+  const raw = data?.choices?.[0]?.message?.content;
+  if (!raw) {
+    throw new Error("OpenAI returned no content");
+  }
+
+  const parsed = JSON.parse(raw);
+  if (typeof parsed.score !== "number") {
+    throw new Error("OpenAI response missing a numeric score");
+  }
+
+  const score = Math.max(0, Math.min(maxScore, parsed.score));
+  return { score, justification: parsed.justification || "" };
+}
+
+module.exports = { generateQuiz, chat, gradeSubjective };

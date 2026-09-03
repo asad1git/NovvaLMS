@@ -113,7 +113,7 @@ passwordHash via `toJSON` transform) for every new model.
 | US-03 | Admin creates courses, CSV bulk enrollment | EP02 | 3 | 3 ✅ |
 | US-04 | Teacher uploads lecture files (PDF/PPTX, 20MB max) | EP03 | 3 | 3 ✅ |
 | US-05 | Teacher generates AI quiz via RAG | EP04 | 8 | 4-5 ✅ |
-| US-06 | Teacher reviews/approves AI grades (HITL) | EP05 | 5 | 6 (workflow done ahead of schedule; AI drafting still pending) |
+| US-06 | Teacher reviews/approves AI grades (HITL) | EP05 | 5 | 6 ✅ |
 | US-07 | Student uses context-aware AI chatbot | EP06 | 8 | 7 ✅ |
 | US-08 | Student attempts timed quiz, 30s auto-save | EP06 | 5 | 7 ✅ |
 | US-09 | Admin generates fee challan PDF | EP07 | 3 | 8 |
@@ -124,7 +124,7 @@ passwordHash via `toJSON` transform) for every new model.
 
 ---
 
-## Current Status (Sprints 1-5, 7 Done; US-06 Workflow Substrate Done — see backlog table)
+## Current Status (Sprints 1-7 Done — see backlog table)
 
 **Verified end-to-end against a real local MongoDB (not mocked) and a real
 browser (Playwright click-through, zero console errors), covering every
@@ -133,7 +133,8 @@ student, no-token, cross-student attempt tampering):**
 - `backend/models/User.js`, `Course.js`, `Enrollment.js`, `Material.js`,
   `Quiz.js`, `Question.js` (now has `type: "mcq"|"subjective"` + `maxScore`),
   `QuizAttempt.js` (now has `maxScore` + `gradingComplete`), `Answer.js`
-  (now has `textAnswer`, `gradeStatus`, `score`, `feedback`, `gradedBy`, `gradedAt`),
+  (now has `textAnswer`, `gradeStatus`, `score`, `feedback`, `gradedBy`, `gradedAt`,
+  `aiDraftScore`, `aiDraftJustification`),
   `ChatSession.js` (one continuous thread per student+course, unique pair, auto-created —
   no session-switching UI, matching QuizAttempt's start-or-resume pattern), `Message.js`
   (role: user/assistant, `sources: [Material]` for citation display)
@@ -182,14 +183,19 @@ student can't bypass it via devtools.
 AI-vendor-sequencing decision: build the full traditional workflow first, plug in AI generation
 (US-05) behind the same `Quiz`/`Question` schema later, once an AI vendor is chosen.
 
-**HITL grading is a manual approve-only step for now** — a subjective answer goes straight to
-`gradeStatus: "pending"` at submission (nothing drafts a score yet), and a Teacher's entry in
-Grade Approvals IS the final grade, not a review of an AI draft. This is deliberate: it builds
-the exact `pending → graded` state machine and `recomputeAttemptScore` seam that Sprint 6's AI
-grading needs, without inventing a fake "approve your own draft" step that has no AI yet to be
-meaningful. When AI grading arrives, it populates `score`/`feedback` at submission time instead
-of leaving them null — Grade Approvals then becomes a real approve/override screen, unchanged
-in shape.
+**US-06 (HITL AI grading) is fully built and live-verified.** When a quiz is submitted,
+`attemptController.submitAttempt` responds to the student immediately (no added latency —
+a real Gemini grading call takes ~20s), then drafts an AI grade for each subjective answer
+in the background via `provider.gradeSubjective({question, maxScore, answer})`, storing
+the result in `Answer.aiDraftScore`/`aiDraftJustification`. These fields are purely
+informational: `Answer.score`/`feedback` (what actually counts toward the attempt's total,
+per `recomputeAttemptScore`) are set ONLY when a Teacher saves a grade in Grade Approvals,
+which pre-fills from the AI draft (shown with an "AI Suggested: X/Y" badge) but submits
+whatever the Teacher actually has in the form — accepted as-is or edited. Confirmed live:
+AI drafted 5/5 on a strong answer with an accurate justification, a Teacher then
+deliberately overrode it to 4/5 with their own feedback, and the override (not the AI's
+draft) became the final grade — proving the HITL boundary actually holds, not just that a
+draft gets shown.
 
 **File storage is local disk for now** (`backend/uploads/materials/`, served only via
 an authenticated `GET /api/materials/:id/download` route — deliberately not a static
@@ -200,9 +206,11 @@ survive a later swap to a real S3/Cloudinary URL without a migration.
 **AI vendor decided: Gemini primary, OpenAI swap-ready.** `backend/services/ai/` is the
 External AI Service Layer from CLAUDE.md's own architecture diagram — `index.js` picks
 `geminiProvider.js` or `openaiProvider.js` based on the `AI_PROVIDER` env var (default
-`gemini`), both implementing the identical `generateQuiz({text, numQuestions})` contract
-via native `fetch` (no new HTTP-client dependency) with JSON-schema-enforced structured
-output (Sprint 5's "JSON enforcement" goal). Switching providers is an env var + restart,
+`gemini`), both implementing the identical `generateQuiz({text, numQuestions})`,
+`chat({context, question, history})`, and `gradeSubjective({question, maxScore, answer})`
+contracts via native `fetch` (no new HTTP-client dependency) with JSON-schema-enforced
+structured output where the response needs to be reliably parseable (quiz generation,
+grading — chat is free-text by design). Switching providers is an env var + restart,
 never a code change. `backend/services/ragEngine.js` extracts PDF text (`pdf-parse` v2 —
 its API is class-based, `new PDFParse({data: buffer}).getText()`, not the v1 function
 export most docs/examples show) and chunks it. Quiz generation feeds the AI the full
@@ -246,11 +254,8 @@ retired by the time this was live-tested — Gemini's own error response named t
 replacement). If a future model retirement breaks this again, it's a `GEMINI_MODEL` env
 var change, not a code change.
 
-**Not started:** AI grade *drafting* specifically (the HITL review/approve workflow from
-US-06 is done — when this is picked up, add a `gradeSubjective(answer, rubric)` function
-to each `services/ai/` provider alongside `generateQuiz`/`chat`, following the same
-pattern), fee challan / salary slip PDF generation (US-09/10), performance analytics
-(US-11 — now unblocked, real QuizAttempt data exists to power it).
+**Not started:** fee challan / salary slip PDF generation (US-09/10), performance
+analytics (US-11 — unblocked, real QuizAttempt data exists to power it).
 
 **Pre-existing, unrelated npm audit finding:** `qs` (transitive via `express`→`body-parser`)
 has a moderate DoS advisory with no patched version published yet as of this writing —
@@ -287,9 +292,9 @@ exact system — match them pixel-for-pixel when building out each dashboard.
 | 1 | Foundation, DB schemas, repo setup | ✅ Done |
 | 2 | Auth: JWT, bcrypt, RBAC, credential email | ✅ Done |
 | 3 | Courses, CSV enrollment, file upload (local disk for now) | ✅ Done |
-| 4 | RAG Engine core (pdf-parse, chunking, OpenAI API) | 🔲 |
-| 5 | AI quiz generation, JSON enforcement, publish | 🔲 |
-| 6 | AI grading + HITL approval panel | 🔲 (approval panel done ahead of schedule as US-06 substrate; AI drafting still pending) |
+| 4 | RAG Engine core (pdf-parse, chunking, OpenAI API) | ✅ Done |
+| 5 | AI quiz generation, JSON enforcement, publish | ✅ Done |
+| 6 | AI grading + HITL approval panel | ✅ Done |
 | 7 | AI chatbot + timed quiz + auto-save | ✅ Done |
 | 8 | Fee challan / salary slip PDF generation | 🔲 |
 | 9 | Analytics dashboard, regression testing, polish | 🔲 |

@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { getPendingGrades, gradeAnswer } from "../api/quizzes";
 
+// Resolves what the score/feedback inputs should show: the teacher's own
+// edit if they've touched the field this session, else the AI's draft
+// (pre-filled so "approve" is just clicking Save), else blank.
+function resolveField(draft, field, answer, aiField) {
+  if (draft[field] !== undefined) return draft[field];
+  if (answer[aiField] !== null && answer[aiField] !== undefined && answer[aiField] !== "") return answer[aiField];
+  return "";
+}
+
 export default function GradeApprovals() {
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,11 +38,13 @@ export default function GradeApprovals() {
 
   async function handleGrade(answer) {
     const draft = drafts[answer._id] || {};
-    if (draft.score === undefined || draft.score === "") return;
+    const score = resolveField(draft, "score", answer, "aiDraftScore");
+    const feedback = resolveField(draft, "feedback", answer, "aiDraftJustification");
+    if (score === "") return;
     setSavingId(answer._id);
     setError("");
     try {
-      await gradeAnswer(answer._id, Number(draft.score), draft.feedback || "");
+      await gradeAnswer(answer._id, Number(score), feedback);
       await refresh();
     } catch (err) {
       setError(err.response?.data?.message || "Failed to save grade");
@@ -62,6 +73,9 @@ export default function GradeApprovals() {
           )}
           {pending.map((a) => {
             const draft = drafts[a._id] || {};
+            const hasAiDraft = a.aiDraftScore !== null && a.aiDraftScore !== undefined;
+            const scoreValue = resolveField(draft, "score", a, "aiDraftScore");
+            const feedbackValue = resolveField(draft, "feedback", a, "aiDraftJustification");
             return (
               <div key={a._id} className="border border-gray-100 rounded p-4">
                 <div className="flex items-center justify-between mb-1">
@@ -74,6 +88,20 @@ export default function GradeApprovals() {
                 <div className="bg-gray-50 border border-gray-100 rounded p-2 text-xs text-gray-800 mb-3 whitespace-pre-wrap">
                   {a.textAnswer || <span className="text-gray-400 italic">No answer submitted.</span>}
                 </div>
+
+                {hasAiDraft ? (
+                  <div className="flex items-center gap-1 mb-2">
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-badge-blue-bg text-badge-blue-text">
+                      AI Suggested: {a.aiDraftScore}/{a.maxScore}
+                    </span>
+                    <span className="text-[10px] text-gray-400">— review and save, or edit before saving</span>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-gray-400 mb-2">
+                    No AI draft yet (still drafting, or drafting failed) — grade manually below.
+                  </p>
+                )}
+
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -81,19 +109,19 @@ export default function GradeApprovals() {
                     max={a.maxScore}
                     placeholder={`Score (0-${a.maxScore})`}
                     className="w-32 border border-gray-300 rounded px-2 py-1.5 text-xs"
-                    value={draft.score ?? ""}
+                    value={scoreValue}
                     onChange={(e) => updateDraft(a._id, { score: e.target.value })}
                   />
                   <input
                     type="text"
                     placeholder="Feedback (optional)"
                     className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs"
-                    value={draft.feedback ?? ""}
+                    value={feedbackValue}
                     onChange={(e) => updateDraft(a._id, { feedback: e.target.value })}
                   />
                   <button
                     onClick={() => handleGrade(a)}
-                    disabled={savingId === a._id || draft.score === undefined || draft.score === ""}
+                    disabled={savingId === a._id || scoreValue === ""}
                     className="bg-navy text-white text-xs font-medium rounded px-3 py-1.5 disabled:opacity-50"
                   >
                     {savingId === a._id ? "Saving…" : "Save Grade"}

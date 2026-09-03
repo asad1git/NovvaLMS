@@ -4,6 +4,7 @@ const Question = require("../models/Question");
 const QuizAttempt = require("../models/QuizAttempt");
 const Answer = require("../models/Answer");
 const { recomputeAttemptScore } = require("../utils/scoring");
+const { getAIProvider } = require("../services/ai");
 
 async function loadOwnInProgressAttempt(req, res) {
   const attempt = await QuizAttempt.findById(req.params.id);
@@ -58,12 +59,44 @@ const autosaveAnswer = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Drafts an AI grade for one subjective answer and saves it as
+ * aiDraftScore/aiDraftJustification — never touches score/feedback/
+ * gradeStatus, so this can safely run after the HTTP response has already
+ * been sent. Failures are swallowed: the Teacher just grades manually in
+ * Grade Approvals for that answer, exactly as before this feature existed.
+ */
+async function draftGradeInBackground(attemptId, question) {
+  try {
+    const answer = await Answer.findOne({ attempt: attemptId, question: question._id });
+    if (!answer) return;
+
+    const provider = getAIProvider();
+    const draft = await provider.gradeSubjective({
+      question: question.text,
+      maxScore: question.maxScore,
+      answer: answer.textAnswer,
+    });
+
+    answer.aiDraftScore = draft.score;
+    answer.aiDraftJustification = draft.justification;
+    await answer.save();
+  } catch (err) {
+    // Intentionally swallowed — see doc comment above.
+  }
+}
+
+/**
  * US-08 / HITL — POST /api/attempts/:id/submit (Student, own attempt only)
  * MCQ answers are graded immediately. Subjective answers can't be — they're
  * marked "pending" here and picked up in `recomputeAttemptScore` once a
  * Teacher grades them (see gradingController.js). An unanswered MCQ just
  * counts as wrong; an unanswered subjective question still goes to
  * "pending" review with an empty textAnswer.
+ *
+ * AI grade drafting (US-06) happens AFTER the response is sent, not
+ * awaited here — a real Gemini call takes ~20s per question, and nothing
+ * about submitting a quiz should make a student wait that long. The draft
+ * lands whenever it lands; Grade Approvals just shows it if it's there.
  */
 const submitAttempt = asyncHandler(async (req, res) => {
   const attempt = await loadOwnInProgressAttempt(req, res);
@@ -85,6 +118,9 @@ const submitAttempt = asyncHandler(async (req, res) => {
   const finalAttempt = await recomputeAttemptScore(attempt._id);
 
   res.status(200).json({ success: true, data: finalAttempt });
+
+  // Fire-and-forget, intentionally not awaited.
+  Promise.all(subjectiveQuestions.map((q) => draftGradeInBackground(attempt._id, q))).catch(() => {});
 });
 
 module.exports = { autosaveAnswer, submitAttempt };
