@@ -180,6 +180,16 @@ student, no-token, cross-student attempt tampering):**
   `MyResults.jsx` + `Analytics.jsx` (the "My Results"/"Analytics" nav items that sat unused
   since Sprint 1 — per-quiz score list with pending-review/percentage badges, and a
   per-topic breakdown with a weak-topics callout for anything scoring below 60%)
+- `AdminOverview.jsx` / `TeacherOverview.jsx` / `StudentOverview.jsx` — the "Dashboard" nav
+  item in all three role dashboards, previously the one remaining unwired placeholder (every
+  other nav item was already live). Each is a landing page of stat cards + a short recent-items
+  list + quick-link buttons (wired via an `onNavigate` prop that calls the parent dashboard's
+  `setActiveNav`, so a click jumps straight to that section) built entirely from existing
+  endpoints — no new backend routes needed. Admin sees student/teacher/course counts and unpaid
+  challans; Teacher sees course/enrollment/quiz/pending-grade counts (enrollment and quiz counts
+  are summed client-side per course via `Promise.all`, fine at this project's per-teacher course
+  count); Student sees enrolled-course count, quiz average, and the same weak-topics callout as
+  `Analytics.jsx`, reusing `getMyAnalytics()`.
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
 - `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,

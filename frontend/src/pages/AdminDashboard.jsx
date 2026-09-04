@@ -4,6 +4,7 @@ import AdminCourses from "./AdminCourses";
 import AdminUsers from "./AdminUsers";
 import AdminFeeChallans from "./AdminFeeChallans";
 import AdminSalarySlips from "./AdminSalarySlips";
+import AdminOverview from "./AdminOverview";
 
 const NAV_ITEMS = ["Dashboard", "Manage Users", "Manage Courses", "Fee Challans", "Salary Slips"];
 
@@ -21,14 +22,7 @@ export default function AdminDashboard() {
       ) : activeNav === "Salary Slips" ? (
         <AdminSalarySlips />
       ) : (
-        <div className="bg-white border border-gray-200 rounded-card p-6 text-sm text-gray-600">
-          <p className="font-medium text-gray-900 mb-1">All admin modules are live.</p>
-          <p>
-            "Manage Users" creates accounts of any role, "Manage Courses" creates courses and
-            bulk-enrolls students via CSV, "Fee Challans" and "Salary Slips" generate downloadable
-            PDF documents.
-          </p>
-        </div>
+        <AdminOverview onNavigate={setActiveNav} />
       )}
     </DashboardShell>
   );
