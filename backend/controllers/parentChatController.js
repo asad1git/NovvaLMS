@@ -3,6 +3,7 @@ const ParentLink = require("../models/ParentLink");
 const ParentChatSession = require("../models/ParentChatSession");
 const ParentMessage = require("../models/ParentMessage");
 const { computeAnalyticsForStudent } = require("./analyticsController");
+const { formatAnalyticsSummary } = require("../utils/formatAnalyticsSummary");
 const { getAIProvider } = require("../services/ai");
 
 const HISTORY_TURNS = 6;
@@ -21,43 +22,6 @@ async function getOrCreateSession(parentId, studentId) {
     session = await ParentChatSession.create({ parent: parentId, student: studentId });
   }
   return session;
-}
-
-/**
- * Builds the AI context from a student's analytics summary — topic/score
- * data only. Deliberately never includes the student's name or email, per
- * CLAUDE.md's PII rule; the frontend already knows which child this is
- * (shown in its own UI), so the AI never needs identity to answer.
- */
-function buildAnalyticsContext(analytics) {
-  const { attempts, topics, overall } = analytics;
-
-  const lines = [
-    `Total quizzes submitted: ${overall.totalAttempts}`,
-    `Overall average score: ${overall.averagePercentage !== null ? overall.averagePercentage + "%" : "not yet available (no graded quizzes)"}`,
-    "",
-    "Performance by topic:",
-  ];
-
-  if (topics.length === 0) {
-    lines.push("(no graded questions yet)");
-  } else {
-    for (const t of topics) {
-      lines.push(`- ${t.topic}: ${t.pointsEarned}/${t.pointsPossible} points (${t.percentage}%)`);
-    }
-  }
-
-  lines.push("", "Recent quiz results:");
-  if (attempts.length === 0) {
-    lines.push("(no quizzes submitted yet)");
-  } else {
-    for (const a of attempts.slice(0, 10)) {
-      const scoreText = a.percentage !== null ? `${a.score}/${a.maxScore} (${a.percentage}%)` : "pending teacher review";
-      lines.push(`- "${a.quizTitle}" (${a.courseTitle}): ${scoreText}`);
-    }
-  }
-
-  return lines.join("\n");
 }
 
 /**
@@ -99,7 +63,7 @@ const sendMessage = asyncHandler(async (req, res) => {
   const history = priorMessages.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
 
   const analytics = await computeAnalyticsForStudent(req.params.studentId);
-  const context = buildAnalyticsContext(analytics);
+  const context = formatAnalyticsSummary(analytics);
 
   let answer;
   try {

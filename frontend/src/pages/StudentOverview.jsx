@@ -78,7 +78,7 @@ export default function StudentOverview({ onNavigate }) {
 
       <div className="flex gap-3">
         <QuickLink label="My Courses" onClick={() => onNavigate?.("My Courses")} />
-        <QuickLink label="AI Chatbot" onClick={() => onNavigate?.("AI Chatbot")} />
+        <QuickLink label="Novva Assistant" onClick={() => onNavigate?.("Novva Assistant")} />
         <QuickLink label="Analytics" onClick={() => onNavigate?.("Analytics")} />
       </div>
     </div>

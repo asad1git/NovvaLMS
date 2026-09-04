@@ -8,6 +8,8 @@ const Message = require("../models/Message");
 const { MATERIALS_DIR } = require("../middleware/uploadMiddleware");
 const { extractTextFromPdf, chunkText, selectRelevantChunks } = require("../services/ragEngine");
 const { getAIProvider } = require("../services/ai");
+const { computeAnalyticsForStudent } = require("./analyticsController");
+const { formatAnalyticsSummary } = require("../utils/formatAnalyticsSummary");
 
 const NO_CONTEXT_REPLY = "I do not have enough context from the uploaded material.";
 const HISTORY_TURNS = 6; // recent messages kept for conversational continuity
@@ -60,6 +62,16 @@ async function buildCourseChunks(courseId) {
 }
 
 /**
+ * Every material in the course (any file type, not just PDF), for the
+ * "what's been uploaded" meta-question the assistant can now answer without
+ * a content chunk needing to match.
+ */
+function formatMaterialsList(materials) {
+  if (materials.length === 0) return "(none uploaded yet)";
+  return materials.map((m) => `- ${m.title} (${m.fileType})`).join("\n");
+}
+
+/**
  * US-07 — GET /api/courses/:id/chat/messages (Student, enrolled)
  */
 const getMessages = asyncHandler(async (req, res) => {
@@ -79,10 +91,20 @@ const getMessages = asyncHandler(async (req, res) => {
 /**
  * US-07 — POST /api/courses/:id/chat/messages (Student, enrolled)
  * RAG steps 1-5 per CLAUDE.md: extract -> chunk -> select relevant chunks
- * -> inject as context -> strict "context-only" system prompt. If nothing
- * relevant is found, short-circuits to the exact required refusal message
- * without ever calling the AI — correctness by construction rather than
- * hoping the model complies with an empty-context instruction.
+ * -> inject as context -> strict "context-only" system prompt for lecture
+ * content. Also gives the assistant course-scoped weak-area awareness
+ * (reusing the same aggregation US-11's Analytics page uses) and a list of
+ * every uploaded material, so it can answer "what's been uploaded" and
+ * "where am I weak" without needing a keyword-matched chunk — those aren't
+ * lecture-content questions, so the RAG chunk gate shouldn't block them.
+ *
+ * The zero-cost refusal (no AI call at all) is now reserved for the
+ * genuinely empty case — no matched chunks AND no materials AND no quiz
+ * history — "correctness by construction" for a course with nothing to
+ * discuss at all. Once there's *anything* to ground on, the AI is trusted
+ * to route the right section to the right question per its system prompt's
+ * strict per-section rules (still refusing content questions the chunks
+ * don't cover, verbatim).
  */
 const sendMessage = asyncHandler(async (req, res) => {
   const course = await assertEnrolled(req, res);
@@ -103,17 +125,32 @@ const sendMessage = asyncHandler(async (req, res) => {
     .then((docs) => docs.reverse());
   const history = priorMessages.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
 
-  const chunksWithSource = await buildCourseChunks(course._id);
+  const [chunksWithSource, materials, analytics] = await Promise.all([
+    buildCourseChunks(course._id),
+    Material.find({ course: course._id }).select("title fileType"),
+    computeAnalyticsForStudent(req.user._id, { courseId: course._id }),
+  ]);
   const relevant = selectRelevantChunks(chunksWithSource, content, 5);
+
+  const hasLectureExcerpts = relevant.length > 0;
+  const hasMaterials = materials.length > 0;
+  const hasPerformanceData = analytics.overall.totalAttempts > 0;
 
   let answer;
   let sourceMaterialIds = [];
 
-  if (relevant.length === 0) {
+  if (!hasLectureExcerpts && !hasMaterials && !hasPerformanceData) {
     answer = NO_CONTEXT_REPLY;
   } else {
-    const context = relevant.map((c) => c.text).join("\n---\n");
-    sourceMaterialIds = [...new Set(relevant.map((c) => String(c.materialId)))];
+    if (hasLectureExcerpts) {
+      sourceMaterialIds = [...new Set(relevant.map((c) => String(c.materialId)))];
+    }
+
+    const context = [
+      `LECTURE EXCERPTS:\n${hasLectureExcerpts ? relevant.map((c) => c.text).join("\n---\n") : "(none matched this question)"}`,
+      `COURSE MATERIALS:\n${formatMaterialsList(materials)}`,
+      `YOUR PERFORMANCE:\n${formatAnalyticsSummary(analytics)}`,
+    ].join("\n\n");
 
     try {
       const provider = getAIProvider();

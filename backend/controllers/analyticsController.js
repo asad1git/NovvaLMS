@@ -4,16 +4,24 @@ const Question = require("../models/Question");
 const Answer = require("../models/Answer");
 
 /**
- * Shared aggregation core for US-11 — reused by both `getMyAnalytics`
- * (student, self) and the parent-portal's `getChildAnalytics`
- * (parentLinkController), so there is exactly one place that defines what
- * "a student's analytics" means. See `getMyAnalytics` for the resolution
- * rules this follows.
+ * Shared aggregation core for US-11 — reused by `getMyAnalytics` (student,
+ * self), the parent-portal's `getChildAnalytics`, and the student
+ * chatbot's course-scoped weak-area awareness, so there is exactly one
+ * place that defines what "a student's analytics" means. See
+ * `getMyAnalytics` for the resolution rules this follows.
+ *
+ * `courseId` (optional) scopes the result to just that course's quizzes —
+ * used by the chatbot, which is a per-course conversation and shouldn't
+ * cite weak topics that actually came from a different course's quizzes.
  */
-async function computeAnalyticsForStudent(studentId) {
-  const attempts = await QuizAttempt.find({ student: studentId, submittedAt: { $ne: null } })
+async function computeAnalyticsForStudent(studentId, { courseId } = {}) {
+  let attempts = await QuizAttempt.find({ student: studentId, submittedAt: { $ne: null } })
     .populate({ path: "quiz", select: "title course", populate: { path: "course", select: "title" } })
     .sort({ submittedAt: -1 });
+
+  if (courseId) {
+    attempts = attempts.filter((a) => a.quiz && String(a.quiz.course?._id) === String(courseId));
+  }
 
   const attemptResults = [];
   const topicStats = new Map(); // topic -> { pointsEarned, pointsPossible, questionsResolved }

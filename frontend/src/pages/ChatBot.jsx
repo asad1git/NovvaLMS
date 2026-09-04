@@ -84,13 +84,17 @@ export default function ChatBot() {
           ))}
         </select>
         <p className="text-[10px] text-gray-400 mt-2">
-          Answers are drawn only from this course's uploaded lecture materials.
+          Ask about this course's lecture materials, what's been uploaded, or your own quiz
+          performance and weak topics — Novva Assistant only answers from your real data.
         </p>
       </div>
 
       <div className="flex-1 bg-white border border-gray-200 rounded-card p-4 overflow-y-auto mb-3 space-y-3">
         {messages.length === 0 && (
-          <p className="text-xs text-gray-500">Ask a question about this course's lecture materials.</p>
+          <p className="text-xs text-gray-500">
+            Try "What does this course cover?", "Where am I weak?", or ask about the lecture
+            material directly.
+          </p>
         )}
         {messages.map((m) => (
           <div key={m._id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>

@@ -7,7 +7,7 @@ import Analytics from "./Analytics";
 import StudentOverview from "./StudentOverview";
 import AccountSettings from "./AccountSettings";
 
-const NAV_ITEMS = ["Dashboard", "My Courses", "My Results", "Analytics", "AI Chatbot", "Account Settings"];
+const NAV_ITEMS = ["Dashboard", "My Courses", "My Results", "Analytics", "Novva Assistant", "Account Settings"];
 
 export default function StudentDashboard() {
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -16,7 +16,7 @@ export default function StudentDashboard() {
     <DashboardShell role="Student" navItems={NAV_ITEMS} activeNav={activeNav} onNavClick={setActiveNav}>
       {activeNav === "My Courses" ? (
         <StudentCourses />
-      ) : activeNav === "AI Chatbot" ? (
+      ) : activeNav === "Novva Assistant" ? (
         <ChatBot />
       ) : activeNav === "My Results" ? (
         <MyResults />

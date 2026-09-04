@@ -360,6 +360,30 @@ Material(s) it drew from (`Message.sources`, shown in the UI). One conversation 
 start-or-resume pattern. The system prompt explicitly forbids markdown formatting (no
 `**`, `#`, bullets) since this is a plain-text chat window, not a markdown renderer.
 
+**The student chatbot is now "Novva Assistant" (renamed in the UI) — expanded beyond pure
+lecture-content Q&A into course-scoped weak-area awareness + a materials list, post-backlog.**
+`chatController.sendMessage` now builds three labeled context sections instead of one: LECTURE
+EXCERPTS (unchanged — RAG-matched chunks), COURSE MATERIALS (every uploaded material's title,
+always included, so "what's been uploaded?" works without a chunk needing to match), and YOUR
+PERFORMANCE (`computeAnalyticsForStudent(studentId, {courseId})` — the same US-11 aggregation,
+now course-scoped so a weak topic cited in one course's chat can't actually be from another
+course's quizzes — formatted via the shared `utils/formatAnalyticsSummary.js`, also reused by
+the parent chatbot). This required loosening the old zero-chunks-means-refuse gate: a "where am
+I weak?" or "what's uploaded?" question is a legitimate, answerable question even when it
+keyword-matches zero lecture chunks, so the code-level zero-cost refusal is now reserved for the
+genuinely empty case (no chunks AND no materials AND no quiz history) — once *anything* exists to
+ground on, the AI is trusted to route the right section to the right question, per its system
+prompt's strict per-section rules (still refusing lecture-content questions the chunks don't
+cover, verbatim — confirmed live with an off-topic astronomy question). Improvement suggestions
+are explicitly hedged ("likely covers", "worth checking") rather than presented as guaranteed
+citations, since there's no stored link between a `Question.topic` and a specific `Material` —
+confirmed live that the model actually uses this hedged phrasing rather than overclaiming.
+**Known minor imprecision:** `Message.sources` is set whenever any chunk scored non-zero
+relevance, even if the AI's actual answer drew from COURSE MATERIALS or YOUR PERFORMANCE instead
+of that chunk — the material named is always real, just occasionally attributed to the wrong
+answer. Not fixed, since doing so reliably would need classifying which section the model
+actually drew from, which isn't cheaply knowable from response text alone.
+
 **US-05 is fully verified end-to-end, including a real live Gemini call.** RBAC,
 validation, PDF extraction, the "not configured" graceful-failure path, AND a real
 `GEMINI_API_KEY` generating actual questions from a real PDF were all tested (curl +
