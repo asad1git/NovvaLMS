@@ -5,8 +5,9 @@ import ChatBot from "./ChatBot";
 import MyResults from "./MyResults";
 import Analytics from "./Analytics";
 import StudentOverview from "./StudentOverview";
+import AccountSettings from "./AccountSettings";
 
-const NAV_ITEMS = ["Dashboard", "My Courses", "My Results", "Analytics", "AI Chatbot"];
+const NAV_ITEMS = ["Dashboard", "My Courses", "My Results", "Analytics", "AI Chatbot", "Account Settings"];
 
 export default function StudentDashboard() {
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -21,6 +22,8 @@ export default function StudentDashboard() {
         <MyResults />
       ) : activeNav === "Analytics" ? (
         <Analytics />
+      ) : activeNav === "Account Settings" ? (
+        <AccountSettings />
       ) : (
         <StudentOverview onNavigate={setActiveNav} />
       )}

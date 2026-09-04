@@ -123,4 +123,66 @@ const createUser = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { login, getMe, createUser };
+/**
+ * PUT /api/auth/me — self-service profile edit (name only; email/role are
+ * admin-managed via userRoutes to keep account identity changes auditable).
+ */
+const updateMe = asyncHandler(async (req, res) => {
+  const { name } = req.body;
+
+  if (name !== undefined) {
+    if (!name.trim()) {
+      res.status(400);
+      throw new Error("Name cannot be empty");
+    }
+    req.user.name = name.trim();
+    await req.user.save();
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      _id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      role: req.user.role,
+      isActive: req.user.isActive,
+    },
+  });
+});
+
+/**
+ * PUT /api/auth/me/password — self-service password change. Requires the
+ * current password (never a bare reset) so a hijacked session token alone
+ * can't lock the real owner out.
+ */
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    res.status(400);
+    throw new Error("Current password and new password are required");
+  }
+  if (newPassword.length < 8) {
+    res.status(400);
+    throw new Error("New password must be at least 8 characters");
+  }
+
+  const user = await User.findById(req.user._id).select("+passwordHash");
+  const isMatch = await user.comparePassword(currentPassword);
+  if (!isMatch) {
+    // 400, not 401 — this is a fully-authenticated user submitting a wrong
+    // value, not an invalid/expired session. A 401 here would trip the
+    // frontend's global interceptor (api/axios.js) and force-log them out
+    // instead of showing an inline "incorrect password" error.
+    res.status(400);
+    throw new Error("Current password is incorrect");
+  }
+
+  await user.setPassword(newPassword);
+  await user.save();
+
+  res.status(200).json({ success: true, data: { message: "Password updated" } });
+});
+
+module.exports = { login, getMe, createUser, updateMe, changePassword };

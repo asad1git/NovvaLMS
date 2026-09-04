@@ -190,6 +190,18 @@ student, no-token, cross-student attempt tampering):**
   are summed client-side per course via `Promise.all`, fine at this project's per-teacher course
   count); Student sees enrolled-course count, quiz average, and the same weak-topics callout as
   `Analytics.jsx`, reusing `getMyAnalytics()`.
+- `AccountSettings.jsx` — self-service "Account Settings" nav item on all three dashboards
+  (edit name, change password). Previously the only way to change a password was direct DB
+  access — every account was fully admin-provisioned with no self-service path at all.
+  `PUT /api/auth/me` (name only; email/role stay admin-managed via `userRoutes.js` for
+  auditability) and `PUT /api/auth/me/password` (requires the current password, never a bare
+  reset, so a hijacked session token alone can't lock the real owner out) both live in
+  `authController.js` next to the existing `login`/`getMe`. Caught one real bug during
+  live-testing: a wrong-current-password rejection was originally a 401, which collided with
+  `api/axios.js`'s global "401 means invalid/expired session → force logout" interceptor —
+  a fully-authenticated user submitting a wrong password was getting silently kicked to the
+  login screen instead of seeing an inline error. Fixed by returning 400 instead (a wrong
+  password is a validation failure of submitted data, not a session/auth failure).
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
 - `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,

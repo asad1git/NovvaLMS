@@ -3,8 +3,9 @@ import DashboardShell from "../components/DashboardShell";
 import TeacherCourses from "./TeacherCourses";
 import GradeApprovals from "./GradeApprovals";
 import TeacherOverview from "./TeacherOverview";
+import AccountSettings from "./AccountSettings";
 
-const NAV_ITEMS = ["Dashboard", "My Courses", "Grade Approvals"];
+const NAV_ITEMS = ["Dashboard", "My Courses", "Grade Approvals", "Account Settings"];
 
 export default function TeacherDashboard() {
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -15,6 +16,8 @@ export default function TeacherDashboard() {
         <TeacherCourses />
       ) : activeNav === "Grade Approvals" ? (
         <GradeApprovals />
+      ) : activeNav === "Account Settings" ? (
+        <AccountSettings />
       ) : (
         <TeacherOverview onNavigate={setActiveNav} />
       )}

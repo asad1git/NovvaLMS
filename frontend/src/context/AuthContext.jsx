@@ -30,8 +30,13 @@ export function AuthProvider({ children }) {
     setAuth(null);
   }, []);
 
+  const updateName = useCallback((name) => {
+    localStorage.setItem("novva_name", name);
+    setAuth((prev) => (prev ? { ...prev, name } : prev));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ auth, login, logout }}>
+    <AuthContext.Provider value={{ auth, login, logout, updateName }}>
       {children}
     </AuthContext.Provider>
   );
