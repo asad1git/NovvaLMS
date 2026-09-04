@@ -215,6 +215,18 @@ in Brevo's dashboard first (Senders, Domains & Dedicated IPs) — SMTP accepts a
 from an unverified sender (`250 OK`) but then silently drops it before delivery, which looked
 identical to a working send until confirmed by checking a real inbox. `EMAIL_FROM` is now the
 verified sender. Credentials live only in the gitignored `backend/.env`, never in git history.
+
+**Forgot-password is now built** — the "Forgot password?" link on `Login.jsx` was previously
+dead text (no `onClick`, matching the pattern of every other dormant prototype element found
+this session). `POST /api/auth/forgot-password` and `POST /api/auth/reset-password` are public
+routes (no `protect`) in `authController.js`. Only a SHA-256 hash of the reset token is ever
+stored on `User.passwordResetTokenHash` (mirrors `passwordHash`'s own philosophy) — the raw
+token exists only in the emailed link, 1-hour expiry, single-use (cleared on success), so a DB
+read alone can never forge a reset. `forgotPassword` always returns the same generic message
+whether or not the email exists, same enumeration-safe principle as `login`'s `invalidCreds`.
+Two new public pages, `ForgotPassword.jsx` and `ResetPassword.jsx` (the latter reads `?token=`
+via `useSearchParams`), both public routes in `App.jsx` alongside `/login`. Verified end-to-end
+including a real Brevo-delivered reset email and confirming the token is rejected on reuse.
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
 - `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,

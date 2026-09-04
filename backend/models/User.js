@@ -34,6 +34,19 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Forgot-password flow. Only the SHA-256 hash of the reset token is ever
+    // stored (mirrors passwordHash's philosophy) — the raw token exists only
+    // in the emailed link, so a DB read alone can never forge a reset.
+    passwordResetTokenHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+      select: false,
+    },
   },
   { timestamps: { createdAt: "createdAt", updatedAt: false } }
 );

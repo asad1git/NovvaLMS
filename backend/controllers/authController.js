@@ -185,4 +185,86 @@ const changePassword = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { message: "Password updated" } });
 });
 
-module.exports = { login, getMe, createUser, updateMe, changePassword };
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * POST /api/auth/forgot-password — public, no auth.
+ * Always responds with the same generic message regardless of whether the
+ * email exists, same principle as login's invalidCreds — never let this
+ * endpoint be used to enumerate registered accounts.
+ */
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400);
+    throw new Error("Email is required");
+  }
+
+  const genericResponse = {
+    success: true,
+    data: { message: "If an account exists for that email, a password reset link has been sent." },
+  };
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user || !user.isActive) {
+    return res.status(200).json(genericResponse);
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  user.passwordResetTokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  user.passwordResetExpires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+  await user.save();
+
+  const resetUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/reset-password?token=${rawToken}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: "Reset your Novva LMS password",
+    html: `
+      <p>Hello ${user.name},</p>
+      <p>We received a request to reset your Novva LMS password. This link expires in 1 hour:</p>
+      <p><a href="${resetUrl}">${resetUrl}</a></p>
+      <p>If you did not request this, you can safely ignore this email — your password will not change.</p>
+    `,
+  });
+
+  res.status(200).json(genericResponse);
+});
+
+/**
+ * POST /api/auth/reset-password — public, no auth.
+ * The raw token only ever exists in the emailed link; the DB holds just its
+ * SHA-256 hash, so this look-up can never be satisfied by DB access alone.
+ */
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    res.status(400);
+    throw new Error("Token and new password are required");
+  }
+  if (newPassword.length < 8) {
+    res.status(400);
+    throw new Error("New password must be at least 8 characters");
+  }
+
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const user = await User.findOne({
+    passwordResetTokenHash: tokenHash,
+    passwordResetExpires: { $gt: new Date() },
+  }).select("+passwordResetTokenHash +passwordResetExpires");
+
+  if (!user) {
+    res.status(400);
+    throw new Error("This reset link is invalid or has expired");
+  }
+
+  await user.setPassword(newPassword);
+  user.passwordResetTokenHash = null;
+  user.passwordResetExpires = null;
+  await user.save();
+
+  res.status(200).json({ success: true, data: { message: "Password has been reset. You can now log in." } });
+});
+
+module.exports = { login, getMe, createUser, updateMe, changePassword, forgotPassword, resetPassword };
