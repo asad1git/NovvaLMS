@@ -98,19 +98,14 @@ const CHAT_SYSTEM_PROMPT =
   "markdown formatting (no **, #, or bullet characters), since this is a plain-text " +
   "chat window. Use plain sentences or simple numbered lines instead.\n\nCONTEXT:\n";
 
-/**
- * chat({ context, question, history }) -> { answer }
- * Same contract as geminiProvider.chat — never receives student PII, only
- * the retrieved context, the raw question, and prior turn content.
- */
-async function chat({ context, question, history = [] }) {
+async function runChat(systemPrompt, context, question, history) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("AI generation is not configured — set OPENAI_API_KEY in .env");
   }
 
   const messages = [
-    { role: "system", content: CHAT_SYSTEM_PROMPT + context },
+    { role: "system", content: systemPrompt + context },
     ...history.map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
     { role: "user", content: question },
   ];
@@ -136,6 +131,34 @@ async function chat({ context, question, history = [] }) {
   }
 
   return { answer };
+}
+
+/**
+ * chat({ context, question, history }) -> { answer }
+ * Same contract as geminiProvider.chat — never receives student PII, only
+ * the retrieved context, the raw question, and prior turn content.
+ */
+async function chat({ context, question, history = [] }) {
+  return runChat(CHAT_SYSTEM_PROMPT, context, question, history);
+}
+
+const PARENT_CHAT_SYSTEM_PROMPT =
+  "You are an academic performance assistant helping a parent understand their child's " +
+  "progress at university. Answer the parent's question using ONLY the performance data " +
+  "below — do not invent grades, topics, or facts not present in it. If the data doesn't " +
+  "cover what they're asking, say so honestly instead of guessing. Be supportive and " +
+  "constructive — frame weak topics as where to focus study time next, not criticism. " +
+  "Never state or guess the student's name, email, or any other identifying detail even " +
+  "if asked — refer to them only as \"your child\" or \"the student\". Reply in plain " +
+  "text only — no markdown formatting (no **, #, or bullet characters), since this is a " +
+  "plain-text chat window.\n\nPERFORMANCE DATA:\n";
+
+/**
+ * parentChat({ context, question, history }) -> { answer }
+ * Same contract as geminiProvider.parentChat.
+ */
+async function parentChat({ context, question, history = [] }) {
+  return runChat(PARENT_CHAT_SYSTEM_PROMPT, context, question, history);
 }
 
 const GRADE_SCHEMA = {
@@ -206,4 +229,4 @@ async function gradeSubjective({ question, maxScore, answer }) {
   return { score, justification: parsed.justification || "" };
 }
 
-module.exports = { generateQuiz, chat, gradeSubjective };
+module.exports = { generateQuiz, chat, gradeSubjective, parentChat };

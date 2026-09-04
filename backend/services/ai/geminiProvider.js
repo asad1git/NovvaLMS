@@ -92,14 +92,7 @@ const CHAT_SYSTEM_PROMPT =
   "markdown formatting (no **, #, or bullet characters), since this is a plain-text " +
   "chat window. Use plain sentences or simple numbered lines instead.\n\nCONTEXT:\n";
 
-/**
- * chat({ context, question, history }) -> { answer }
- * RAG steps 4-5 (per CLAUDE.md): the caller has already selected the
- * relevant chunks (`context`) — this only ever injects that + the raw
- * question + prior turns, never student PII (no name/email is ever part
- * of `history`/`question`, by construction of the caller).
- */
-async function chat({ context, question, history = [] }) {
+async function runChat(systemPrompt, context, question, history) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("AI generation is not configured — set GEMINI_API_KEY in .env");
@@ -118,7 +111,7 @@ async function chat({ context, question, history = [] }) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents,
-      systemInstruction: { parts: [{ text: CHAT_SYSTEM_PROMPT + context }] },
+      systemInstruction: { parts: [{ text: systemPrompt + context }] },
     }),
   });
 
@@ -134,6 +127,41 @@ async function chat({ context, question, history = [] }) {
   }
 
   return { answer };
+}
+
+/**
+ * chat({ context, question, history }) -> { answer }
+ * RAG steps 4-5 (per CLAUDE.md): the caller has already selected the
+ * relevant chunks (`context`) — this only ever injects that + the raw
+ * question + prior turns, never student PII (no name/email is ever part
+ * of `history`/`question`, by construction of the caller).
+ */
+async function chat({ context, question, history = [] }) {
+  return runChat(CHAT_SYSTEM_PROMPT, context, question, history);
+}
+
+const PARENT_CHAT_SYSTEM_PROMPT =
+  "You are an academic performance assistant helping a parent understand their child's " +
+  "progress at university. Answer the parent's question using ONLY the performance data " +
+  "below — do not invent grades, topics, or facts not present in it. If the data doesn't " +
+  "cover what they're asking, say so honestly instead of guessing. Be supportive and " +
+  "constructive — frame weak topics as where to focus study time next, not criticism. " +
+  "Never state or guess the student's name, email, or any other identifying detail even " +
+  "if asked — refer to them only as \"your child\" or \"the student\". Reply in plain " +
+  "text only — no markdown formatting (no **, #, or bullet characters), since this is a " +
+  "plain-text chat window.\n\nPERFORMANCE DATA:\n";
+
+/**
+ * parentChat({ context, question, history }) -> { answer }
+ * Same contract and safety posture as `chat`, but grounded in a student's
+ * analytics summary (see parentChatController.buildAnalyticsContext) instead
+ * of RAG-selected lecture chunks — the caller guarantees `context` never
+ * contains the student's name/email, only topic/score data (CLAUDE.md's PII
+ * rule), and the system prompt itself refuses to reveal identity as a
+ * second layer of defense.
+ */
+async function parentChat({ context, question, history = [] }) {
+  return runChat(PARENT_CHAT_SYSTEM_PROMPT, context, question, history);
 }
 
 const GRADE_SCHEMA = {
@@ -202,4 +230,4 @@ async function gradeSubjective({ question, maxScore, answer }) {
   return { score, justification: parsed.justification || "" };
 }
 
-module.exports = { generateQuiz, chat, gradeSubjective };
+module.exports = { generateQuiz, chat, gradeSubjective, parentChat };

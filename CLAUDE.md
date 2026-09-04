@@ -83,14 +83,18 @@ to OpenAI/Gemini. Only academic content goes in the prompt.
 
 ---
 
-## Database — 13 MongoDB Collections
+## Database — 15 MongoDB Collections
 
 `Users, Courses, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
-Answers, ChatSessions, Messages, FeeChallans, SalarySlips, ParentLinks`
+Answers, ChatSessions, Messages, FeeChallans, SalarySlips, ParentLinks,
+ParentChatSessions, ParentMessages`
 
 `ParentLinks` (added for the parent-portal feature, post-backlog) maps a
 `parent`-role User to a `student`-role User — same join-collection shape as
-`Enrollments`, admin-managed, never an embedded array on `User`.
+`Enrollments`, admin-managed, never an embedded array on `User`. `ParentChatSessions` +
+`ParentMessages` mirror `ChatSessions`/`Messages`' shape for the parent-facing AI chatbot, kept
+as separate collections (not reused) since a parent-chat session is keyed by parent+student (not
+course) and its messages have no `sources` to cite.
 
 Key relationships:
 - User (teacher) → many Courses
@@ -258,7 +262,31 @@ students see (`MyResults.jsx` + `Analytics.jsx`'s content, merged into one paren
 stat cards, a weak-topics callout, per-quiz results, per-topic breakdown — with a child-picker
 tab strip when a parent has more than one linked student (verified against real multi-child data
 a live user created via the admin UI mid-session, including the empty-state for a child with no
-quiz history yet). Phase 3 (AI chatbot over this same data) is tracked as a follow-up.
+quiz history yet).
+
+**Phase 3 (AI chatbot) completes the parent portal.** Two new collections mirror the
+student-facing chat shape but are kept separate rather than overloading `ChatSession`/`Message`
+— `ParentChatSession` (parent+student, not course, since this answers from overall academic
+performance) and `ParentMessage` (no `sources` field — nothing to cite, since context is
+analytics data, not documents). Both `geminiProvider.js` and `openaiProvider.js` gained a fourth
+function, `parentChat`, alongside `generateQuiz`/`chat`/`gradeSubjective` — reusing the RAG
+chatbot's `chat()` function directly would have been wrong here (its system prompt explicitly
+says "extracted from the course's lecture materials", which doesn't describe analytics data), so
+both providers' HTTP-request plumbing was factored into a shared `runChat(systemPrompt, ...)`
+helper, with `chat` and `parentChat` each supplying their own prompt. The `parentChat` prompt
+tells the AI to answer only from the supplied performance summary, be constructive about weak
+topics, and — as defense-in-depth on top of the context itself never containing it —
+never state the student's name or email even if asked, referring to them only as "your child".
+`parentChatController.buildAnalyticsContext` builds that summary from
+`computeAnalyticsForStudent` (topics, scores, recent results) with zero name/email in it,
+consistent with CLAUDE.md's PII rule. `getMessages`/`sendMessage`
+(`GET`/`POST /api/parent-links/:studentId/chat/messages`, parent-only) both check
+`ParentLink.exists()` before touching any data — confirmed via curl that an unlinked student's
+ID gets a 403 with no AI call ever made, and that a student-role token is rejected by RBAC before
+even reaching the controller. `ParentDashboard.jsx` gained an "AI Assistant" nav item sharing the
+same child-picker as the analytics view; verified end-to-end with a real live Gemini call — the
+AI correctly answered from real quiz data, referred to the student only as "your child", and
+handled a child with zero quiz history by honestly saying so rather than inventing an answer.
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
 - `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,

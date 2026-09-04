@@ -8,6 +8,7 @@ const {
   getMyChildren,
   getChildAnalytics,
 } = require("../controllers/parentLinkController");
+const { getMessages: getChatMessages, sendMessage: sendChatMessage } = require("../controllers/parentChatController");
 
 const router = express.Router();
 
@@ -15,6 +16,8 @@ router.use(protect);
 
 router.get("/my-children", authorize("parent"), getMyChildren);
 router.get("/:studentId/analytics", authorize("parent"), getChildAnalytics);
+router.get("/:studentId/chat/messages", authorize("parent"), getChatMessages);
+router.post("/:studentId/chat/messages", authorize("parent"), sendChatMessage);
 
 router.post("/", authorize("admin"), linkParent);
 router.get("/", authorize("admin"), listParentLinks);
