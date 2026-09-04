@@ -9,10 +9,15 @@ function getTransporter() {
     return null; // not configured yet — caller should handle gracefully
   }
 
+  const port = Number(process.env.EMAIL_PORT) || 465;
+
   transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST || "smtp.gmail.com",
-    port: Number(process.env.EMAIL_PORT) || 465,
-    secure: true,
+    port,
+    // 465 is implicit TLS; 587 (and most other ports) use STARTTLS, which
+    // nodemailer only negotiates when `secure` is false. Hardcoding `true`
+    // silently breaks any provider (e.g. Brevo, port 587) that isn't 465.
+    secure: port === 465,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
