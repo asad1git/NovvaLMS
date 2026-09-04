@@ -6,6 +6,7 @@ const ROLE_BADGE = {
   admin: "bg-gray-100 text-gray-700",
   teacher: "bg-badge-blue-bg text-badge-blue-text",
   student: "bg-badge-amber-bg text-badge-amber-text",
+  parent: "bg-gray-100 text-gray-700",
 };
 
 export default function AdminUsers() {
@@ -106,6 +107,7 @@ export default function AdminUsers() {
           >
             <option value="student">Student</option>
             <option value="teacher">Teacher</option>
+            <option value="parent">Parent</option>
             <option value="admin">Admin</option>
           </select>
           <button
@@ -133,6 +135,7 @@ export default function AdminUsers() {
             <option value="admin">Admin</option>
             <option value="teacher">Teacher</option>
             <option value="student">Student</option>
+            <option value="parent">Parent</option>
           </select>
         </div>
 

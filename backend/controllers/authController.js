@@ -81,9 +81,9 @@ const createUser = asyncHandler(async (req, res) => {
     throw new Error("Name, email, and role are required");
   }
 
-  if (!["admin", "teacher", "student"].includes(role)) {
+  if (!["admin", "teacher", "student", "parent"].includes(role)) {
     res.status(400);
-    throw new Error("Role must be admin, teacher, or student");
+    throw new Error("Role must be admin, teacher, student, or parent");
   }
 
   const existing = await User.findOne({ email: email.toLowerCase() });

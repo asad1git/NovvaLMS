@@ -65,9 +65,10 @@ export default function AdminOverview({ onNavigate }) {
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap">
         <QuickLink label="Manage Users" onClick={() => onNavigate?.("Manage Users")} />
         <QuickLink label="Manage Courses" onClick={() => onNavigate?.("Manage Courses")} />
+        <QuickLink label="Parent Links" onClick={() => onNavigate?.("Parent Links")} />
         <QuickLink label="Fee Challans" onClick={() => onNavigate?.("Fee Challans")} />
         <QuickLink label="Salary Slips" onClick={() => onNavigate?.("Salary Slips")} />
       </div>

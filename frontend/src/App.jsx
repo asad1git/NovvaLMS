@@ -8,6 +8,7 @@ import ResetPassword from "./pages/ResetPassword";
 import AdminDashboard from "./pages/AdminDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
+import ParentDashboard from "./pages/ParentDashboard";
 import QuizAttempt from "./pages/QuizAttempt";
 
 function RootRedirect() {
@@ -47,6 +48,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["student"]}>
                 <StudentDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/parent"
+            element={
+              <ProtectedRoute allowedRoles={["parent"]}>
+                <ParentDashboard />
               </ProtectedRoute>
             }
           />

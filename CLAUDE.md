@@ -51,9 +51,11 @@ Never let a controller run without both middlewares if the route needs auth.
 
 ## Roles & RBAC
 
-Three roles only: `admin`, `teacher`, `student`. A student token must NEVER
+Four roles: `admin`, `teacher`, `student`, `parent`. A student token must NEVER
 be able to reach a teacher or admin route, even if otherwise valid. Enforce
 this at the middleware level (`authorize("admin")`, etc.), not inside controllers.
+A `parent` account only ever sees data for the student(s) it's explicitly linked
+to via `ParentLink` — never course/teacher/admin data.
 
 ---
 
@@ -81,10 +83,14 @@ to OpenAI/Gemini. Only academic content goes in the prompt.
 
 ---
 
-## Database — 12 MongoDB Collections
+## Database — 13 MongoDB Collections
 
 `Users, Courses, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
-Answers, ChatSessions, Messages, FeeChallans, SalarySlips`
+Answers, ChatSessions, Messages, FeeChallans, SalarySlips, ParentLinks`
+
+`ParentLinks` (added for the parent-portal feature, post-backlog) maps a
+`parent`-role User to a `student`-role User — same join-collection shape as
+`Enrollments`, admin-managed, never an embedded array on `User`.
 
 Key relationships:
 - User (teacher) → many Courses
@@ -227,6 +233,21 @@ whether or not the email exists, same enumeration-safe principle as `login`'s `i
 Two new public pages, `ForgotPassword.jsx` and `ResetPassword.jsx` (the latter reads `?token=`
 via `useSearchParams`), both public routes in `App.jsx` alongside `/login`. Verified end-to-end
 including a real Brevo-delivered reset email and confirming the token is rejected on reuse.
+
+**Parent portal, phase 1 (role + linking) is now built.** `parent` is a fourth role (User.role
+enum + `createUser`'s validation array) — `authorize(...)` and `ProtectedRoute` were already
+role-agnostic (rest-param / array-membership checks), so neither needed changing. A new
+`ParentLink` collection (same shape as `Enrollment` — a join collection, not an embedded array,
+for consistency) maps parent User → student User, admin-managed via `POST/GET /api/parent-links`
+and `DELETE /api/parent-links/:id`, with `GET /api/parent-links/my-children` (parent-only)
+feeding the child list. `AdminParentLinks.jsx` (new "Parent Links" nav item) lets an admin link
+any parent account to any student account; `ParentDashboard.jsx` is a minimal "My Children" view
+for now. Verified end-to-end via curl and Playwright, including confirming the RBAC boundary
+actually holds — a parent token gets a 403 on both an admin-only route and a student-only route
+(`/api/analytics/me`), not just a missing UI link. Phases 2 (parent-facing analytics, reusing
+`analyticsController.getMyAnalytics`'s aggregation parameterized by a linked child) and 3 (an AI
+chatbot answering from that same analytics data, never sending the child's name/email to the AI
+per the PII rule) are tracked as follow-ups, not yet built.
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
 - `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,
