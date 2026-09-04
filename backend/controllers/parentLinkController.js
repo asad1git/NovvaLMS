@@ -1,6 +1,7 @@
 const asyncHandler = require("express-async-handler");
 const ParentLink = require("../models/ParentLink");
 const User = require("../models/User");
+const { computeAnalyticsForStudent } = require("./analyticsController");
 
 /**
  * POST /api/parent-links (Admin only)
@@ -76,4 +77,23 @@ const getMyChildren = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: links.map((l) => l.student) });
 });
 
-module.exports = { linkParent, listParentLinks, unlinkParent, getMyChildren };
+/**
+ * GET /api/parent-links/:studentId/analytics (Parent only)
+ * Phase 2 of the parent portal — the same US-11 aggregation a student sees
+ * about themselves, reused here for a linked child. `assertLinked` is the
+ * whole access-control boundary: a parent can only ever see analytics for a
+ * student they're explicitly linked to via ParentLink, never any other
+ * student — checked before the aggregation runs, not left to the frontend.
+ */
+const getChildAnalytics = asyncHandler(async (req, res) => {
+  const linked = await ParentLink.exists({ parent: req.user._id, student: req.params.studentId });
+  if (!linked) {
+    res.status(403);
+    throw new Error("You are not linked to this student");
+  }
+
+  const data = await computeAnalyticsForStudent(req.params.studentId);
+  res.status(200).json({ success: true, data });
+});
+
+module.exports = { linkParent, listParentLinks, unlinkParent, getMyChildren, getChildAnalytics };

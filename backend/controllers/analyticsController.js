@@ -4,20 +4,14 @@ const Question = require("../models/Question");
 const Answer = require("../models/Answer");
 
 /**
- * US-11 — GET /api/analytics/me (Student only)
- * Aggregates every submitted attempt for the logged-in student into:
- *  - a per-quiz results list ("My Results")
- *  - a per-topic breakdown identifying weak topics ("Analytics"), per
- *    CLAUDE.md's "Students get analytics identifying their weak topics".
- *
- * Reuses the exact same resolution rules as utils/scoring.js's
- * recomputeAttemptScore: MCQ is always resolved inline; a subjective
- * question only contributes once a Teacher has graded it (gradeStatus
- * "graded"), so a topic's accuracy is never skewed by answers still
- * awaiting HITL review.
+ * Shared aggregation core for US-11 — reused by both `getMyAnalytics`
+ * (student, self) and the parent-portal's `getChildAnalytics`
+ * (parentLinkController), so there is exactly one place that defines what
+ * "a student's analytics" means. See `getMyAnalytics` for the resolution
+ * rules this follows.
  */
-const getMyAnalytics = asyncHandler(async (req, res) => {
-  const attempts = await QuizAttempt.find({ student: req.user._id, submittedAt: { $ne: null } })
+async function computeAnalyticsForStudent(studentId) {
+  const attempts = await QuizAttempt.find({ student: studentId, submittedAt: { $ne: null } })
     .populate({ path: "quiz", select: "title course", populate: { path: "course", select: "title" } })
     .sort({ submittedAt: -1 });
 
@@ -87,7 +81,25 @@ const getMyAnalytics = asyncHandler(async (req, res) => {
     weakTopics: topics.filter((t) => t.percentage < 60).slice(0, 5),
   };
 
-  res.status(200).json({ success: true, data: { attempts: attemptResults, topics, overall } });
+  return { attempts: attemptResults, topics, overall };
+}
+
+/**
+ * US-11 — GET /api/analytics/me (Student only)
+ * Aggregates every submitted attempt for the logged-in student into:
+ *  - a per-quiz results list ("My Results")
+ *  - a per-topic breakdown identifying weak topics ("Analytics"), per
+ *    CLAUDE.md's "Students get analytics identifying their weak topics".
+ *
+ * Reuses the exact same resolution rules as utils/scoring.js's
+ * recomputeAttemptScore: MCQ is always resolved inline; a subjective
+ * question only contributes once a Teacher has graded it (gradeStatus
+ * "graded"), so a topic's accuracy is never skewed by answers still
+ * awaiting HITL review.
+ */
+const getMyAnalytics = asyncHandler(async (req, res) => {
+  const data = await computeAnalyticsForStudent(req.user._id);
+  res.status(200).json({ success: true, data });
 });
 
-module.exports = { getMyAnalytics };
+module.exports = { getMyAnalytics, computeAnalyticsForStudent };

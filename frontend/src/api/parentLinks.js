@@ -15,3 +15,7 @@ export function unlinkParent(id) {
 export function getMyChildren() {
   return api.get("/parent-links/my-children").then((r) => r.data.data);
 }
+
+export function getChildAnalytics(studentId) {
+  return api.get(`/parent-links/${studentId}/analytics`).then((r) => r.data.data);
+}

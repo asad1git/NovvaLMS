@@ -241,13 +241,24 @@ role-agnostic (rest-param / array-membership checks), so neither needed changing
 for consistency) maps parent User → student User, admin-managed via `POST/GET /api/parent-links`
 and `DELETE /api/parent-links/:id`, with `GET /api/parent-links/my-children` (parent-only)
 feeding the child list. `AdminParentLinks.jsx` (new "Parent Links" nav item) lets an admin link
-any parent account to any student account; `ParentDashboard.jsx` is a minimal "My Children" view
-for now. Verified end-to-end via curl and Playwright, including confirming the RBAC boundary
-actually holds — a parent token gets a 403 on both an admin-only route and a student-only route
-(`/api/analytics/me`), not just a missing UI link. Phases 2 (parent-facing analytics, reusing
-`analyticsController.getMyAnalytics`'s aggregation parameterized by a linked child) and 3 (an AI
-chatbot answering from that same analytics data, never sending the child's name/email to the AI
-per the PII rule) are tracked as follow-ups, not yet built.
+any parent account to any student account. Verified end-to-end via curl and Playwright, including
+confirming the RBAC boundary actually holds — a parent token gets a 403 on both an admin-only
+route and a student-only route (`/api/analytics/me`), not just a missing UI link.
+
+**Phase 2 (parent-facing analytics) is now built.** `analyticsController.js`'s aggregation was
+split into `computeAnalyticsForStudent(studentId)` (the pure logic, unchanged) and the thin
+`getMyAnalytics` handler that calls it with `req.user._id` — this is the single place "a
+student's analytics" is defined, reused rather than duplicated. `parentLinkController.js`'s new
+`getChildAnalytics` (`GET /api/parent-links/:studentId/analytics`, parent-only) checks
+`ParentLink.exists({parent, student})` BEFORE calling that same function — a parent can only
+ever see analytics for a student they're explicitly linked to; confirmed both that a linked
+child's data loads (byte-identical to that student's own `/api/analytics/me` response) and that
+an unlinked student's ID gets a 403. `ParentDashboard.jsx` now renders the same three sections
+students see (`MyResults.jsx` + `Analytics.jsx`'s content, merged into one parent-facing view) —
+stat cards, a weak-topics callout, per-quiz results, per-topic breakdown — with a child-picker
+tab strip when a parent has more than one linked student (verified against real multi-child data
+a live user created via the admin UI mid-session, including the empty-state for a child with no
+quiz history yet). Phase 3 (AI chatbot over this same data) is tracked as a follow-up.
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
 - `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,
