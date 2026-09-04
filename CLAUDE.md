@@ -202,6 +202,19 @@ student, no-token, cross-student attempt tampering):**
   a fully-authenticated user submitting a wrong password was getting silently kicked to the
   login screen instead of seeing an inline error. Fixed by returning 400 instead (a wrong
   password is a validation failure of submitted data, not a session/auth failure).
+
+**Outbound email (`backend/utils/sendEmail.js`) is now live-verified with a real SMTP provider
+(Brevo).** It had silently never sent anything before this — `EMAIL_USER`/`EMAIL_PASS` were
+blank, and `sendEmail()` is deliberately built to fall back to console-logging the email body
+instead of throwing when unconfigured, so account-creation credential emails were only ever
+printed to the backend terminal. Fixed a real transport bug in the process: `secure` was
+hardcoded `true`, which only works for implicit-TLS port 465 — Brevo's relay
+(`smtp-relay.brevo.com:587`) needs STARTTLS instead, so `secure` is now derived from the port
+(`port === 465`). Getting an actual message to arrive also required verifying a sender identity
+in Brevo's dashboard first (Senders, Domains & Dedicated IPs) — SMTP accepts and queues a send
+from an unverified sender (`250 OK`) but then silently drops it before delivery, which looked
+identical to a working send until confirmed by checking a real inbox. `EMAIL_FROM` is now the
+verified sender. Credentials live only in the gitignored `backend/.env`, never in git history.
 - `frontend/src/context/AuthContext.jsx`, `components/ProtectedRoute.jsx`,
   `components/DashboardShell.jsx` (nav is now interactively wired to each dashboard's sections)
 - `frontend/src/api/axios.js`, `api/courses.js` (blob-based authenticated file download,
