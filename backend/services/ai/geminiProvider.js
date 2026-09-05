@@ -97,8 +97,8 @@ const CHAT_SYSTEM_PROMPT =
   "for a named file — answer from LECTURE EXCERPTS and REQUESTED MATERIAL(S) (prefer " +
   "REQUESTED MATERIAL(S) when it covers the named file, since it has the fuller text). If " +
   "REQUESTED MATERIAL(S) says no extracted text is available for that file, tell the " +
-  "student that plainly (only PDF materials can be read directly; suggest they open other " +
-  "file types themselves) instead of using the refusal phrase below. If neither section " +
+  "student that plainly (it may be empty, corrupted, or an image-only scan) instead of " +
+  "using the refusal phrase below. If neither section " +
   'covers what\'s asked, reply exactly: "I do not have enough context from the uploaded ' +
   'material." Never use outside knowledge for content questions, even if you know the ' +
   "answer.\n" +

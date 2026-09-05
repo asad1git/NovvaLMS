@@ -261,13 +261,11 @@ export default function TeacherCourses() {
                   onChange={(e) => setGenerateMaterialId(e.target.value)}
                 >
                   <option value="">Generate from material…</option>
-                  {materials
-                    .filter((m) => m.fileType === "pdf")
-                    .map((m) => (
-                      <option key={m._id} value={m._id}>
-                        {m.title}
-                      </option>
-                    ))}
+                  {materials.map((m) => (
+                    <option key={m._id} value={m._id}>
+                      {m.title}
+                    </option>
+                  ))}
                 </select>
                 <input
                   type="number"
@@ -286,9 +284,9 @@ export default function TeacherCourses() {
                   {generating ? "Generating…" : "Generate with AI"}
                 </button>
               </div>
-              {materials.filter((m) => m.fileType === "pdf").length === 0 && (
+              {materials.length === 0 && (
                 <p className="text-[10px] text-gray-400 -mt-2">
-                  Upload a PDF material above to enable AI generation.
+                  Upload a material above to enable AI generation.
                 </p>
               )}
 

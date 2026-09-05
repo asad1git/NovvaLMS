@@ -394,14 +394,31 @@ system prompt's own rule) the model refused rather than fabricate. Fixed with
 each material's *title* instead (with light singular/plural normalization, since "slide" vs
 "slides" would otherwise miss), and when a material is named directly, `chatController` pulls
 its FULL extracted content into a new REQUESTED MATERIAL(S) context section (capped at 20,000
-chars/material) rather than relying on the narrow top-5 relevance-matched excerpts. If that
-material has no extracted text (a non-PDF, or a PDF that failed extraction), the assistant says
-so plainly instead of the generic refusal — confirmed live against a real edge case: "Week 1
-Slides" turned out to be a 40-byte placeholder stub from early testing with no real content, and
-the fixed assistant correctly said "no extracted text available for Week 1 Slides" instead of
-either fabricating a summary or giving the unhelpful generic refusal; a genuinely off-topic
-question ("What is the capital of France?") still correctly refused verbatim; and summarizing a
-real content-bearing PDF by name now works and is accurate.
+chars/material) rather than relying on the narrow top-5 relevance-matched excerpts. If a named
+material genuinely has no extractable text (empty, corrupted, or an image-only scan with no text
+layer), the assistant says so plainly instead of the generic refusal — confirmed live against a
+real edge case: "Week 1 Slides" turned out to be a 40-byte placeholder stub from early testing
+with no real content, and the fixed assistant correctly said so instead of either fabricating a
+summary or giving the unhelpful generic refusal; a genuinely off-topic question ("What is the
+capital of France?") still correctly refused verbatim; and summarizing a real content-bearing
+PDF by name now works and is accurate.
+
+**PPTX and DOCX are now fully readable, not just uploadable, post-backlog.** Previously
+`uploadMiddleware` accepted all three formats (PDF/PPTX/DOCX, per US-04) but only PDF had any
+text extraction — a PPTX or DOCX could be uploaded, listed, and downloaded, but every AI feature
+silently ignored it. `ragEngine.js` gained `extractTextFromDocx` (via `mammoth`, pure JS, no
+native deps) and `extractTextFromPptx` (no PPTX-specific library — a `.pptx` is just a zip of
+per-slide XML, so `JSZip`, already a natural fit for Office Open XML formats, unzips it and a
+plain regex pulls every `<a:t>` DrawingML text run out in slide order), plus a dispatcher
+`extractText(filePath, fileType)` used everywhere a single format was hardcoded before:
+`chatController.buildCourseChunks` (was PDF-only, now all three feed the chatbot's RAG/summary
+features) and `quizController.generateQuizQuestions` (the old `fileType !== "pdf"` 400 rejection
+is gone — AI quiz generation now works from any accepted format). The teacher's "Generate with
+AI" material picker (`TeacherCourses.jsx`) was also still hardcoded to filter to PDF-only in two
+places — a leftover from before this fix — now shows every uploaded material. Verified live
+end-to-end with real (minimal but genuine) `.docx` and `.pptx` files: the chatbot accurately
+summarized both by name with correct source attribution, and AI quiz generation produced
+accurate, correctly answer-keyed MCQs directly from a real `.docx`'s content.
 
 **US-05 is fully verified end-to-end, including a real live Gemini call.** RBAC,
 validation, PDF extraction, the "not configured" graceful-failure path, AND a real

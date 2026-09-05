@@ -6,7 +6,7 @@ const Material = require("../models/Material");
 const ChatSession = require("../models/ChatSession");
 const Message = require("../models/Message");
 const { MATERIALS_DIR } = require("../middleware/uploadMiddleware");
-const { extractTextFromPdf, chunkText, selectRelevantChunks, findMentionedMaterials } = require("../services/ragEngine");
+const { extractText, chunkText, selectRelevantChunks, findMentionedMaterials } = require("../services/ragEngine");
 const { getAIProvider } = require("../services/ai");
 const { computeAnalyticsForStudent } = require("./analyticsController");
 const { formatAnalyticsSummary } = require("../utils/formatAnalyticsSummary");
@@ -37,21 +37,22 @@ async function getOrCreateSession(studentId, courseId) {
 }
 
 /**
- * Builds { chunksWithSource } from every PDF material in the course. Kept
- * simple (re-extracted per request, no caching) — reasonable at this
- * project's scale; see CLAUDE.md for the tradeoff note.
+ * Builds { chunksWithSource } from every material in the course — PDF,
+ * PPTX, and DOCX all supported via `ragEngine.extractText`'s per-fileType
+ * dispatch. Kept simple (re-extracted per request, no caching) — reasonable
+ * at this project's scale; see CLAUDE.md for the tradeoff note.
  */
 async function buildCourseChunks(courseId) {
-  const materials = await Material.find({ course: courseId, fileType: "pdf" });
+  const materials = await Material.find({ course: courseId });
   const chunksWithSource = [];
 
   for (const material of materials) {
     const filePath = path.join(MATERIALS_DIR, material.fileUrl);
     let text;
     try {
-      text = await extractTextFromPdf(filePath);
+      text = await extractText(filePath, material.fileType);
     } catch (err) {
-      continue; // skip unreadable files rather than fail the whole chat
+      continue; // skip unreadable/corrupt files rather than fail the whole chat
     }
     for (const chunk of chunkText(text)) {
       chunksWithSource.push({ text: chunk, materialId: material._id, materialTitle: material.title });
@@ -88,7 +89,7 @@ function buildRequestedMaterialSection(mentionedMaterials, chunksWithSource) {
   const blocks = mentionedMaterials.map((m) => {
     const materialChunks = chunksWithSource.filter((c) => String(c.materialId) === String(m._id));
     if (materialChunks.length === 0) {
-      return `"${m.title}" — no extracted text available (only PDF materials can be read directly; this file is ${m.fileType}).`;
+      return `"${m.title}" — no extracted text could be found for this file (it may be empty, corrupted, or an image-only scan with no text layer).`;
     }
     materialIds.push(String(m._id));
     const fullText = materialChunks.map((c) => c.text).join(" ").slice(0, MAX_REQUESTED_MATERIAL_CHARS);

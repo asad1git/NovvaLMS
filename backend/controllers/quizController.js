@@ -9,7 +9,7 @@ const Answer = require("../models/Answer");
 const Material = require("../models/Material");
 const { assertCourseManager } = require("../utils/courseAccess");
 const { MATERIALS_DIR } = require("../middleware/uploadMiddleware");
-const { extractTextFromPdf } = require("../services/ragEngine");
+const { extractText } = require("../services/ragEngine");
 const { getAIProvider } = require("../services/ai");
 
 const MAX_SOURCE_CHARS = 30000; // keeps the prompt size sane regardless of provider
@@ -232,13 +232,14 @@ const generateQuizQuestions = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Material not found in this course");
   }
-  if (material.fileType !== "pdf") {
-    res.status(400);
-    throw new Error("AI quiz generation currently supports PDF materials only");
-  }
-
   const filePath = path.join(MATERIALS_DIR, material.fileUrl);
-  const text = await extractTextFromPdf(filePath);
+  let text;
+  try {
+    text = await extractText(filePath, material.fileType);
+  } catch (err) {
+    res.status(400);
+    throw new Error(`Could not extract text from this material: ${err.message}`);
+  }
   if (!text || text.trim().length < 100) {
     res.status(400);
     throw new Error("Could not extract enough text from this material to generate a quiz");

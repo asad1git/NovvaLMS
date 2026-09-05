@@ -1,10 +1,10 @@
 const fs = require("fs");
 const { PDFParse } = require("pdf-parse");
+const mammoth = require("mammoth");
+const JSZip = require("jszip");
 
 /**
- * RAG step 1 (per CLAUDE.md) — extract lecture text. PDF only for now,
- * matching the SDS's stated approach; PPTX/DOCX extraction is a later
- * addition once a library choice is made for those formats.
+ * RAG step 1 (per CLAUDE.md) — extract lecture text.
  *
  * pdf-parse v2's API is class-based (v1's `pdf(buffer)` function export was
  * removed) — `new PDFParse({ data: buffer }).getText()`.
@@ -14,6 +14,58 @@ async function extractTextFromPdf(filePath) {
   const parser = new PDFParse({ data: buffer });
   const { text } = await parser.getText();
   return text;
+}
+
+/**
+ * DOCX extraction via mammoth — a .docx is a zip of XML parts under the
+ * hood, but mammoth handles that entirely; this only needs its raw-text
+ * mode, no HTML conversion, since chunking/RAG only wants plain text.
+ */
+async function extractTextFromDocx(filePath) {
+  const { value } = await mammoth.extractRawText({ path: filePath });
+  return value;
+}
+
+/**
+ * PPTX extraction — a .pptx is a zip archive with one XML file per slide
+ * (`ppt/slides/slideN.xml`), each text run wrapped in a `<a:t>` DrawingML
+ * tag. No PPTX-specific parser dependency needed: JSZip (well-maintained,
+ * pure JS, already a natural fit for any Office Open XML format) unzips it,
+ * then a plain regex pulls every `<a:t>` run's text out in slide order.
+ * Good enough for RAG-style plain-text extraction; doesn't attempt to
+ * preserve layout, tables, or speaker notes.
+ */
+async function extractTextFromPptx(filePath) {
+  const buffer = fs.readFileSync(filePath);
+  const zip = await JSZip.loadAsync(buffer);
+
+  const slideFiles = Object.keys(zip.files)
+    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+    .sort((a, b) => {
+      const numA = Number(a.match(/slide(\d+)\.xml$/)[1]);
+      const numB = Number(b.match(/slide(\d+)\.xml$/)[1]);
+      return numA - numB;
+    });
+
+  const slideTexts = [];
+  for (const name of slideFiles) {
+    const xml = await zip.files[name].async("text");
+    const runs = [...xml.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]);
+    slideTexts.push(runs.join(" "));
+  }
+
+  return slideTexts.join("\n\n");
+}
+
+/**
+ * Dispatches to the right extractor for a Material's `fileType`
+ * ("pdf" | "pptx" | "docx" — the three types uploadMiddleware accepts).
+ */
+async function extractText(filePath, fileType) {
+  if (fileType === "pdf") return extractTextFromPdf(filePath);
+  if (fileType === "docx") return extractTextFromDocx(filePath);
+  if (fileType === "pptx") return extractTextFromPptx(filePath);
+  throw new Error(`Unsupported file type for text extraction: ${fileType}`);
 }
 
 /**
@@ -121,4 +173,12 @@ function findMentionedMaterials(question, materials) {
   });
 }
 
-module.exports = { extractTextFromPdf, chunkText, selectRelevantChunks, findMentionedMaterials };
+module.exports = {
+  extractTextFromPdf,
+  extractTextFromDocx,
+  extractTextFromPptx,
+  extractText,
+  chunkText,
+  selectRelevantChunks,
+  findMentionedMaterials,
+};
