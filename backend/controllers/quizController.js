@@ -11,6 +11,7 @@ const { assertCourseManager } = require("../utils/courseAccess");
 const { MATERIALS_DIR } = require("../middleware/uploadMiddleware");
 const { extractText } = require("../services/ragEngine");
 const { getAIProvider } = require("../services/ai");
+const { notifyUsers } = require("../utils/notify");
 
 const MAX_SOURCE_CHARS = 30000; // keeps the prompt size sane regardless of provider
 
@@ -145,8 +146,23 @@ const publishQuiz = asyncHandler(async (req, res) => {
   const course = await Course.findById(quiz.course);
   assertCourseManager(req.user, res, course);
 
+  const wasPublished = quiz.isPublished;
   quiz.isPublished = req.body.isPublished !== undefined ? !!req.body.isPublished : !quiz.isPublished;
   await quiz.save();
+
+  // Notify on the false -> true transition only — never on unpublish, and
+  // never again if it's already published and gets toggled a second time.
+  if (!wasPublished && quiz.isPublished) {
+    const enrollments = await Enrollment.find({ course: course._id }).select("student");
+    await notifyUsers(
+      enrollments.map((e) => e.student),
+      {
+        type: "quiz_published",
+        title: `New quiz published: ${quiz.title}`,
+        message: `A new quiz "${quiz.title}" is now available in ${course.title}.`,
+      }
+    );
+  }
 
   res.status(200).json({ success: true, data: quiz });
 });

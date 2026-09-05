@@ -449,6 +449,31 @@ via both curl and the real browser upload form: a plain-text file renamed to `.p
 a real PDF still succeeds, a real `.docx` renamed to `.pptx` is rejected (proving this checks
 actual OOXML structure, not just "is it a zip"), and a genuinely correct `.docx` still succeeds.
 
+**Notifications (in-app + email), post-backlog.** A new `Notification` collection (`user`, `type`,
+`title`, `message`, `read`) backs `GET /api/notifications` (any authenticated role, always scoped
+to self, latest 50 + unread count) and `PUT /api/notifications/:id/read` / `/read-all`. The shared
+`utils/notify.js#notifyUsers` is the single place that creates a notification — the DB write is
+awaited (fast, and it's what the list endpoint reads, so it must exist before the triggering
+request returns), but email delivery is fire-and-forget, same principle as the AI grading draft in
+`attemptController.submitAttempt`: a slow or failed SMTP call must never block or fail the action
+that triggered the notification. Four triggers, each firing only on the meaningful transition, not
+every write: `quizController.publishQuiz` notifies every enrolled student, but only on the
+false→true publish transition (never on unpublish or a no-op toggle); `gradingController.gradeAnswer`
+notifies the student, but only when `recomputeAttemptScore` flips `gradingComplete` from false to
+true — a teacher grading one of several subjective answers on the same attempt doesn't spam the
+student until the whole quiz is actually finished; `feeChallanController.createFeeChallan` and
+`salarySlipController.createSalarySlip` (the latter a natural, symmetric extension of the same
+pattern, not explicitly asked for but trivial given the shared helper) notify on creation.
+`NotificationBell.jsx` lives inside `DashboardShell.jsx`'s header — a 🔔 with an unread-count badge,
+30-second poll, click-outside-to-close, and a "mark all as read" action — so it's automatically
+present for all four roles with no per-dashboard wiring. Verified live end-to-end for all four
+trigger types with real data (including a real graded score and real challan amount showing up
+correctly in the notification text), plus the read/read-all endpoints and the full bell UI
+(badge appears, dropdown lists newest-first with accurate relative timestamps, clicking an unread
+item clears its highlight and decrements the badge live) — caught and fixed a Vite stale-cache
+issue mid-verification where the bell silently failed to render at all (same class of issue as
+earlier in this session; cache-clear + restart resolved it, not a code bug).
+
 **US-05 is fully verified end-to-end, including a real live Gemini call.** RBAC,
 validation, PDF extraction, the "not configured" graceful-failure path, AND a real
 `GEMINI_API_KEY` generating actual questions from a real PDF were all tested (curl +

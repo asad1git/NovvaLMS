@@ -1,5 +1,6 @@
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import NotificationBell from "./NotificationBell";
 
 export default function DashboardShell({ role, navItems, activeNav, onNavClick, children }) {
   const { auth, logout } = useAuth();
@@ -64,7 +65,8 @@ export default function DashboardShell({ role, navItems, activeNav, onNavClick, 
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between flex-shrink-0">
           <span className="text-sm font-medium text-gray-900">{activeNav || "Dashboard Overview"}</span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <NotificationBell />
             <span className="text-xs text-gray-500">{auth?.name}</span>
             <div className="w-7 h-7 bg-navy rounded-full flex items-center justify-center text-white text-[10px] font-medium">
               {initials}

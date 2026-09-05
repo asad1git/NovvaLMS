@@ -3,8 +3,10 @@ const Course = require("../models/Course");
 const Quiz = require("../models/Quiz");
 const Question = require("../models/Question");
 const Answer = require("../models/Answer");
+const QuizAttempt = require("../models/QuizAttempt");
 const { assertCourseManager } = require("../utils/courseAccess");
 const { recomputeAttemptScore } = require("../utils/scoring");
+const { notifyUsers } = require("../utils/notify");
 
 /**
  * HITL — GET /api/grading/pending (Admin, or Teacher scoped to their own courses)
@@ -93,7 +95,19 @@ const gradeAnswer = asyncHandler(async (req, res) => {
   answer.gradedAt = new Date();
   await answer.save();
 
-  await recomputeAttemptScore(answer.attempt);
+  const attemptBefore = await QuizAttempt.findById(answer.attempt).select("gradingComplete student");
+  const updatedAttempt = await recomputeAttemptScore(answer.attempt);
+
+  // Notify only on the not-complete -> complete transition — a teacher
+  // grading one of several subjective answers on the same attempt shouldn't
+  // spam the student until the whole quiz is actually finished grading.
+  if (!attemptBefore.gradingComplete && updatedAttempt.gradingComplete) {
+    await notifyUsers([attemptBefore.student], {
+      type: "grade_posted",
+      title: `Your quiz "${quiz.title}" has been graded`,
+      message: `Your grade for "${quiz.title}" in ${course.title} is now final: ${updatedAttempt.score}/${updatedAttempt.maxScore}.`,
+    });
+  }
 
   res.status(200).json({ success: true, data: answer });
 });

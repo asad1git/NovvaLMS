@@ -16,6 +16,7 @@ const feeChallanRoutes = require("./routes/feeChallanRoutes");
 const salarySlipRoutes = require("./routes/salarySlipRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const parentLinkRoutes = require("./routes/parentLinkRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -49,6 +50,7 @@ app.use("/api/fee-challans", feeChallanRoutes);
 app.use("/api/salary-slips", salarySlipRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/parent-links", parentLinkRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // ─── Error handling (must be last) ───
 app.use(notFound);

@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const SalarySlip = require("../models/SalarySlip");
 const User = require("../models/User");
 const { generateSalarySlipPdf } = require("../services/pdfEngine");
+const { notifyUsers } = require("../utils/notify");
 
 function canAccess(user, slip) {
   // slip.employee may be a populated User doc (has ._id) or a raw
@@ -34,6 +35,12 @@ const createSalarySlip = asyncHandler(async (req, res) => {
     basicSalary,
     allowances: allowances || 0,
     deductions: deductions || 0,
+  });
+
+  await notifyUsers([employee._id], {
+    type: "salary_slip_issued",
+    title: `New salary slip issued: ${month}`,
+    message: `Your salary slip for ${month} is now available.`,
   });
 
   res.status(201).json({ success: true, data: slip });

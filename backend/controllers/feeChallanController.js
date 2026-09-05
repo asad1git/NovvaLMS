@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const FeeChallan = require("../models/FeeChallan");
 const User = require("../models/User");
 const { generateFeeChallanPdf } = require("../services/pdfEngine");
+const { notifyUsers } = require("../utils/notify");
 
 function canAccess(user, challan) {
   // challan.student may be a populated User doc (has ._id) or a raw
@@ -36,6 +37,12 @@ const createFeeChallan = asyncHandler(async (req, res) => {
     amount,
     dueDate,
     description,
+  });
+
+  await notifyUsers([student._id], {
+    type: "fee_challan_issued",
+    title: `New fee challan issued: ${challanNumber}`,
+    message: `A fee challan of Rs. ${amount} (due ${new Date(dueDate).toLocaleDateString()}) has been issued to your account.`,
   });
 
   res.status(201).json({ success: true, data: challan });
