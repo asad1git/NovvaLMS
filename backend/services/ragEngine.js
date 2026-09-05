@@ -90,4 +90,35 @@ function selectRelevantChunks(chunksWithSource, query, topK = 5) {
     .slice(0, topK);
 }
 
-module.exports = { extractTextFromPdf, chunkText, selectRelevantChunks };
+// Crude singular/plural normalization ("slides" -> "slide") so a question
+// naming a material doesn't miss it purely over pluralization — good enough
+// at this project's scale without a real stemmer.
+function normalizeToken(w) {
+  return w.endsWith("s") && w.length > 3 ? w.slice(0, -1) : w;
+}
+
+/**
+ * Detects when a question names a specific uploaded material by title
+ * (e.g. "summarize Week 1 Slides", "what's inside Week 1 Slides") rather
+ * than asking about content that would surface via `selectRelevantChunks`.
+ * A plain title reference rarely shares vocabulary with the material's
+ * actual body text — "Week 1 Slides" is metadata, not something that
+ * necessarily appears inside the slides themselves — so keyword-scoring the
+ * question against chunk *content* alone misses these requests entirely.
+ * This scores the question's tokens against each material's *title*
+ * instead, returning any material where most of its title's tokens appear
+ * in the question. `materials` needs at least `_id`/`title` per entry.
+ */
+function findMentionedMaterials(question, materials) {
+  const questionTokens = new Set(tokenize(question).map(normalizeToken));
+  if (questionTokens.size === 0) return [];
+
+  return materials.filter((m) => {
+    const titleTokens = tokenize(m.title).map(normalizeToken);
+    if (titleTokens.length === 0) return false;
+    const matched = titleTokens.filter((t) => questionTokens.has(t)).length;
+    return matched / titleTokens.length >= 0.6;
+  });
+}
+
+module.exports = { extractTextFromPdf, chunkText, selectRelevantChunks, findMentionedMaterials };

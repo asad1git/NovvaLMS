@@ -6,7 +6,7 @@ const Material = require("../models/Material");
 const ChatSession = require("../models/ChatSession");
 const Message = require("../models/Message");
 const { MATERIALS_DIR } = require("../middleware/uploadMiddleware");
-const { extractTextFromPdf, chunkText, selectRelevantChunks } = require("../services/ragEngine");
+const { extractTextFromPdf, chunkText, selectRelevantChunks, findMentionedMaterials } = require("../services/ragEngine");
 const { getAIProvider } = require("../services/ai");
 const { computeAnalyticsForStudent } = require("./analyticsController");
 const { formatAnalyticsSummary } = require("../utils/formatAnalyticsSummary");
@@ -71,6 +71,33 @@ function formatMaterialsList(materials) {
   return materials.map((m) => `- ${m.title} (${m.fileType})`).join("\n");
 }
 
+const MAX_REQUESTED_MATERIAL_CHARS = 20000; // per material, mirrors quizController's MAX_SOURCE_CHARS pattern
+
+/**
+ * When the student names a material directly ("summarize Week 1 Slides"),
+ * `selectRelevantChunks`'s top-5 keyword match against the question is the
+ * wrong tool — a title reference rarely shares vocabulary with the file's
+ * actual body text, so it would usually surface nothing. This pulls that
+ * material's FULL extracted content instead, so "what's inside X" /
+ * "summarize X" genuinely works rather than hitting the refusal.
+ */
+function buildRequestedMaterialSection(mentionedMaterials, chunksWithSource) {
+  if (mentionedMaterials.length === 0) return { text: "", materialIds: [] };
+
+  const materialIds = [];
+  const blocks = mentionedMaterials.map((m) => {
+    const materialChunks = chunksWithSource.filter((c) => String(c.materialId) === String(m._id));
+    if (materialChunks.length === 0) {
+      return `"${m.title}" — no extracted text available (only PDF materials can be read directly; this file is ${m.fileType}).`;
+    }
+    materialIds.push(String(m._id));
+    const fullText = materialChunks.map((c) => c.text).join(" ").slice(0, MAX_REQUESTED_MATERIAL_CHARS);
+    return `"${m.title}" (full content, since the student named it directly):\n${fullText}`;
+  });
+
+  return { text: blocks.join("\n\n---\n\n"), materialIds };
+}
+
 /**
  * US-07 — GET /api/courses/:id/chat/messages (Student, enrolled)
  */
@@ -93,18 +120,23 @@ const getMessages = asyncHandler(async (req, res) => {
  * RAG steps 1-5 per CLAUDE.md: extract -> chunk -> select relevant chunks
  * -> inject as context -> strict "context-only" system prompt for lecture
  * content. Also gives the assistant course-scoped weak-area awareness
- * (reusing the same aggregation US-11's Analytics page uses) and a list of
- * every uploaded material, so it can answer "what's been uploaded" and
- * "where am I weak" without needing a keyword-matched chunk — those aren't
- * lecture-content questions, so the RAG chunk gate shouldn't block them.
+ * (reusing the same aggregation US-11's Analytics page uses), a list of
+ * every uploaded material, and — when the question names a material
+ * directly ("summarize Week 1 Slides") — that material's full extracted
+ * content, since a title reference rarely shares vocabulary with the
+ * file's actual body text and would otherwise miss `selectRelevantChunks`'s
+ * keyword scoring entirely. None of "what's been uploaded", "where am I
+ * weak", or "summarize <material>" are lecture-content questions, so the
+ * RAG chunk gate shouldn't block any of them.
  *
- * The zero-cost refusal (no AI call at all) is now reserved for the
- * genuinely empty case — no matched chunks AND no materials AND no quiz
- * history — "correctness by construction" for a course with nothing to
- * discuss at all. Once there's *anything* to ground on, the AI is trusted
- * to route the right section to the right question per its system prompt's
- * strict per-section rules (still refusing content questions the chunks
- * don't cover, verbatim).
+ * The zero-cost refusal (no AI call at all) is reserved for the genuinely
+ * empty case — no matched chunks, no named-material match, no materials at
+ * all, AND no quiz history — "correctness by construction" for a course
+ * with nothing to discuss at all. Once there's *anything* to ground on, the
+ * AI is trusted to route the right section to the right question per its
+ * system prompt's strict per-section rules (still refusing content
+ * questions neither LECTURE EXCERPTS nor REQUESTED MATERIAL(S) cover,
+ * verbatim).
  */
 const sendMessage = asyncHandler(async (req, res) => {
   const course = await assertEnrolled(req, res);
@@ -131,26 +163,35 @@ const sendMessage = asyncHandler(async (req, res) => {
     computeAnalyticsForStudent(req.user._id, { courseId: course._id }),
   ]);
   const relevant = selectRelevantChunks(chunksWithSource, content, 5);
+  const mentionedMaterials = findMentionedMaterials(content, materials);
+  const requestedMaterial = buildRequestedMaterialSection(mentionedMaterials, chunksWithSource);
 
   const hasLectureExcerpts = relevant.length > 0;
+  const hasRequestedMaterial = requestedMaterial.text !== "";
   const hasMaterials = materials.length > 0;
   const hasPerformanceData = analytics.overall.totalAttempts > 0;
 
   let answer;
   let sourceMaterialIds = [];
 
-  if (!hasLectureExcerpts && !hasMaterials && !hasPerformanceData) {
+  if (!hasLectureExcerpts && !hasRequestedMaterial && !hasMaterials && !hasPerformanceData) {
     answer = NO_CONTEXT_REPLY;
   } else {
-    if (hasLectureExcerpts) {
-      sourceMaterialIds = [...new Set(relevant.map((c) => String(c.materialId)))];
-    }
+    sourceMaterialIds = [
+      ...new Set([
+        ...(hasLectureExcerpts ? relevant.map((c) => String(c.materialId)) : []),
+        ...requestedMaterial.materialIds,
+      ]),
+    ];
 
     const context = [
       `LECTURE EXCERPTS:\n${hasLectureExcerpts ? relevant.map((c) => c.text).join("\n---\n") : "(none matched this question)"}`,
+      hasRequestedMaterial ? `REQUESTED MATERIAL(S):\n${requestedMaterial.text}` : "",
       `COURSE MATERIALS:\n${formatMaterialsList(materials)}`,
       `YOUR PERFORMANCE:\n${formatAnalyticsSummary(analytics)}`,
-    ].join("\n\n");
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     try {
       const provider = getAIProvider();

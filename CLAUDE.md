@@ -384,6 +384,25 @@ of that chunk — the material named is always real, just occasionally attribute
 answer. Not fixed, since doing so reliably would need classifying which section the model
 actually drew from, which isn't cheaply knowable from response text alone.
 
+**Fixed a real gap caught by live user testing, post-backlog:** "what's inside Week 1 Slides?"
+and "summarize Week 1 Slides" both hit the refusal, even though that material genuinely exists.
+Root cause: `selectRelevantChunks` scores the question's words against each chunk's *body text* —
+a plain title reference like "Week 1 Slides" is metadata, not vocabulary that necessarily appears
+inside the file's own content, so it scored zero matching chunks and (correctly, per the
+system prompt's own rule) the model refused rather than fabricate. Fixed with
+`ragEngine.findMentionedMaterials(question, materials)` — scores the question's tokens against
+each material's *title* instead (with light singular/plural normalization, since "slide" vs
+"slides" would otherwise miss), and when a material is named directly, `chatController` pulls
+its FULL extracted content into a new REQUESTED MATERIAL(S) context section (capped at 20,000
+chars/material) rather than relying on the narrow top-5 relevance-matched excerpts. If that
+material has no extracted text (a non-PDF, or a PDF that failed extraction), the assistant says
+so plainly instead of the generic refusal — confirmed live against a real edge case: "Week 1
+Slides" turned out to be a 40-byte placeholder stub from early testing with no real content, and
+the fixed assistant correctly said "no extracted text available for Week 1 Slides" instead of
+either fabricating a summary or giving the unhelpful generic refusal; a genuinely off-topic
+question ("What is the capital of France?") still correctly refused verbatim; and summarizing a
+real content-bearing PDF by name now works and is accurate.
+
 **US-05 is fully verified end-to-end, including a real live Gemini call.** RBAC,
 validation, PDF extraction, the "not configured" graceful-failure path, AND a real
 `GEMINI_API_KEY` generating actual questions from a real PDF were all tested (curl +
