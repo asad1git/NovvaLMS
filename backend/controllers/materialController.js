@@ -6,6 +6,7 @@ const Material = require("../models/Material");
 const { assertCourseAccess, assertCourseManager } = require("../utils/courseAccess");
 const { MATERIALS_DIR } = require("../middleware/uploadMiddleware");
 const { extractText } = require("../services/ragEngine");
+const { verifyFileSignature } = require("../utils/verifyFileSignature");
 
 // Below this many characters of extracted text, treat the file as
 // effectively empty for AI purposes — a real slide can legitimately be
@@ -51,6 +52,18 @@ const uploadMaterial = asyncHandler(async (req, res) => {
 
   const fileType = path.extname(req.file.originalname).slice(1).toLowerCase();
   const filePath = path.join(MATERIALS_DIR, req.file.filename);
+
+  // uploadMiddleware's fileFilter only checked the extension string — a
+  // renamed file (e.g. something.exe saved as something.pdf) would sail
+  // straight through it. This confirms the actual bytes match what was
+  // claimed before the file is ever attached to a course.
+  const signatureMismatch = await verifyFileSignature(filePath, fileType);
+  if (signatureMismatch) {
+    fs.unlink(filePath, () => {}); // best-effort cleanup of the rejected upload
+    res.status(400);
+    throw new Error(signatureMismatch);
+  }
+
   const textExtractionWarning = await checkExtractability(filePath, fileType);
 
   const material = await Material.create({

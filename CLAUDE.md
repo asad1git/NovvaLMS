@@ -435,6 +435,20 @@ Slides" itself) are NOT retroactively checked — `textExtractionWarning` stays 
 until re-uploaded, since a bulk backfill wasn't asked for. Verified live: a genuinely empty PDF
 correctly warns, a real content-bearing DOCX correctly doesn't.
 
+**Real file-type validation, post-backlog** — `uploadMiddleware`'s `fileFilter` only ever checked
+the claimed extension string, so a renamed file (e.g. plain text saved as `something.pdf`) sailed
+straight through it. `utils/verifyFileSignature.js` checks the actual bytes after upload, before
+the file is ever attached to a course: PDF must start with the `%PDF` magic bytes; PPTX and DOCX
+are both ZIP archives (Office Open XML) sharing the same outer magic bytes, so telling them apart
+from an arbitrary renamed file — and from each other — needs looking inside the archive, not just
+the first 4 bytes, which is why it reuses `JSZip` (already a dependency for PPTX extraction) to
+confirm a DOCX actually contains `word/document.xml` and a PPTX actually contains a `ppt/`
+structure. A mismatch deletes the already-written file (`fs.unlink`, best-effort, same pattern as
+`deleteMaterial`) and rejects with a 400 before any `Material` row is ever created. Verified live
+via both curl and the real browser upload form: a plain-text file renamed to `.pdf` is rejected,
+a real PDF still succeeds, a real `.docx` renamed to `.pptx` is rejected (proving this checks
+actual OOXML structure, not just "is it a zip"), and a genuinely correct `.docx` still succeeds.
+
 **US-05 is fully verified end-to-end, including a real live Gemini call.** RBAC,
 validation, PDF extraction, the "not configured" graceful-failure path, AND a real
 `GEMINI_API_KEY` generating actual questions from a real PDF were all tested (curl +
