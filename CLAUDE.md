@@ -420,6 +420,21 @@ end-to-end with real (minimal but genuine) `.docx` and `.pptx` files: the chatbo
 summarized both by name with correct source attribution, and AI quiz generation produced
 accurate, correctly answer-keyed MCQs directly from a real `.docx`'s content.
 
+**Upload-time extraction check, post-backlog** — closes the exact class of bug that caused the
+"Week 1 Slides" confusion above (a 40-byte stub sat in the DB unflagged for days before a
+student's question exposed it). `materialController.uploadMaterial` now attempts
+`ragEngine.extractText` immediately on upload and stores the result (or lack of one) as
+`Material.textExtractionWarning` — never blocking the upload itself, since a human should decide
+whether an image-heavy deck is still worth keeping, just surfacing the problem right away instead
+of silently. Below 20 extracted characters counts as "no usable text" (low enough that a
+legitimately terse real slide, e.g. a title-only slide, isn't false-flagged). The teacher sees
+the warning immediately after upload AND as a persistent ⚠ badge (hover for the reason) next to
+that material going forward — `getMaterials` already returns the full document, so no extra
+endpoint was needed. Pre-existing materials uploaded before this field existed (including "Week 1
+Slides" itself) are NOT retroactively checked — `textExtractionWarning` stays `null` for them
+until re-uploaded, since a bulk backfill wasn't asked for. Verified live: a genuinely empty PDF
+correctly warns, a real content-bearing DOCX correctly doesn't.
+
 **US-05 is fully verified end-to-end, including a real live Gemini call.** RBAC,
 validation, PDF extraction, the "not configured" graceful-failure path, AND a real
 `GEMINI_API_KEY` generating actual questions from a real PDF were all tested (curl +

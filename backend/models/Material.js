@@ -42,6 +42,16 @@ const materialSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    // Set at upload time by attempting text extraction immediately, so a
+    // teacher learns right away that a file has no usable text (empty,
+    // corrupted, or an image-only scan) instead of a student discovering it
+    // much later via the chatbot or AI quiz generation. Null means either
+    // extraction succeeded, or hasn't been checked yet (materials uploaded
+    // before this field existed).
+    textExtractionWarning: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: { createdAt: "createdAt", updatedAt: false } }
 );

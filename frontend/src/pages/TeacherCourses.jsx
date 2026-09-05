@@ -27,6 +27,7 @@ export default function TeacherCourses() {
   const [title, setTitle] = useState("");
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadWarning, setUploadWarning] = useState("");
 
   const [quizzes, setQuizzes] = useState([]);
   const [showQuizForm, setShowQuizForm] = useState(false);
@@ -68,8 +69,12 @@ export default function TeacherCourses() {
     if (!file || !selectedCourse) return;
     setUploading(true);
     setError("");
+    setUploadWarning("");
     try {
-      await uploadMaterial(selectedCourse._id, file, title);
+      const uploaded = await uploadMaterial(selectedCourse._id, file, title);
+      if (uploaded.textExtractionWarning) {
+        setUploadWarning(`"${uploaded.title}": ${uploaded.textExtractionWarning}`);
+      }
       setTitle("");
       setFile(null);
       e.target.reset();
@@ -215,12 +220,27 @@ export default function TeacherCourses() {
             </button>
           </form>
           <p className="text-[11px] text-gray-500 mb-3">PDF, PPTX, or DOCX — max 20MB.</p>
+          {uploadWarning && (
+            <div className="bg-badge-amber-bg text-badge-amber-text text-[11px] rounded px-3 py-2 mb-3">
+              ⚠ {uploadWarning}
+            </div>
+          )}
 
           <div className="space-y-1">
             {materials.map((m) => (
               <div key={m._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
                 <div>
-                  <div className="text-gray-900 font-medium">{m.title}</div>
+                  <div className="text-gray-900 font-medium flex items-center gap-1.5">
+                    {m.title}
+                    {m.textExtractionWarning && (
+                      <span
+                        title={m.textExtractionWarning}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-badge-amber-bg text-badge-amber-text cursor-help"
+                      >
+                        ⚠ no readable text
+                      </span>
+                    )}
+                  </div>
                   <div className="text-[11px] text-gray-400 uppercase">
                     {m.fileType} · {(m.fileSize / 1024).toFixed(0)} KB
                   </div>
