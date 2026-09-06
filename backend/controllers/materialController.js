@@ -109,6 +109,58 @@ const downloadMaterial = asyncHandler(async (req, res) => {
 });
 
 /**
+ * PUT /api/materials/:id/replace (Admin or the owning course's Teacher)
+ * Swaps a material's underlying file in place — same `_id`, so anything
+ * that already references this material (a generated quiz's provenance,
+ * the chatbot's `Message.sources` citations, `findMentionedMaterials`
+ * title lookups) keeps working, instead of a re-upload creating a
+ * confusing duplicate Material row alongside the old one. `title` stays
+ * unless a new one is explicitly given; the file, its type, size, and
+ * extraction warning are always refreshed from the new upload.
+ */
+const replaceMaterial = asyncHandler(async (req, res) => {
+  const material = await Material.findById(req.params.id);
+  if (!material) {
+    res.status(404);
+    throw new Error("Material not found");
+  }
+
+  const course = await Course.findById(material.course);
+  assertCourseManager(req.user, res, course);
+
+  if (!req.file) {
+    res.status(400);
+    throw new Error("A PDF, PPTX, or DOCX file is required (field name: file, max 20MB)");
+  }
+
+  const fileType = path.extname(req.file.originalname).slice(1).toLowerCase();
+  const filePath = path.join(MATERIALS_DIR, req.file.filename);
+
+  const signatureMismatch = await verifyFileSignature(filePath, fileType);
+  if (signatureMismatch) {
+    fs.unlink(filePath, () => {}); // best-effort cleanup of the rejected upload
+    res.status(400);
+    throw new Error(signatureMismatch);
+  }
+
+  const textExtractionWarning = await checkExtractability(filePath, fileType);
+
+  const oldFileUrl = material.fileUrl;
+
+  material.fileName = req.file.originalname;
+  material.fileUrl = req.file.filename;
+  material.fileType = fileType;
+  material.fileSize = req.file.size;
+  material.textExtractionWarning = textExtractionWarning;
+  if (req.body.title) material.title = req.body.title;
+  await material.save();
+
+  fs.unlink(path.join(MATERIALS_DIR, oldFileUrl), () => {}); // best-effort — only after the new file is safely attached
+
+  res.status(200).json({ success: true, data: material });
+});
+
+/**
  * DELETE /api/materials/:id — Admin or the uploading course's Teacher.
  */
 const deleteMaterial = asyncHandler(async (req, res) => {
@@ -127,4 +179,4 @@ const deleteMaterial = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { _id: material._id } });
 });
 
-module.exports = { uploadMaterial, getMaterials, downloadMaterial, deleteMaterial };
+module.exports = { uploadMaterial, getMaterials, downloadMaterial, replaceMaterial, deleteMaterial };

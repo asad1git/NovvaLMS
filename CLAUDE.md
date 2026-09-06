@@ -474,6 +474,20 @@ item clears its highlight and decrements the badge live) — caught and fixed a 
 issue mid-verification where the bell silently failed to render at all (same class of issue as
 earlier in this session; cache-clear + restart resolved it, not a code bug).
 
+**Replace-material, post-backlog** — closes the "re-uploading a corrected file creates a
+duplicate" gap. `PUT /api/materials/:id/replace` (Admin or the owning course's Teacher) swaps a
+material's underlying file in place — same `_id` — rather than a re-upload creating a second,
+confusingly-similar `Material` row alongside the old one. Runs the exact same signature and
+extraction checks as a fresh upload (`verifyFileSignature`, then `checkExtractability`) before
+touching anything; the old file on disk is only deleted (`fs.unlink`, best-effort) after the new
+one is safely attached to the record, so a rejected replacement (bad signature, wrong format)
+never corrupts or loses the material that was already working. Because the `_id` never changes,
+anything already keyed to it keeps working across the swap — confirmed live: uploaded a
+40-byte-stub PDF, replaced it with a real content-bearing DOCX, and the chatbot immediately
+summarized it correctly under its original title (`findMentionedMaterials` title-matching and
+`Message.sources` citation both still resolve correctly), with zero new `Material` documents
+created. Verified through both curl and the actual browser upload form's new "Replace" control.
+
 **US-05 is fully verified end-to-end, including a real live Gemini call.** RBAC,
 validation, PDF extraction, the "not configured" graceful-failure path, AND a real
 `GEMINI_API_KEY` generating actual questions from a real PDF were all tested (curl +

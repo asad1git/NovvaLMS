@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listCourses, getMaterials, uploadMaterial, deleteMaterial, downloadMaterial } from "../api/courses";
+import { listCourses, getMaterials, uploadMaterial, replaceMaterial, deleteMaterial, downloadMaterial } from "../api/courses";
 import {
   listQuizzesForCourse,
   createQuiz,
@@ -28,6 +28,7 @@ export default function TeacherCourses() {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadWarning, setUploadWarning] = useState("");
+  const [replacingId, setReplacingId] = useState(null);
 
   const [quizzes, setQuizzes] = useState([]);
   const [showQuizForm, setShowQuizForm] = useState(false);
@@ -89,6 +90,24 @@ export default function TeacherCourses() {
   async function handleDelete(materialId) {
     await deleteMaterial(materialId);
     setMaterials(await getMaterials(selectedCourse._id));
+  }
+
+  async function handleReplace(materialId, newFile) {
+    if (!newFile) return;
+    setReplacingId(materialId);
+    setError("");
+    setUploadWarning("");
+    try {
+      const updated = await replaceMaterial(materialId, newFile);
+      if (updated.textExtractionWarning) {
+        setUploadWarning(`"${updated.title}": ${updated.textExtractionWarning}`);
+      }
+      setMaterials(await getMaterials(selectedCourse._id));
+    } catch (err) {
+      setError(err.response?.data?.message || "Replace failed");
+    } finally {
+      setReplacingId(null);
+    }
   }
 
   function updateQuestion(index, patch) {
@@ -245,10 +264,24 @@ export default function TeacherCourses() {
                     {m.fileType} · {(m.fileSize / 1024).toFixed(0)} KB
                   </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex items-center gap-3">
                   <button onClick={() => downloadMaterial(m._id, m.fileName)} className="text-navy-light hover:underline">
                     Download
                   </button>
+                  <label className="text-navy-light hover:underline cursor-pointer">
+                    {replacingId === m._id ? "Replacing…" : "Replace"}
+                    <input
+                      type="file"
+                      accept=".pdf,.pptx,.docx"
+                      className="hidden"
+                      disabled={replacingId === m._id}
+                      onChange={(e) => {
+                        const selected = e.target.files[0];
+                        e.target.value = ""; // allow re-selecting the same filename later
+                        handleReplace(m._id, selected);
+                      }}
+                    />
+                  </label>
                   <button onClick={() => handleDelete(m._id)} className="text-badge-red-text hover:underline">
                     Delete
                   </button>

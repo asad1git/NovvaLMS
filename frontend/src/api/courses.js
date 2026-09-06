@@ -29,6 +29,12 @@ export function uploadMaterial(courseId, file, title) {
   return api.post(`/courses/${courseId}/materials`, form).then((r) => r.data.data);
 }
 
+export function replaceMaterial(materialId, file) {
+  const form = new FormData();
+  form.append("file", file);
+  return api.put(`/materials/${materialId}/replace`, form).then((r) => r.data.data);
+}
+
 export function deleteMaterial(materialId) {
   return api.delete(`/materials/${materialId}`).then((r) => r.data.data);
 }
