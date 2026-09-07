@@ -607,9 +607,22 @@ console errors — including one real mid-pass bug caught by the dev server itse
 JS block comment (`bg-*/border-*`) prematurely closed the comment and broke the Babel parse,
 fixed by rewording the comment. This pass covers the shared primitives, `DashboardShell`, `Login`,
 both Overview pages families, `Analytics`, `Attendance`, `ParentDashboard`, `MyResults`,
-`NotificationBell`, and `AccountSettings` — the remaining pages (course/quiz management, chat,
-admin CRUD screens) still use the pre-polish markup and are natural next candidates for the same
-treatment.
+`NotificationBell`, and `AccountSettings`.
+
+**Visual-polish pass, batch 2 — completes the sweep.** Same primitives, same palette, applied to
+every page batch 1 left untouched: `TeacherCourses.jsx` (materials/quiz-builder/attendance —
+the largest page in the app), `StudentCourses.jsx`, `ChatBot.jsx` (Novva Assistant — chat bubbles
+gained `shadow-sm` + a `fadeIn` entrance, matching the treatment `ParentChat` already had),
+`QuizAttempt.jsx` (the timed quiz-taking screen), every admin CRUD screen (`AdminUsers.jsx`,
+`AdminCourses.jsx`, `AdminFeeChallans.jsx`, `AdminSalarySlips.jsx`, `AdminParentLinks.jsx`,
+`GradeApprovals.jsx`), and the two standalone auth pages `ForgotPassword.jsx`/`ResetPassword.jsx`
+(now match `Login.jsx`'s radial-gradient background and card treatment instead of a plain white
+page — they share its exact layout, so drift between the three would otherwise have stood out).
+No behavior changes anywhere in this batch — same endpoints, same state logic, purely markup.
+Verified via Playwright across all four roles (admin/teacher/student login flows through every
+touched page, plus both standalone auth pages directly) with zero console errors. The full
+frontend now uses the shared `ui/` primitives consistently — no page still carries the pre-polish
+hand-rolled card/button/badge markup.
 
 ---
 
