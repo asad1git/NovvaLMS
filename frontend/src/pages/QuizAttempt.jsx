@@ -141,7 +141,7 @@ export default function QuizAttempt() {
   return (
     <DashboardShell
       role="Student"
-      navItems={["Dashboard", "My Courses", "My Results", "Analytics", "Novva Assistant"]}
+      navItems={["Dashboard", "My Courses", "My Results", "Analytics", "Attendance", "Novva Assistant"]}
       activeNav="My Courses"
       onNavClick={() => navigate("/student")}
     >

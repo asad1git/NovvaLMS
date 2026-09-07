@@ -12,6 +12,7 @@ const {
 const { uploadMaterial, getMaterials } = require("../controllers/materialController");
 const { createQuiz, generateQuizQuestions, getQuizzesForCourse } = require("../controllers/quizController");
 const { getMessages, sendMessage } = require("../controllers/chatController");
+const { createSession, listSessions } = require("../controllers/attendanceController");
 
 const router = express.Router();
 
@@ -41,5 +42,8 @@ router.get("/:id/quizzes", getQuizzesForCourse);
 
 router.get("/:id/chat/messages", authorize("student"), getMessages);
 router.post("/:id/chat/messages", authorize("student"), sendMessage);
+
+router.post("/:id/attendance", authorize("admin", "teacher"), createSession);
+router.get("/:id/attendance", listSessions);
 
 module.exports = router;

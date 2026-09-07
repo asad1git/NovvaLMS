@@ -7,6 +7,12 @@ import {
   setQuizPublished,
   getAttemptsForQuiz,
 } from "../api/quizzes";
+import {
+  listSessions as listAttendanceSessions,
+  createSession as createAttendanceSession,
+  getSessionDetail,
+  updateSessionRecords,
+} from "../api/attendance";
 
 const BLANK_QUESTION = () => ({
   type: "mcq",
@@ -43,6 +49,16 @@ export default function TeacherCourses() {
   const [generateNumQuestions, setGenerateNumQuestions] = useState(5);
   const [generating, setGenerating] = useState(false);
 
+  const [attendanceSessions, setAttendanceSessions] = useState([]);
+  const [attendanceOverall, setAttendanceOverall] = useState(null);
+  const [showSessionForm, setShowSessionForm] = useState(false);
+  const [sessionDate, setSessionDate] = useState("");
+  const [sessionTopic, setSessionTopic] = useState("");
+  const [creatingSession, setCreatingSession] = useState(false);
+  const [markingSession, setMarkingSession] = useState(null);
+  const [markingRecords, setMarkingRecords] = useState([]);
+  const [savingMarks, setSavingMarks] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
@@ -59,10 +75,71 @@ export default function TeacherCourses() {
     setSelectedCourse(course);
     setError("");
     setResultsQuiz(null);
+    setMarkingSession(null);
     setMaterials([]); // clear immediately so a course switch never shows the previous course's list
     setQuizzes([]);
+    setAttendanceSessions([]);
     setMaterials(await getMaterials(course._id));
     setQuizzes(await listQuizzesForCourse(course._id));
+    const attendance = await listAttendanceSessions(course._id);
+    setAttendanceSessions(attendance.sessions);
+    setAttendanceOverall(attendance.overall);
+  }
+
+  async function refreshAttendance() {
+    const attendance = await listAttendanceSessions(selectedCourse._id);
+    setAttendanceSessions(attendance.sessions);
+    setAttendanceOverall(attendance.overall);
+  }
+
+  async function handleCreateSession(e) {
+    e.preventDefault();
+    if (!sessionDate || !selectedCourse) return;
+    setCreatingSession(true);
+    setError("");
+    try {
+      await createAttendanceSession(selectedCourse._id, sessionDate, sessionTopic);
+      setSessionDate("");
+      setSessionTopic("");
+      setShowSessionForm(false);
+      await refreshAttendance();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to create session");
+    } finally {
+      setCreatingSession(false);
+    }
+  }
+
+  async function handleOpenSession(sessionId) {
+    setError("");
+    try {
+      const detail = await getSessionDetail(sessionId);
+      setMarkingSession(detail.session);
+      setMarkingRecords(detail.records);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load session");
+    }
+  }
+
+  function updateRecordStatus(studentId, status) {
+    setMarkingRecords((recs) => recs.map((r) => (r.student._id === studentId ? { ...r, status } : r)));
+  }
+
+  async function handleSaveMarks() {
+    setSavingMarks(true);
+    setError("");
+    try {
+      await updateSessionRecords(
+        markingSession._id,
+        markingRecords.map((r) => ({ studentId: r.student._id, status: r.status }))
+      );
+      setMarkingSession(null);
+      await refreshAttendance();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to save attendance");
+    } finally {
+      setSavingMarks(false);
+    }
   }
 
   async function handleUpload(e) {
@@ -501,6 +578,116 @@ export default function TeacherCourses() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedCourse && (
+        <div className="bg-white border border-gray-200 rounded-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-gray-900">
+              Attendance — {selectedCourse.code}
+              {attendanceOverall?.averageAttendanceRate != null && (
+                <span className="text-[11px] text-gray-500 font-normal ml-2">
+                  ({attendanceOverall.averageAttendanceRate}% average)
+                </span>
+              )}
+            </h2>
+            <button
+              onClick={() => setShowSessionForm((s) => !s)}
+              className="bg-navy text-white text-xs font-medium rounded px-3 py-1.5"
+            >
+              {showSessionForm ? "Cancel" : "New Session"}
+            </button>
+          </div>
+
+          {showSessionForm && (
+            <form onSubmit={handleCreateSession} className="flex items-center gap-2 mb-4 border border-gray-200 rounded p-3">
+              <input
+                type="date"
+                value={sessionDate}
+                onChange={(e) => setSessionDate(e.target.value)}
+                className="border border-gray-300 rounded px-3 py-1.5 text-xs"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Topic (optional)"
+                value={sessionTopic}
+                onChange={(e) => setSessionTopic(e.target.value)}
+                className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-xs"
+              />
+              <button
+                type="submit"
+                disabled={creatingSession}
+                className="bg-navy-light text-white text-xs font-medium rounded px-3 py-1.5 disabled:opacity-50"
+              >
+                {creatingSession ? "Creating…" : "Create"}
+              </button>
+            </form>
+          )}
+
+          {markingSession ? (
+            <div className="border border-gray-200 rounded p-3">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-medium text-gray-900">
+                  Mark attendance — {new Date(markingSession.date).toLocaleDateString()}
+                  {markingSession.topic && ` (${markingSession.topic})`}
+                </h3>
+                <button onClick={() => setMarkingSession(null)} className="text-[11px] text-gray-500 hover:underline">
+                  Close
+                </button>
+              </div>
+              <div className="space-y-1 mb-3">
+                {markingRecords.map((r) => (
+                  <div key={r._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-1.5">
+                    <span className="text-gray-900">{r.student.name}</span>
+                    <select
+                      value={r.status}
+                      onChange={(e) => updateRecordStatus(r.student._id, e.target.value)}
+                      className={`text-[11px] border rounded px-2 py-1 ${
+                        r.status === "present"
+                          ? "bg-badge-green-bg text-badge-green-text border-transparent"
+                          : r.status === "absent"
+                          ? "bg-badge-red-bg text-badge-red-text border-transparent"
+                          : "bg-badge-amber-bg text-badge-amber-text border-transparent"
+                      }`}
+                    >
+                      <option value="present">Present</option>
+                      <option value="absent">Absent</option>
+                      <option value="late">Late</option>
+                      <option value="excused">Excused</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={handleSaveMarks}
+                disabled={savingMarks}
+                className="bg-navy text-white text-xs font-medium rounded px-4 py-2 disabled:opacity-50"
+              >
+                {savingMarks ? "Saving…" : "Save Attendance"}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {attendanceSessions.length === 0 && <p className="text-xs text-gray-500">No sessions recorded yet.</p>}
+              {attendanceSessions.map((s) => (
+                <div
+                  key={s._id}
+                  onClick={() => handleOpenSession(s._id)}
+                  className="flex items-center justify-between text-xs border-b border-gray-100 py-2 cursor-pointer hover:bg-gray-50"
+                >
+                  <div>
+                    <div className="text-gray-900 font-medium">{new Date(s.date).toLocaleDateString()}</div>
+                    {s.topic && <div className="text-[11px] text-gray-400">{s.topic}</div>}
+                  </div>
+                  <span className="text-[11px] text-gray-500">
+                    {s.presentCount}/{s.totalStudents} present
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </div>

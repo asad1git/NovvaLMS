@@ -6,8 +6,17 @@ import MyResults from "./MyResults";
 import Analytics from "./Analytics";
 import StudentOverview from "./StudentOverview";
 import AccountSettings from "./AccountSettings";
+import Attendance from "./Attendance";
 
-const NAV_ITEMS = ["Dashboard", "My Courses", "My Results", "Analytics", "Novva Assistant", "Account Settings"];
+const NAV_ITEMS = [
+  "Dashboard",
+  "My Courses",
+  "My Results",
+  "Analytics",
+  "Attendance",
+  "Novva Assistant",
+  "Account Settings",
+];
 
 export default function StudentDashboard() {
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -22,6 +31,8 @@ export default function StudentDashboard() {
         <MyResults />
       ) : activeNav === "Analytics" ? (
         <Analytics />
+      ) : activeNav === "Attendance" ? (
+        <Attendance />
       ) : activeNav === "Account Settings" ? (
         <AccountSettings />
       ) : (

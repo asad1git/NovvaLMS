@@ -83,18 +83,21 @@ to OpenAI/Gemini. Only academic content goes in the prompt.
 
 ---
 
-## Database — 15 MongoDB Collections
+## Database — 18 MongoDB Collections
 
 `Users, Courses, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
 Answers, ChatSessions, Messages, FeeChallans, SalarySlips, ParentLinks,
-ParentChatSessions, ParentMessages`
+ParentChatSessions, ParentMessages, Notifications, AttendanceSessions, AttendanceRecords`
 
 `ParentLinks` (added for the parent-portal feature, post-backlog) maps a
 `parent`-role User to a `student`-role User — same join-collection shape as
 `Enrollments`, admin-managed, never an embedded array on `User`. `ParentChatSessions` +
 `ParentMessages` mirror `ChatSessions`/`Messages`' shape for the parent-facing AI chatbot, kept
 as separate collections (not reused) since a parent-chat session is keyed by parent+student (not
-course) and its messages have no `sources` to cite.
+course) and its messages have no `sources` to cite. `Notifications` (post-backlog) backs the
+in-app + email notification system, one document per (user, event). `AttendanceSessions` +
+`AttendanceRecords` (post-backlog) back per-class-session attendance — same join-collection shape
+as `Quiz`/`QuizAttempt`, a session then one record per enrolled student.
 
 Key relationships:
 - User (teacher) → many Courses
@@ -487,6 +490,30 @@ anything already keyed to it keeps working across the swap — confirmed live: u
 summarized it correctly under its original title (`findMentionedMaterials` title-matching and
 `Message.sources` citation both still resolve correctly), with zero new `Material` documents
 created. Verified through both curl and the actual browser upload form's new "Replace" control.
+
+**Attendance tracking is now built, post-backlog — a new epic beyond the original 47-point
+backlog.** Teacher-marked, per-class-session (not self-check-in — matches this project's existing
+HITL philosophy of the teacher holding authority, and avoids the integrity problems self-check-in
+would introduce). Two new collections mirror the `Quiz`/`QuizAttempt` shape already established
+rather than an embedded array: `AttendanceSession` (course, date, optional topic) and
+`AttendanceRecord` (session, student, status — unique per `(session, student)`, same pattern as
+`QuizAttempt`'s unique `(quiz, student)`). Creating a session (`POST /api/courses/:id/attendance`,
+Admin/Teacher) auto-seeds a record for every currently enrolled student defaulted to **present**
+— flipping the few exceptions is less total effort than checking off everyone who showed up, for
+the common case where most students attend. `GET /api/courses/:id/attendance` always returns the
+same `{ sessions, overall }` envelope regardless of role, with role-appropriate contents: a
+Teacher/Admin gets every session's present/total headcount plus a course-wide average attendance
+rate; a Student gets only their own status per session plus their own percentage (computed
+server-side, one source of truth, same principle as `computeAnalyticsForStudent`).
+`PUT /api/attendance/sessions/:sessionId` bulk-updates every student's status in one call —
+matching how a teacher actually works through a class list, not one request per student.
+`TeacherCourses.jsx` gained a "New Session" + click-to-mark UI; `Attendance.jsx` is a new
+"Attendance" nav item for students (course picker, stat cards, session history) with a
+below-75%-attendance callout mirroring the weak-topics callout's styling. Verified end-to-end via
+curl (including RBAC: a student blocked from creating sessions and from the teacher-only detail
+endpoint) and Playwright (create a session, mark one student absent, confirm the course-wide
+average updates live, confirm the student's own view shows the correct status and the low-
+attendance warning correctly triggers against real data).
 
 **US-05 is fully verified end-to-end, including a real live Gemini call.** RBAC,
 validation, PDF extraction, the "not configured" graceful-failure path, AND a real
