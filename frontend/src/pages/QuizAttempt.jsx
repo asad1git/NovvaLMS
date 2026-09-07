@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardShell from "../components/DashboardShell";
 import { getQuiz, startOrResumeAttempt, autosaveAnswer, submitAttempt } from "../api/quizzes";
+import { Card, Button, LoadingState } from "../components/ui";
+
+const inputClass =
+  "w-full border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 function formatTime(ms) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -126,12 +131,12 @@ export default function QuizAttempt() {
     setSelections((prev) => ({ ...prev, [questionId]: value }));
   }
 
-  if (loading) return <div className="p-5 text-sm text-gray-500">Loading quiz…</div>;
+  if (loading) return <div className="p-5"><LoadingState label="Loading quiz…" /></div>;
 
   if (error) {
     return (
       <div className="p-5">
-        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 inline-block">
+        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 inline-block animate-[fadeIn_0.15s_ease-in]">
           {error}
         </div>
       </div>
@@ -150,12 +155,12 @@ export default function QuizAttempt() {
           ← Back to courses
         </button>
 
-        <div className="bg-white border border-gray-200 rounded-card p-6">
+        <Card padding="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-gray-900">{quiz.title}</h2>
             {!result && (
               <span
-                className={`text-xs font-medium px-2 py-1 rounded ${
+                className={`text-xs font-medium px-2 py-1 rounded transition-colors duration-150 ${
                   remainingMs < 60000 ? "bg-badge-red-bg text-badge-red-text" : "bg-badge-blue-bg text-badge-blue-text"
                 }`}
               >
@@ -165,7 +170,7 @@ export default function QuizAttempt() {
           </div>
 
           {result ? (
-            <div className="text-center py-8">
+            <div className="text-center py-8 animate-[fadeIn_0.2s_ease-in]">
               <p className="text-sm text-gray-600 mb-1">Quiz submitted.</p>
               <p className="text-2xl font-semibold text-gray-900">
                 {result.score} / {result.maxScore}
@@ -179,7 +184,7 @@ export default function QuizAttempt() {
           ) : (
             <div className="space-y-5">
               {questions.map((q, i) => (
-                <div key={q._id} className="border border-gray-100 rounded p-4">
+                <div key={q._id} className="border border-gray-100 rounded p-4 transition-shadow duration-150 hover:shadow-card">
                   <p className="text-xs font-medium text-gray-900 mb-3">
                     {i + 1}. {q.text}
                     {q.type === "subjective" && (
@@ -188,7 +193,7 @@ export default function QuizAttempt() {
                   </p>
                   {q.type === "subjective" ? (
                     <textarea
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-xs"
+                      className={inputClass}
                       rows={4}
                       placeholder="Type your answer…"
                       value={selections[q._id] || ""}
@@ -212,16 +217,12 @@ export default function QuizAttempt() {
                 </div>
               ))}
 
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="bg-navy text-white text-xs font-medium rounded px-4 py-2 disabled:opacity-50"
-              >
+              <Button onClick={handleSubmit} disabled={submitting}>
                 {submitting ? "Submitting…" : "Submit Quiz"}
-              </button>
+              </Button>
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </DashboardShell>
   );

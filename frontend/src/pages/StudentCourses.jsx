@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { listCourses, getMaterials, downloadMaterial } from "../api/courses";
 import { listQuizzesForCourse } from "../api/quizzes";
+import { Card, Button, EmptyState, LoadingState } from "../components/ui";
 
 export default function StudentCourses() {
   const navigate = useNavigate();
@@ -33,25 +34,27 @@ export default function StudentCourses() {
     setQuizzes(await listQuizzesForCourse(course._id));
   }
 
-  if (loading) return <div className="text-sm text-gray-500">Loading courses…</div>;
+  if (loading) return <LoadingState label="Loading courses…" />;
 
   return (
     <div className="space-y-5">
       {error && (
-        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2">{error}</div>
+        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
+          {error}
+        </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <h2 className="text-sm font-medium text-gray-900 mb-3">My Courses</h2>
         <div className="space-y-2">
           {courses.length === 0 && (
-            <p className="text-xs text-gray-500">You are not enrolled in any courses yet.</p>
+            <EmptyState icon="📚" title="You are not enrolled in any courses yet." />
           )}
           {courses.map((c) => (
             <div
               key={c._id}
               onClick={() => openCourse(c)}
-              className={`px-3 py-2 rounded cursor-pointer border ${
+              className={`px-3 py-2 rounded cursor-pointer border transition-colors duration-150 ${
                 selectedCourse?._id === c._id
                   ? "border-navy-light bg-badge-blue-bg"
                   : "border-gray-200 hover:bg-gray-50"
@@ -64,14 +67,17 @@ export default function StudentCourses() {
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
       {selectedCourse && (
-        <div className="bg-white border border-gray-200 rounded-card p-5">
+        <Card>
           <h2 className="text-sm font-medium text-gray-900 mb-3">Materials — {selectedCourse.code}</h2>
           <div className="space-y-1">
             {materials.map((m) => (
-              <div key={m._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
+              <div
+                key={m._id}
+                className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+              >
                 <div>
                   <div className="text-gray-900 font-medium">{m.title}</div>
                   <div className="text-[11px] text-gray-400 uppercase">
@@ -86,32 +92,32 @@ export default function StudentCourses() {
                 </button>
               </div>
             ))}
-            {materials.length === 0 && <p className="text-xs text-gray-500">No materials uploaded yet.</p>}
+            {materials.length === 0 && <EmptyState icon="📄" title="No materials uploaded yet." />}
           </div>
-        </div>
+        </Card>
       )}
 
       {selectedCourse && (
-        <div className="bg-white border border-gray-200 rounded-card p-5">
+        <Card>
           <h2 className="text-sm font-medium text-gray-900 mb-3">Quizzes — {selectedCourse.code}</h2>
           <div className="space-y-1">
             {quizzes.map((q) => (
-              <div key={q._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
+              <div
+                key={q._id}
+                className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+              >
                 <div>
                   <div className="text-gray-900 font-medium">{q.title}</div>
                   <div className="text-[11px] text-gray-400">{q.durationMinutes} min</div>
                 </div>
-                <button
-                  onClick={() => navigate(`/quiz/${q._id}`)}
-                  className="bg-navy text-white text-xs font-medium rounded px-3 py-1.5"
-                >
+                <Button onClick={() => navigate(`/quiz/${q._id}`)} className="px-3 py-1.5">
                   Open
-                </button>
+                </Button>
               </div>
             ))}
-            {quizzes.length === 0 && <p className="text-xs text-gray-500">No quizzes available yet.</p>}
+            {quizzes.length === 0 && <EmptyState icon="📝" title="No quizzes available yet." />}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

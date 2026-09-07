@@ -13,6 +13,11 @@ import {
   getSessionDetail,
   updateSessionRecords,
 } from "../api/attendance";
+import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
+
+const inputClass =
+  "border border-gray-300 rounded px-3 py-1.5 text-xs transition-colors duration-150 " +
+  "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 const BLANK_QUESTION = () => ({
   type: "mcq",
@@ -258,23 +263,27 @@ export default function TeacherCourses() {
     setResults(await getAttemptsForQuiz(quiz._id));
   }
 
-  if (loading) return <div className="text-sm text-gray-500">Loading courses…</div>;
+  if (loading) return <LoadingState label="Loading courses…" />;
 
   return (
     <div className="space-y-5">
       {error && (
-        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2">{error}</div>
+        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
+          {error}
+        </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <h2 className="text-sm font-medium text-gray-900 mb-3">My Courses</h2>
         <div className="space-y-2">
-          {courses.length === 0 && <p className="text-xs text-gray-500">No courses assigned yet.</p>}
+          {courses.length === 0 && (
+            <EmptyState icon="📚" title="No courses assigned yet." />
+          )}
           {courses.map((c) => (
             <div
               key={c._id}
               onClick={() => openCourse(c)}
-              className={`px-3 py-2 rounded cursor-pointer border ${
+              className={`px-3 py-2 rounded cursor-pointer border transition-colors duration-150 ${
                 selectedCourse?._id === c._id
                   ? "border-navy-light bg-badge-blue-bg"
                   : "border-gray-200 hover:bg-gray-50"
@@ -287,10 +296,10 @@ export default function TeacherCourses() {
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
       {selectedCourse && (
-        <div className="bg-white border border-gray-200 rounded-card p-5">
+        <Card>
           <h2 className="text-sm font-medium text-gray-900 mb-3">Materials — {selectedCourse.code}</h2>
 
           <form onSubmit={handleUpload} className="flex items-center gap-2 mb-2">
@@ -299,7 +308,7 @@ export default function TeacherCourses() {
               placeholder="Title (optional)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1.5 text-xs"
+              className={inputClass}
             />
             <input
               type="file"
@@ -307,34 +316,30 @@ export default function TeacherCourses() {
               onChange={(e) => setFile(e.target.files[0])}
               className="text-xs"
             />
-            <button
-              type="submit"
-              disabled={uploading || !file}
-              className="bg-navy text-white text-xs font-medium rounded px-3 py-1.5 disabled:opacity-50"
-            >
+            <Button type="submit" disabled={uploading || !file} className="px-3 py-1.5">
               {uploading ? "Uploading…" : "Upload"}
-            </button>
+            </Button>
           </form>
           <p className="text-[11px] text-gray-500 mb-3">PDF, PPTX, or DOCX — max 20MB.</p>
           {uploadWarning && (
-            <div className="bg-badge-amber-bg text-badge-amber-text text-[11px] rounded px-3 py-2 mb-3">
+            <div className="bg-badge-amber-bg text-badge-amber-text text-[11px] rounded px-3 py-2 mb-3 animate-[fadeIn_0.15s_ease-in]">
               ⚠ {uploadWarning}
             </div>
           )}
 
           <div className="space-y-1">
             {materials.map((m) => (
-              <div key={m._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
+              <div
+                key={m._id}
+                className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+              >
                 <div>
                   <div className="text-gray-900 font-medium flex items-center gap-1.5">
                     {m.title}
                     {m.textExtractionWarning && (
-                      <span
-                        title={m.textExtractionWarning}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-badge-amber-bg text-badge-amber-text cursor-help"
-                      >
+                      <Badge variant="amber" title={m.textExtractionWarning} className="cursor-help">
                         ⚠ no readable text
-                      </span>
+                      </Badge>
                     )}
                   </div>
                   <div className="text-[11px] text-gray-400 uppercase">
@@ -365,28 +370,25 @@ export default function TeacherCourses() {
                 </div>
               </div>
             ))}
-            {materials.length === 0 && <p className="text-xs text-gray-500">No materials uploaded yet.</p>}
+            {materials.length === 0 && <EmptyState icon="📄" title="No materials uploaded yet." />}
           </div>
-        </div>
+        </Card>
       )}
 
       {selectedCourse && (
-        <div className="bg-white border border-gray-200 rounded-card p-5">
+        <Card>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-gray-900">Quizzes — {selectedCourse.code}</h2>
-            <button
-              onClick={() => setShowQuizForm((v) => !v)}
-              className="bg-navy text-white text-xs font-medium rounded px-3 py-1.5"
-            >
+            <Button onClick={() => setShowQuizForm((v) => !v)} variant={showQuizForm ? "secondary" : "primary"} className="px-3 py-1.5">
               {showQuizForm ? "Cancel" : "New Quiz"}
-            </button>
+            </Button>
           </div>
 
           {showQuizForm && (
-            <form onSubmit={handleCreateQuiz} className="border border-gray-200 rounded p-3 mb-4 space-y-3">
+            <form onSubmit={handleCreateQuiz} className="border border-gray-200 rounded p-3 mb-4 space-y-3 animate-[fadeIn_0.15s_ease-in]">
               <div className="bg-badge-blue-bg border border-navy-light/20 rounded p-3 flex items-center gap-2">
                 <select
-                  className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs bg-white"
+                  className={`flex-1 bg-white ${inputClass}`}
                   value={generateMaterialId}
                   onChange={(e) => setGenerateMaterialId(e.target.value)}
                 >
@@ -401,18 +403,19 @@ export default function TeacherCourses() {
                   type="number"
                   min="1"
                   max="20"
-                  className="w-16 border border-gray-300 rounded px-2 py-1.5 text-xs"
+                  className={`w-16 ${inputClass}`}
                   value={generateNumQuestions}
                   onChange={(e) => setGenerateNumQuestions(e.target.value)}
                 />
-                <button
+                <Button
                   type="button"
                   onClick={handleGenerate}
                   disabled={generating || !generateMaterialId}
-                  className="bg-navy-light text-white text-xs font-medium rounded px-3 py-1.5 disabled:opacity-50"
+                  variant="secondary"
+                  className="px-3 py-1.5"
                 >
                   {generating ? "Generating…" : "Generate with AI"}
-                </button>
+                </Button>
               </div>
               {materials.length === 0 && (
                 <p className="text-[10px] text-gray-400 -mt-2">
@@ -422,7 +425,7 @@ export default function TeacherCourses() {
 
               <div className="flex gap-2">
                 <input
-                  className="flex-1 border border-gray-300 rounded px-3 py-2 text-xs"
+                  className={`flex-1 ${inputClass} py-2`}
                   placeholder="Quiz title"
                   value={quizTitle}
                   onChange={(e) => setQuizTitle(e.target.value)}
@@ -431,7 +434,7 @@ export default function TeacherCourses() {
                 <input
                   type="number"
                   min="1"
-                  className="w-32 border border-gray-300 rounded px-3 py-2 text-xs"
+                  className={`w-32 ${inputClass} py-2`}
                   placeholder="Minutes"
                   value={quizDuration}
                   onChange={(e) => setQuizDuration(e.target.value)}
@@ -443,7 +446,7 @@ export default function TeacherCourses() {
                 <div key={qi} className="border border-gray-100 rounded p-3 space-y-2 bg-gray-50">
                   <div className="flex items-center gap-2">
                     <select
-                      className="border border-gray-300 rounded px-2 py-1.5 text-xs bg-white"
+                      className={`bg-white ${inputClass}`}
                       value={q.type}
                       onChange={(e) => updateQuestion(qi, { type: e.target.value })}
                     >
@@ -451,7 +454,7 @@ export default function TeacherCourses() {
                       <option value="subjective">Subjective (manually graded)</option>
                     </select>
                     <input
-                      className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-xs"
+                      className={`flex-1 ${inputClass}`}
                       placeholder={`Question ${qi + 1}`}
                       value={q.text}
                       onChange={(e) => updateQuestion(qi, { text: e.target.value })}
@@ -469,7 +472,7 @@ export default function TeacherCourses() {
                   </div>
 
                   <input
-                    className="w-48 border border-gray-300 rounded px-2 py-1 text-[11px]"
+                    className={`w-48 ${inputClass} px-2 py-1 text-[11px]`}
                     placeholder="Topic (optional, e.g. Arrays)"
                     value={q.topic || ""}
                     onChange={(e) => updateQuestion(qi, { topic: e.target.value })}
@@ -482,7 +485,7 @@ export default function TeacherCourses() {
                       <input
                         type="number"
                         min="1"
-                        className="w-20 border border-gray-300 rounded px-2 py-1 text-xs"
+                        className={`w-20 ${inputClass} px-2 py-1`}
                         value={q.maxScore}
                         onChange={(e) => updateQuestion(qi, { maxScore: Number(e.target.value) })}
                         required
@@ -503,7 +506,7 @@ export default function TeacherCourses() {
                               onChange={() => updateQuestion(qi, { correctOptionIndex: oi })}
                             />
                             <input
-                              className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs"
+                              className={`flex-1 ${inputClass} px-2 py-1`}
                               placeholder={`Option ${oi + 1}`}
                               value={opt}
                               onChange={(e) => updateOption(qi, oi, e.target.value)}
@@ -522,33 +525,26 @@ export default function TeacherCourses() {
                 <button type="button" onClick={addQuestion} className="text-xs text-navy-light hover:underline">
                   + Add another question
                 </button>
-                <button
-                  type="submit"
-                  disabled={creatingQuiz}
-                  className="bg-navy text-white text-xs font-medium rounded px-4 py-2 disabled:opacity-50"
-                >
+                <Button type="submit" disabled={creatingQuiz}>
                   {creatingQuiz ? "Creating…" : "Create Quiz"}
-                </button>
+                </Button>
               </div>
             </form>
           )}
 
           <div className="space-y-1">
-            {quizzes.length === 0 && <p className="text-xs text-gray-500">No quizzes yet.</p>}
+            {quizzes.length === 0 && <EmptyState icon="📝" title="No quizzes yet." />}
             {quizzes.map((q) => (
-              <div key={q._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
+              <div
+                key={q._id}
+                className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+              >
                 <div>
                   <div className="text-gray-900 font-medium">{q.title}</div>
                   <div className="text-[11px] text-gray-400">{q.durationMinutes} min</div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded ${
-                      q.isPublished ? "bg-badge-green-bg text-badge-green-text" : "bg-badge-amber-bg text-badge-amber-text"
-                    }`}
-                  >
-                    {q.isPublished ? "Published" : "Draft"}
-                  </span>
+                  <Badge variant={q.isPublished ? "green" : "amber"}>{q.isPublished ? "Published" : "Draft"}</Badge>
                   <button onClick={() => handleTogglePublish(q)} className="text-navy-light hover:underline">
                     {q.isPublished ? "Unpublish" : "Publish"}
                   </button>
@@ -561,10 +557,10 @@ export default function TeacherCourses() {
           </div>
 
           {resultsQuiz && (
-            <div className="mt-4 border-t border-gray-100 pt-3">
+            <div className="mt-4 border-t border-gray-100 pt-3 animate-[fadeIn_0.15s_ease-in]">
               <h3 className="text-xs font-medium text-gray-900 mb-2">Results — {resultsQuiz.title}</h3>
               <div className="space-y-1">
-                {results.length === 0 && <p className="text-xs text-gray-500">No attempts yet.</p>}
+                {results.length === 0 && <EmptyState icon="🗒️" title="No attempts yet." />}
                 {results.map((r) => (
                   <div key={r._id} className="flex justify-between text-xs border-b border-gray-100 py-1">
                     <span>{r.student?.name}</span>
@@ -580,11 +576,11 @@ export default function TeacherCourses() {
               </div>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {selectedCourse && (
-        <div className="bg-white border border-gray-200 rounded-card p-5">
+        <Card>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-gray-900">
               Attendance — {selectedCourse.code}
@@ -594,21 +590,18 @@ export default function TeacherCourses() {
                 </span>
               )}
             </h2>
-            <button
-              onClick={() => setShowSessionForm((s) => !s)}
-              className="bg-navy text-white text-xs font-medium rounded px-3 py-1.5"
-            >
+            <Button onClick={() => setShowSessionForm((s) => !s)} variant={showSessionForm ? "secondary" : "primary"} className="px-3 py-1.5">
               {showSessionForm ? "Cancel" : "New Session"}
-            </button>
+            </Button>
           </div>
 
           {showSessionForm && (
-            <form onSubmit={handleCreateSession} className="flex items-center gap-2 mb-4 border border-gray-200 rounded p-3">
+            <form onSubmit={handleCreateSession} className="flex items-center gap-2 mb-4 border border-gray-200 rounded p-3 animate-[fadeIn_0.15s_ease-in]">
               <input
                 type="date"
                 value={sessionDate}
                 onChange={(e) => setSessionDate(e.target.value)}
-                className="border border-gray-300 rounded px-3 py-1.5 text-xs"
+                className={inputClass}
                 required
               />
               <input
@@ -616,20 +609,16 @@ export default function TeacherCourses() {
                 placeholder="Topic (optional)"
                 value={sessionTopic}
                 onChange={(e) => setSessionTopic(e.target.value)}
-                className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-xs"
+                className={`flex-1 ${inputClass}`}
               />
-              <button
-                type="submit"
-                disabled={creatingSession}
-                className="bg-navy-light text-white text-xs font-medium rounded px-3 py-1.5 disabled:opacity-50"
-              >
+              <Button type="submit" disabled={creatingSession} variant="secondary" className="px-3 py-1.5">
                 {creatingSession ? "Creating…" : "Create"}
-              </button>
+              </Button>
             </form>
           )}
 
           {markingSession ? (
-            <div className="border border-gray-200 rounded p-3">
+            <div className="border border-gray-200 rounded p-3 animate-[fadeIn_0.15s_ease-in]">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-medium text-gray-900">
                   Mark attendance — {new Date(markingSession.date).toLocaleDateString()}
@@ -646,7 +635,7 @@ export default function TeacherCourses() {
                     <select
                       value={r.status}
                       onChange={(e) => updateRecordStatus(r.student._id, e.target.value)}
-                      className={`text-[11px] border rounded px-2 py-1 ${
+                      className={`text-[11px] border rounded px-2 py-1 transition-colors duration-150 ${
                         r.status === "present"
                           ? "bg-badge-green-bg text-badge-green-text border-transparent"
                           : r.status === "absent"
@@ -662,22 +651,18 @@ export default function TeacherCourses() {
                   </div>
                 ))}
               </div>
-              <button
-                onClick={handleSaveMarks}
-                disabled={savingMarks}
-                className="bg-navy text-white text-xs font-medium rounded px-4 py-2 disabled:opacity-50"
-              >
+              <Button onClick={handleSaveMarks} disabled={savingMarks}>
                 {savingMarks ? "Saving…" : "Save Attendance"}
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="space-y-1">
-              {attendanceSessions.length === 0 && <p className="text-xs text-gray-500">No sessions recorded yet.</p>}
+              {attendanceSessions.length === 0 && <EmptyState icon="🗓️" title="No sessions recorded yet." />}
               {attendanceSessions.map((s) => (
                 <div
                   key={s._id}
                   onClick={() => handleOpenSession(s._id)}
-                  className="flex items-center justify-between text-xs border-b border-gray-100 py-2 cursor-pointer hover:bg-gray-50"
+                  className="flex items-center justify-between text-xs border-b border-gray-100 py-2 cursor-pointer transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
                 >
                   <div>
                     <div className="text-gray-900 font-medium">{new Date(s.date).toLocaleDateString()}</div>
@@ -690,7 +675,7 @@ export default function TeacherCourses() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
       )}
     </div>
   );

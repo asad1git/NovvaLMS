@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import { listCourses, createCourse, listTeachers, bulkEnrollCSV, getEnrollments } from "../api/courses";
+import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
+
+const inputClass =
+  "border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AdminCourses() {
   const [courses, setCourses] = useState([]);
@@ -71,33 +76,35 @@ export default function AdminCourses() {
     }
   }
 
-  if (loading) return <div className="text-sm text-gray-500">Loading courses…</div>;
+  if (loading) return <LoadingState label="Loading courses…" />;
 
   return (
     <div className="space-y-5">
       {error && (
-        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2">{error}</div>
+        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
+          {error}
+        </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <h2 className="text-sm font-medium text-gray-900 mb-3">Create Course</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
           <input
-            className="border border-gray-300 rounded px-3 py-2 text-xs"
+            className={inputClass}
             placeholder="Course title"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             required
           />
           <input
-            className="border border-gray-300 rounded px-3 py-2 text-xs"
+            className={inputClass}
             placeholder="Course code (e.g. CS201)"
             value={form.code}
             onChange={(e) => setForm({ ...form, code: e.target.value })}
             required
           />
           <select
-            className="border border-gray-300 rounded px-3 py-2 text-xs bg-white"
+            className={`bg-white ${inputClass}`}
             value={form.teacherId}
             onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
             required
@@ -110,30 +117,26 @@ export default function AdminCourses() {
             ))}
           </select>
           <input
-            className="border border-gray-300 rounded px-3 py-2 text-xs"
+            className={inputClass}
             placeholder="Description (optional)"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
-          <button
-            type="submit"
-            disabled={creating}
-            className="col-span-2 bg-navy text-white text-xs font-medium rounded px-4 py-2 w-fit disabled:opacity-50"
-          >
+          <Button type="submit" disabled={creating} className="col-span-2 w-fit">
             {creating ? "Creating…" : "Create Course"}
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
 
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <h2 className="text-sm font-medium text-gray-900 mb-3">All Courses</h2>
         <div className="space-y-2">
-          {courses.length === 0 && <p className="text-xs text-gray-500">No courses yet.</p>}
+          {courses.length === 0 && <EmptyState icon="📚" title="No courses yet." />}
           {courses.map((c) => (
             <div
               key={c._id}
               onClick={() => openCourse(c)}
-              className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer border ${
+              className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer border transition-colors duration-150 ${
                 selectedCourse?._id === c._id
                   ? "border-navy-light bg-badge-blue-bg"
                   : "border-gray-200 hover:bg-gray-50"
@@ -145,37 +148,27 @@ export default function AdminCourses() {
                 </div>
                 <div className="text-[11px] text-gray-500">Teacher: {c.teacher?.name || "—"}</div>
               </div>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded ${
-                  c.isActive ? "bg-badge-green-bg text-badge-green-text" : "bg-badge-red-bg text-badge-red-text"
-                }`}
-              >
-                {c.isActive ? "Active" : "Inactive"}
-              </span>
+              <Badge variant={c.isActive ? "green" : "red"}>{c.isActive ? "Active" : "Inactive"}</Badge>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
       {selectedCourse && (
-        <div className="bg-white border border-gray-200 rounded-card p-5">
+        <Card>
           <h2 className="text-sm font-medium text-gray-900 mb-3">Bulk Enroll — {selectedCourse.code}</h2>
           <form onSubmit={handleEnroll} className="flex items-center gap-2 mb-2">
             <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files[0])} className="text-xs" />
-            <button
-              type="submit"
-              disabled={enrolling || !csvFile}
-              className="bg-navy-light text-white text-xs font-medium rounded px-3 py-1.5 disabled:opacity-50"
-            >
+            <Button type="submit" disabled={enrolling || !csvFile} variant="secondary" className="px-3 py-1.5">
               {enrolling ? "Uploading…" : "Upload CSV"}
-            </button>
+            </Button>
           </form>
           <p className="text-[11px] text-gray-500 mb-3">
             CSV must have an "email" column of existing student accounts.
           </p>
 
           {enrollResult && (
-            <div className="grid grid-cols-3 gap-2 mb-4 text-[11px]">
+            <div className="grid grid-cols-3 gap-2 mb-4 text-[11px] animate-[fadeIn_0.15s_ease-in]">
               <div className="bg-badge-green-bg text-badge-green-text rounded px-2 py-1">
                 Enrolled: {enrollResult.enrolled.length}
               </div>
@@ -196,9 +189,9 @@ export default function AdminCourses() {
                 <span className="text-gray-400">{e.student?.email}</span>
               </div>
             ))}
-            {roster.length === 0 && <p className="text-xs text-gray-500">No students enrolled yet.</p>}
+            {roster.length === 0 && <EmptyState icon="🧑‍🎓" title="No students enrolled yet." />}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

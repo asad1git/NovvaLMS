@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { listCourses } from "../api/courses";
 import { getMessages, sendMessage } from "../api/chat";
+import { Card, Button } from "../components/ui";
+
+const inputClass =
+  "border border-gray-300 rounded px-3 py-1.5 text-xs transition-colors duration-150 " +
+  "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function ChatBot() {
   const [courses, setCourses] = useState([]);
@@ -66,13 +71,15 @@ export default function ChatBot() {
   return (
     <div className="max-w-2xl mx-auto flex flex-col" style={{ height: "calc(100vh - 130px)" }}>
       {error && (
-        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 mb-3">{error}</div>
+        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 mb-3 animate-[fadeIn_0.15s_ease-in]">
+          {error}
+        </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-card p-4 mb-3">
+      <Card padding="p-4" className="mb-3">
         <label className="text-xs text-gray-600 mr-2">Course:</label>
         <select
-          className="border border-gray-300 rounded px-2 py-1.5 text-xs bg-white"
+          className={`bg-white ${inputClass}`}
           value={courseId}
           onChange={(e) => setCourseId(e.target.value)}
         >
@@ -87,9 +94,9 @@ export default function ChatBot() {
           Ask about this course's lecture materials, what's been uploaded, or your own quiz
           performance and weak topics — Novva Assistant only answers from your real data.
         </p>
-      </div>
+      </Card>
 
-      <div className="flex-1 bg-white border border-gray-200 rounded-card p-4 overflow-y-auto mb-3 space-y-3">
+      <Card padding="p-4" className="flex-1 overflow-y-auto mb-3 space-y-3">
         {messages.length === 0 && (
           <p className="text-xs text-gray-500">
             Try "What does this course cover?", "Where am I weak?", or ask about the lecture
@@ -97,9 +104,9 @@ export default function ChatBot() {
           </p>
         )}
         {messages.map((m) => (
-          <div key={m._id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div key={m._id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} animate-[fadeIn_0.2s_ease-out]`}>
             <div
-              className={`max-w-[80%] rounded-card px-3 py-2 text-xs ${
+              className={`max-w-[80%] rounded-card shadow-sm px-3 py-2 text-xs ${
                 m.role === "user" ? "bg-navy text-white" : "bg-badge-blue-bg text-gray-900"
               }`}
             >
@@ -113,28 +120,24 @@ export default function ChatBot() {
           </div>
         ))}
         {sending && (
-          <div className="flex justify-start">
-            <div className="bg-badge-blue-bg text-gray-500 rounded-card px-3 py-2 text-xs italic">Thinking…</div>
+          <div className="flex justify-start animate-[fadeIn_0.2s_ease-out]">
+            <div className="bg-badge-blue-bg text-gray-500 rounded-card shadow-sm px-3 py-2 text-xs italic">Thinking…</div>
           </div>
         )}
         <div ref={bottomRef} />
-      </div>
+      </Card>
 
       <form onSubmit={handleSend} className="flex gap-2">
         <input
-          className="flex-1 border border-gray-300 rounded px-3 py-2 text-xs"
+          className={`flex-1 ${inputClass} py-2`}
           placeholder="Ask a question about this course…"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           disabled={sending || !courseId}
         />
-        <button
-          type="submit"
-          disabled={sending || !draft.trim() || !courseId}
-          className="bg-navy text-white text-xs font-medium rounded px-4 py-2 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={sending || !draft.trim() || !courseId}>
           Send
-        </button>
+        </Button>
       </form>
     </div>
   );

@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import { listUsers, createUser, updateUser } from "../api/users";
+import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
 
-const ROLE_BADGE = {
-  admin: "bg-gray-100 text-gray-700",
-  teacher: "bg-badge-blue-bg text-badge-blue-text",
-  student: "bg-badge-amber-bg text-badge-amber-text",
-  parent: "bg-gray-100 text-gray-700",
+const ROLE_BADGE_VARIANT = {
+  admin: "gray",
+  teacher: "blue",
+  student: "amber",
+  parent: "gray",
 };
+
+const inputClass =
+  "border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -71,22 +76,26 @@ export default function AdminUsers() {
     }
   }
 
-  if (loading) return <div className="text-sm text-gray-500">Loading users…</div>;
+  if (loading) return <LoadingState label="Loading users…" />;
 
   return (
     <div className="space-y-5">
       {error && (
-        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2">{error}</div>
+        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
+          {error}
+        </div>
       )}
       {notice && (
-        <div className="bg-badge-green-bg text-badge-green-text text-xs rounded-card px-4 py-2">{notice}</div>
+        <div className="bg-badge-green-bg text-badge-green-text text-xs rounded-card px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
+          {notice}
+        </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <h2 className="text-sm font-medium text-gray-900 mb-3">Create User</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-3 gap-3">
           <input
-            className="border border-gray-300 rounded px-3 py-2 text-xs"
+            className={inputClass}
             placeholder="Full name"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -94,14 +103,14 @@ export default function AdminUsers() {
           />
           <input
             type="email"
-            className="border border-gray-300 rounded px-3 py-2 text-xs"
+            className={inputClass}
             placeholder="Email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
           />
           <select
-            className="border border-gray-300 rounded px-3 py-2 text-xs bg-white"
+            className={`bg-white ${inputClass}`}
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}
           >
@@ -110,24 +119,20 @@ export default function AdminUsers() {
             <option value="parent">Parent</option>
             <option value="admin">Admin</option>
           </select>
-          <button
-            type="submit"
-            disabled={creating}
-            className="col-span-3 bg-navy text-white text-xs font-medium rounded px-4 py-2 w-fit disabled:opacity-50"
-          >
+          <Button type="submit" disabled={creating} className="col-span-3 w-fit">
             {creating ? "Creating…" : "Create User"}
-          </button>
+          </Button>
         </form>
         <p className="text-[11px] text-gray-500 mt-2">
           A temporary password is generated automatically and emailed to the user.
         </p>
-      </div>
+      </Card>
 
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-medium text-gray-900">All Users ({users.length})</h2>
           <select
-            className="border border-gray-300 rounded px-2 py-1 text-xs bg-white"
+            className={`bg-white ${inputClass} py-1`}
             value={roleFilter}
             onChange={(e) => handleFilterChange(e.target.value)}
           >
@@ -140,39 +145,37 @@ export default function AdminUsers() {
         </div>
 
         <div className="space-y-1">
-          {users.length === 0 && <p className="text-xs text-gray-500">No users found.</p>}
+          {users.length === 0 && <EmptyState icon="👤" title="No users found." />}
           {users.map((u) => (
-            <div key={u._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
+            <div
+              key={u._id}
+              className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+            >
               <div>
                 <div className="text-gray-900 font-medium">{u.name}</div>
                 <div className="text-[11px] text-gray-400">{u.email}</div>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`text-[10px] px-2 py-0.5 rounded capitalize ${ROLE_BADGE[u.role] || "bg-gray-100 text-gray-700"}`}>
+                <Badge variant={ROLE_BADGE_VARIANT[u.role] || "gray"} className="capitalize">
                   {u.role}
-                </span>
+                </Badge>
                 {u._id === currentUserId ? (
-                  <span
-                    title="You can't deactivate your own account"
-                    className="text-[10px] px-2 py-0.5 rounded bg-badge-green-bg text-badge-green-text opacity-60"
-                  >
+                  <Badge variant="green" title="You can't deactivate your own account" className="opacity-60">
                     Active (you)
-                  </span>
+                  </Badge>
                 ) : (
                   <button
                     onClick={() => handleToggleActive(u)}
-                    className={`text-[10px] px-2 py-0.5 rounded cursor-pointer hover:opacity-80 ${
-                      u.isActive ? "bg-badge-green-bg text-badge-green-text" : "bg-badge-red-bg text-badge-red-text"
-                    }`}
+                    className="cursor-pointer hover:opacity-80 transition-opacity duration-150"
                   >
-                    {u.isActive ? "Active" : "Inactive"}
+                    <Badge variant={u.isActive ? "green" : "red"}>{u.isActive ? "Active" : "Inactive"}</Badge>
                   </button>
                 )}
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

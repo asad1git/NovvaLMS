@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { listTeachers } from "../api/courses";
 import { listSalarySlips, createSalarySlip, downloadSalarySlipPdf } from "../api/finance";
+import { Card, Button, EmptyState, LoadingState } from "../components/ui";
+
+const inputClass =
+  "border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AdminSalarySlips() {
   const [employees, setEmployees] = useState([]);
@@ -47,19 +52,21 @@ export default function AdminSalarySlips() {
     }
   }
 
-  if (loading) return <div className="text-sm text-gray-500">Loading…</div>;
+  if (loading) return <LoadingState label="Loading salary slips…" />;
 
   return (
     <div className="space-y-5">
       {error && (
-        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2">{error}</div>
+        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
+          {error}
+        </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <h2 className="text-sm font-medium text-gray-900 mb-3">Create Salary Slip</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
           <select
-            className="border border-gray-300 rounded px-3 py-2 text-xs bg-white"
+            className={`bg-white ${inputClass}`}
             value={form.employeeId}
             onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
             required
@@ -72,7 +79,7 @@ export default function AdminSalarySlips() {
             ))}
           </select>
           <input
-            className="border border-gray-300 rounded px-3 py-2 text-xs"
+            className={inputClass}
             placeholder="Month (e.g. September 2026)"
             value={form.month}
             onChange={(e) => setForm({ ...form, month: e.target.value })}
@@ -81,7 +88,7 @@ export default function AdminSalarySlips() {
           <input
             type="number"
             min="0"
-            className="border border-gray-300 rounded px-3 py-2 text-xs"
+            className={inputClass}
             placeholder="Basic Salary (Rs.)"
             value={form.basicSalary}
             onChange={(e) => setForm({ ...form, basicSalary: e.target.value })}
@@ -90,7 +97,7 @@ export default function AdminSalarySlips() {
           <input
             type="number"
             min="0"
-            className="border border-gray-300 rounded px-3 py-2 text-xs"
+            className={inputClass}
             placeholder="Allowances (optional)"
             value={form.allowances}
             onChange={(e) => setForm({ ...form, allowances: e.target.value })}
@@ -98,27 +105,26 @@ export default function AdminSalarySlips() {
           <input
             type="number"
             min="0"
-            className="border border-gray-300 rounded px-3 py-2 text-xs"
+            className={inputClass}
             placeholder="Deductions (optional)"
             value={form.deductions}
             onChange={(e) => setForm({ ...form, deductions: e.target.value })}
           />
-          <button
-            type="submit"
-            disabled={creating}
-            className="col-span-2 bg-navy text-white text-xs font-medium rounded px-4 py-2 w-fit disabled:opacity-50"
-          >
+          <Button type="submit" disabled={creating} className="col-span-2 w-fit">
             {creating ? "Creating…" : "Create Slip"}
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
 
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <h2 className="text-sm font-medium text-gray-900 mb-3">All Salary Slips ({slips.length})</h2>
         <div className="space-y-1">
-          {slips.length === 0 && <p className="text-xs text-gray-500">No salary slips yet.</p>}
+          {slips.length === 0 && <EmptyState icon="💰" title="No salary slips yet." />}
           {slips.map((s) => (
-            <div key={s._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
+            <div
+              key={s._id}
+              className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+            >
               <div>
                 <div className="text-gray-900 font-medium">
                   {s.employee?.name} — {s.month}
@@ -134,7 +140,7 @@ export default function AdminSalarySlips() {
             </div>
           ))}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
