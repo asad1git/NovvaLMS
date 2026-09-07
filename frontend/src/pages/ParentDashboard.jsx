@@ -3,6 +3,7 @@ import DashboardShell from "../components/DashboardShell";
 import AccountSettings from "./AccountSettings";
 import { getMyChildren, getChildAnalytics } from "../api/parentLinks";
 import { getMessages, sendMessage } from "../api/parentChat";
+import { StatCard, Card, Button, EmptyState, LoadingState } from "../components/ui";
 
 const NAV_ITEMS = ["Dashboard", "AI Assistant", "Account Settings"];
 
@@ -19,15 +20,6 @@ function barColor(pct) {
   return "bg-badge-red-text";
 }
 
-function StatCard({ label, value, accent }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-card p-5">
-      <p className="text-[11px] text-gray-500 mb-1">{label}</p>
-      <p className={`text-2xl font-semibold ${accent ? "text-badge-red-text" : "text-gray-900"}`}>{value}</p>
-    </div>
-  );
-}
-
 function ChildPicker({ children, selectedId, setSelectedId }) {
   if (children.length <= 1) return null;
   return (
@@ -36,10 +28,10 @@ function ChildPicker({ children, selectedId, setSelectedId }) {
         <button
           key={c._id}
           onClick={() => setSelectedId(c._id)}
-          className={`text-xs font-medium px-4 py-2 rounded-card border ${
+          className={`text-xs font-medium px-4 py-2 rounded-card border transition-all duration-150 ${
             c._id === selectedId
-              ? "bg-navy text-white border-navy"
-              : "bg-white text-gray-700 border-gray-200 hover:border-navy-light"
+              ? "bg-navy text-white border-navy shadow-card"
+              : "bg-white text-gray-700 border-gray-200 hover:border-navy-light hover:shadow-card"
           }`}
         >
           {c.name}
@@ -49,87 +41,104 @@ function ChildPicker({ children, selectedId, setSelectedId }) {
   );
 }
 
+function NoLinkedChildren() {
+  return (
+    <Card>
+      <EmptyState
+        icon="👨‍👩‍👧"
+        title="No students linked to your account yet"
+        subtitle="Contact your institution's admin to get linked to your child's account."
+      />
+    </Card>
+  );
+}
+
 function ChildAnalytics({ child, analytics }) {
   const { attempts, topics, overall } = analytics;
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Quizzes Taken" value={overall.totalAttempts} />
+        <StatCard label="Quizzes Taken" value={overall.totalAttempts} icon="📝" />
         <StatCard
           label="Average Score"
           value={overall.averagePercentage !== null ? `${overall.averagePercentage}%` : "—"}
+          icon="📊"
         />
-        <StatCard label="Weak Topics" value={overall.weakTopics.length} accent={overall.weakTopics.length > 0} />
+        <StatCard label="Weak Topics" value={overall.weakTopics.length} accent={overall.weakTopics.length > 0} icon="⚠️" />
       </div>
 
       {overall.weakTopics.length > 0 && (
-        <div className="bg-badge-red-bg border border-badge-red-text/20 rounded-card p-5">
+        <Card variant="danger">
           <h2 className="text-sm font-medium text-badge-red-text mb-2">
             {child.name} is scoring below 60% on these topics
           </h2>
           <div className="flex flex-wrap gap-2">
             {overall.weakTopics.map((t) => (
-              <span key={t.topic} className="text-xs font-medium bg-white text-badge-red-text px-3 py-1 rounded">
+              <span key={t.topic} className="text-xs font-medium bg-white text-badge-red-text px-3 py-1 rounded shadow-sm">
                 {t.topic} — {t.percentage}%
               </span>
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <h2 className="text-sm font-medium text-gray-900 mb-3">Quiz Results ({attempts.length})</h2>
-        {attempts.length === 0 && <p className="text-xs text-gray-500">No submitted quizzes yet.</p>}
-        <div className="space-y-1">
-          {attempts.map((r) => (
-            <div key={r.attemptId} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
-              <div>
-                <div className="text-gray-900 font-medium">{r.quizTitle}</div>
-                <div className="text-[11px] text-gray-500">
-                  {r.courseTitle} · submitted {new Date(r.submittedAt).toLocaleDateString()}
+        {attempts.length === 0 ? (
+          <EmptyState icon="📝" title="No submitted quizzes yet" />
+        ) : (
+          <div className="space-y-1">
+            {attempts.map((r) => (
+              <div key={r.attemptId} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
+                <div>
+                  <div className="text-gray-900 font-medium">{r.quizTitle}</div>
+                  <div className="text-[11px] text-gray-500">
+                    {r.courseTitle} · submitted {new Date(r.submittedAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {!r.gradingComplete && (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-badge-amber-bg text-badge-amber-text">
+                      Awaiting review
+                    </span>
+                  )}
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${scoreBadgeClass(r.percentage)}`}>
+                    {r.score}/{r.maxScore ?? "?"}
+                    {r.percentage !== null ? ` (${r.percentage}%)` : ""}
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                {!r.gradingComplete && (
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-badge-amber-bg text-badge-amber-text">
-                    Awaiting review
-                  </span>
-                )}
-                <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${scoreBadgeClass(r.percentage)}`}>
-                  {r.score}/{r.maxScore ?? "?"}
-                  {r.percentage !== null ? ` (${r.percentage}%)` : ""}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-card p-5">
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Performance by Topic</h2>
-        {topics.length === 0 && (
-          <p className="text-xs text-gray-500">No graded questions yet — topic breakdown appears once scored.</p>
+            ))}
+          </div>
         )}
-        <div className="space-y-3">
-          {topics.map((t) => (
-            <div key={t.topic}>
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-gray-900 font-medium">{t.topic}</span>
-                <span className="text-gray-500">
-                  {t.pointsEarned}/{t.pointsPossible} ({t.percentage}%)
-                </span>
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-medium text-gray-900 mb-3">Performance by Topic</h2>
+        {topics.length === 0 ? (
+          <EmptyState icon="📊" title="No topic breakdown yet" subtitle="This appears once quizzes are scored." />
+        ) : (
+          <div className="space-y-3">
+            {topics.map((t) => (
+              <div key={t.topic}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-gray-900 font-medium">{t.topic}</span>
+                  <span className="text-gray-500">
+                    {t.pointsEarned}/{t.pointsPossible} ({t.percentage}%)
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-100 rounded overflow-hidden">
+                  <div
+                    className={`h-1.5 rounded transition-[width] duration-500 ease-out ${barColor(t.percentage)}`}
+                    style={{ width: `${Math.min(100, t.percentage)}%` }}
+                  />
+                </div>
               </div>
-              <div className="w-full h-1.5 bg-gray-100 rounded">
-                <div
-                  className={`h-1.5 rounded ${barColor(t.percentage)}`}
-                  style={{ width: `${Math.min(100, t.percentage)}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
@@ -149,14 +158,7 @@ function ParentOverview({ children, selectedId, setSelectedId }) {
       .finally(() => setLoading(false));
   }, [selectedId]);
 
-  if (children.length === 0) {
-    return (
-      <div className="bg-white border border-gray-200 rounded-card p-5 text-xs text-gray-500">
-        No students are linked to your account yet. Contact your institution's admin to get
-        linked to your child's account.
-      </div>
-    );
-  }
+  if (children.length === 0) return <NoLinkedChildren />;
 
   const selectedChild = children.find((c) => c._id === selectedId);
 
@@ -164,11 +166,7 @@ function ParentOverview({ children, selectedId, setSelectedId }) {
     <div>
       <ChildPicker children={children} selectedId={selectedId} setSelectedId={setSelectedId} />
       {error && <p className="text-xs text-badge-red-text mb-3">{error}</p>}
-      {loading || !analytics ? (
-        <p className="text-sm text-gray-500">Loading {selectedChild?.name}'s progress…</p>
-      ) : (
-        <ChildAnalytics child={selectedChild} analytics={analytics} />
-      )}
+      {loading || !analytics ? <LoadingState label={`Loading ${selectedChild?.name}'s progress…`} /> : <ChildAnalytics child={selectedChild} analytics={analytics} />}
     </div>
   );
 }
@@ -215,39 +213,32 @@ function ParentChat({ children, selectedId, setSelectedId }) {
     }
   }
 
-  if (children.length === 0) {
-    return (
-      <div className="bg-white border border-gray-200 rounded-card p-5 text-xs text-gray-500">
-        No students are linked to your account yet. Contact your institution's admin to get
-        linked to your child's account.
-      </div>
-    );
-  }
+  if (children.length === 0) return <NoLinkedChildren />;
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col" style={{ height: "calc(100vh - 130px)" }}>
       <ChildPicker children={children} selectedId={selectedId} setSelectedId={setSelectedId} />
       {error && (
-        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 mb-3">{error}</div>
+        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 mb-3 animate-[fadeIn_0.15s_ease-in]">{error}</div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-card p-4 mb-3">
+      <Card padding="p-4" className="mb-3">
         <p className="text-[10px] text-gray-400">
           Ask about {selectedChild?.name}'s quiz scores, weak topics, or overall progress. Answers
           are drawn only from {selectedChild?.name}'s recorded performance data.
         </p>
-      </div>
+      </Card>
 
-      <div className="flex-1 bg-white border border-gray-200 rounded-card p-4 overflow-y-auto mb-3 space-y-3">
+      <Card padding="p-4" className="flex-1 overflow-y-auto mb-3 space-y-3">
         {messages.length === 0 && (
           <p className="text-xs text-gray-500">
             Ask a question, e.g. "Where is {selectedChild?.name} struggling?" or "How is the average score trending?"
           </p>
         )}
         {messages.map((m) => (
-          <div key={m._id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div key={m._id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} animate-[fadeIn_0.2s_ease-in]`}>
             <div
-              className={`max-w-[80%] rounded-card px-3 py-2 text-xs ${
+              className={`max-w-[80%] rounded-card px-3 py-2 text-xs shadow-sm ${
                 m.role === "user" ? "bg-navy text-white" : "bg-badge-blue-bg text-gray-900"
               }`}
             >
@@ -261,23 +252,19 @@ function ParentChat({ children, selectedId, setSelectedId }) {
           </div>
         )}
         <div ref={bottomRef} />
-      </div>
+      </Card>
 
       <form onSubmit={handleSend} className="flex gap-2">
         <input
-          className="flex-1 border border-gray-300 rounded px-3 py-2 text-xs"
+          className="flex-1 border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30"
           placeholder={`Ask about ${selectedChild?.name || "your child"}'s performance…`}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           disabled={sending || !selectedId}
         />
-        <button
-          type="submit"
-          disabled={sending || !draft.trim() || !selectedId}
-          className="bg-navy text-white text-xs font-medium rounded px-4 py-2 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={sending || !draft.trim() || !selectedId}>
           Send
-        </button>
+        </Button>
       </form>
     </div>
   );
@@ -301,7 +288,7 @@ export default function ParentDashboard() {
   return (
     <DashboardShell role="Parent" navItems={NAV_ITEMS} activeNav={activeNav} onNavClick={setActiveNav}>
       {loadingChildren ? (
-        <p className="text-sm text-gray-500">Loading…</p>
+        <LoadingState />
       ) : activeNav === "Account Settings" ? (
         <AccountSettings />
       ) : activeNav === "AI Assistant" ? (

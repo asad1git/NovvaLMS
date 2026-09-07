@@ -586,6 +586,31 @@ All 7 high-fidelity screen prototypes (Login, Admin/Teacher/Student Dashboard,
 Quiz Attempt, AI Chatbot, Performance Analytics) were designed against this
 exact system — match them pixel-for-pixel when building out each dashboard.
 
+**Visual-polish pass, post-backlog — completes Sprint 9's originally-deferred "polish" item.**
+Same layout and locked palette throughout, just elevated execution. Two additive tokens in
+`tailwind.config.js` (`shadow-card`, `shadow-card-hover`) give cards a resting shadow instead of a
+flat border, with a lift on hover for clickable ones. A new `frontend/src/components/ui/`
+directory (`Badge`, `Button`, `Card`, `StatCard`, `EmptyState`, `LoadingState`, barrel-exported
+from `ui/index.js`) replaces markup that was previously hand-duplicated per page — `StatCard` in
+particular existed as a near-identical local copy in six different files
+(Admin/Teacher/StudentOverview, `Analytics.jsx`, `ParentDashboard.jsx`, `Attendance.jsx`) before
+being consolidated here. `Card` takes a `variant` prop (`default`/`danger`/`warning`/`success`)
+for color rather than a `className` override — **a `className` conflicting with `Card`'s own
+`bg-*`/`border-*` classes doesn't reliably win, since Tailwind's cascade order depends on where a
+rule lands in the compiled stylesheet, not on class order in the attribute string**; this was a
+real bug caught during the pass itself (a `danger` card briefly rendered white instead of red) and
+is why `variant` exists instead of trusting the override. `DashboardShell.jsx` (wraps every
+dashboard) and `Login.jsx` (first impression, standalone) were elevated directly. Two shared
+keyframes (`fadeIn`, `slideDown`) live in `index.css` for error messages and the notification
+dropdown. Verified after every batch via Playwright screenshots across all four roles with zero
+console errors — including one real mid-pass bug caught by the dev server itself: a `*/` inside a
+JS block comment (`bg-*/border-*`) prematurely closed the comment and broke the Babel parse,
+fixed by rewording the comment. This pass covers the shared primitives, `DashboardShell`, `Login`,
+both Overview pages families, `Analytics`, `Attendance`, `ParentDashboard`, `MyResults`,
+`NotificationBell`, and `AccountSettings` — the remaining pages (course/quiz management, chat,
+admin CRUD screens) still use the pre-polish markup and are natural next candidates for the same
+treatment.
+
 ---
 
 ## Sprint Plan (2 weeks each)

@@ -23,6 +23,13 @@ export default {
       borderRadius: {
         card: "8px",
       },
+      // Additive elevation scale for the visual-polish pass — the locked
+      // palette/radii above stay untouched, this just gives cards/buttons a
+      // subtle sense of depth instead of a flat border only.
+      boxShadow: {
+        card: "0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)",
+        "card-hover": "0 4px 10px rgba(16,24,40,0.08), 0 2px 4px rgba(16,24,40,0.04)",
+      },
     },
   },
   plugins: [],

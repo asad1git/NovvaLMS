@@ -6,3 +6,25 @@ body {
   margin: 0;
   background-color: #f4f6f9;
 }
+
+/* Small shared animations for the visual-polish pass — kept minimal and
+   subtle (fades/slides), not decorative for its own sake. */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

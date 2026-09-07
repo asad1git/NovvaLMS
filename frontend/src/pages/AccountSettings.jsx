@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getMe, updateProfile, changePassword } from "../api/account";
+import { Card, Button } from "../components/ui";
+
+const inputClass =
+  "w-full border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AccountSettings() {
   const { auth, updateName } = useAuth();
@@ -69,46 +74,33 @@ export default function AccountSettings() {
 
   return (
     <div className="space-y-4 max-w-lg">
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <h2 className="text-sm font-medium text-gray-900 mb-3">Profile</h2>
         <form onSubmit={handleProfileSubmit} className="space-y-3">
           <div>
             <label className="block text-[11px] text-gray-500 mb-1">Email</label>
-            <input
-              className="w-full border border-gray-200 rounded px-3 py-2 text-xs bg-gray-50 text-gray-500"
-              value={email}
-              disabled
-            />
+            <input className={`${inputClass} bg-gray-50 text-gray-500`} value={email} disabled />
           </div>
           <div>
             <label className="block text-[11px] text-gray-500 mb-1">Name</label>
-            <input
-              className="w-full border border-gray-300 rounded px-3 py-2 text-xs"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
-          {profileError && <p className="text-xs text-badge-red-text">{profileError}</p>}
-          {profileMsg && <p className="text-xs text-badge-green-text">{profileMsg}</p>}
-          <button
-            type="submit"
-            disabled={savingProfile}
-            className="bg-navy text-white text-xs font-medium rounded px-4 py-2 disabled:opacity-50"
-          >
+          {profileError && <p className="text-xs text-badge-red-text animate-[fadeIn_0.15s_ease-in]">{profileError}</p>}
+          {profileMsg && <p className="text-xs text-badge-green-text animate-[fadeIn_0.15s_ease-in]">{profileMsg}</p>}
+          <Button type="submit" disabled={savingProfile}>
             {savingProfile ? "Saving…" : "Save Profile"}
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
 
-      <div className="bg-white border border-gray-200 rounded-card p-5">
+      <Card>
         <h2 className="text-sm font-medium text-gray-900 mb-3">Change Password</h2>
         <form onSubmit={handlePasswordSubmit} className="space-y-3">
           <div>
             <label className="block text-[11px] text-gray-500 mb-1">Current Password</label>
             <input
               type="password"
-              className="w-full border border-gray-300 rounded px-3 py-2 text-xs"
+              className={inputClass}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
@@ -118,7 +110,7 @@ export default function AccountSettings() {
             <label className="block text-[11px] text-gray-500 mb-1">New Password</label>
             <input
               type="password"
-              className="w-full border border-gray-300 rounded px-3 py-2 text-xs"
+              className={inputClass}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               minLength={8}
@@ -130,24 +122,20 @@ export default function AccountSettings() {
             <label className="block text-[11px] text-gray-500 mb-1">Confirm New Password</label>
             <input
               type="password"
-              className="w-full border border-gray-300 rounded px-3 py-2 text-xs"
+              className={inputClass}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               minLength={8}
               required
             />
           </div>
-          {passwordError && <p className="text-xs text-badge-red-text">{passwordError}</p>}
-          {passwordMsg && <p className="text-xs text-badge-green-text">{passwordMsg}</p>}
-          <button
-            type="submit"
-            disabled={savingPassword}
-            className="bg-navy text-white text-xs font-medium rounded px-4 py-2 disabled:opacity-50"
-          >
+          {passwordError && <p className="text-xs text-badge-red-text animate-[fadeIn_0.15s_ease-in]">{passwordError}</p>}
+          {passwordMsg && <p className="text-xs text-badge-green-text animate-[fadeIn_0.15s_ease-in]">{passwordMsg}</p>}
+          <Button type="submit" disabled={savingPassword}>
             {savingPassword ? "Updating…" : "Update Password"}
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

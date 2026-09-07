@@ -71,17 +71,23 @@ export default function NotificationBell() {
 
   return (
     <div className="relative" ref={panelRef}>
-      <button onClick={handleOpen} className="relative w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100">
+      <button
+        onClick={handleOpen}
+        className="relative w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-150 active:scale-95"
+      >
         <span className="text-base">🔔</span>
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 bg-badge-red-text text-white text-[9px] font-medium rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-0.5">
+          <span className="absolute -top-0.5 -right-0.5 bg-badge-red-text text-white text-[9px] font-medium rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-0.5 shadow-sm">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-card shadow-lg z-50 max-h-96 overflow-y-auto">
+        <div
+          className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-card shadow-card-hover z-50 max-h-96 overflow-y-auto"
+          style={{ animation: "slideDown 0.15s ease-out" }}
+        >
           <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
             <span className="text-xs font-medium text-gray-900">Notifications</span>
             {unreadCount > 0 && (
@@ -91,14 +97,17 @@ export default function NotificationBell() {
             )}
           </div>
           {notifications.length === 0 ? (
-            <p className="text-xs text-gray-500 px-3 py-4 text-center">No notifications yet.</p>
+            <div className="text-center py-8 px-4">
+              <span className="text-2xl opacity-40">🔕</span>
+              <p className="text-xs text-gray-500 mt-2">No notifications yet.</p>
+            </div>
           ) : (
             <div className="divide-y divide-gray-100">
               {notifications.map((n) => (
                 <div
                   key={n._id}
                   onClick={() => handleNotificationClick(n)}
-                  className={`px-3 py-2 cursor-pointer hover:bg-gray-50 ${n.read ? "" : "bg-badge-blue-bg/40"}`}
+                  className={`px-3 py-2 cursor-pointer transition-colors duration-150 hover:bg-gray-50 ${n.read ? "" : "bg-badge-blue-bg/40"}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-xs font-medium text-gray-900">{n.title}</p>

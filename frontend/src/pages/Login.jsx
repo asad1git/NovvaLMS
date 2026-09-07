@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { Button } from "../components/ui";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -34,22 +35,34 @@ export default function Login() {
     }
   }
 
+  const inputClass =
+    "w-full text-sm px-3 py-2 border border-gray-300 rounded-md transition-colors duration-150 " +
+    "focus:outline-none focus:border-navy-light focus:ring-2 focus:ring-navy-light/25";
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg-page px-4">
-      <div className="w-full max-w-sm bg-white rounded-card border border-gray-200 px-8 py-10">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{
+        background:
+          "radial-gradient(circle at 20% 20%, rgba(31,56,100,0.06), transparent 45%), " +
+          "radial-gradient(circle at 80% 80%, rgba(46,117,182,0.06), transparent 45%), " +
+          "#F4F6F9",
+      }}
+    >
+      <div className="w-full max-w-sm bg-white rounded-card border border-gray-200 shadow-card-hover px-8 py-10">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-1">
-          <div className="w-9 h-9 bg-navy rounded-lg flex items-center justify-center">
+          <div className="w-9 h-9 bg-navy rounded-lg flex items-center justify-center shadow-md">
             <span className="text-white text-lg">🎓</span>
           </div>
-          <span className="text-xl font-medium text-gray-900">Novva LMS</span>
+          <span className="text-xl font-medium text-gray-900 tracking-tight">Novva LMS</span>
         </div>
         <p className="text-xs text-gray-500 text-center mb-7">
           AI-Powered Learning Management System
         </p>
 
         {error && (
-          <div className="flex items-center gap-2 text-xs text-red-700 bg-badge-red-bg rounded-md px-3 py-2 mb-4">
+          <div className="flex items-center gap-2 text-xs text-red-700 bg-badge-red-bg rounded-md px-3 py-2 mb-4 animate-[fadeIn_0.15s_ease-in]">
             <span>⚠</span>
             <span>{error}</span>
           </div>
@@ -65,7 +78,7 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@ucp.edu.pk"
-              className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-navy-light"
+              className={inputClass}
             />
           </div>
 
@@ -77,12 +90,12 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="w-full text-sm px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-navy-light"
+                className={`${inputClass} pr-12`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs transition-colors duration-150"
                 tabIndex={-1}
               >
                 {showPassword ? "Hide" : "Show"}
@@ -90,13 +103,9 @@ export default function Login() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-navy text-white text-sm font-medium py-2.5 rounded-md hover:bg-navy-light transition-colors disabled:opacity-60"
-          >
+          <Button type="submit" disabled={loading} className="w-full !py-2.5 !text-sm">
             {loading ? "Logging in..." : "Login"}
-          </button>
+          </Button>
         </form>
 
         <Link
