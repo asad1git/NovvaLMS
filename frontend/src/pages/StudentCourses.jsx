@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconBooks, IconFileText, IconNotes } from "@tabler/icons-react";
+import { IconBooks, IconFileText, IconNotes, IconClipboardList } from "@tabler/icons-react";
 import { listCourses, getMaterials, downloadMaterial } from "../api/courses";
 import { listQuizzesForCourse } from "../api/quizzes";
-import { Card, Button, EmptyState, LoadingState } from "../components/ui";
+import {
+  listAssignments,
+  downloadAssignmentFile,
+  submitAssignment as apiSubmitAssignment,
+} from "../api/assignments";
+import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
 
 export default function StudentCourses() {
   const navigate = useNavigate();
@@ -13,6 +18,9 @@ export default function StudentCourses() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [materials, setMaterials] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [submitFile, setSubmitFile] = useState({});
+  const [submittingId, setSubmittingId] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -31,8 +39,26 @@ export default function StudentCourses() {
     setError("");
     setMaterials([]); // clear immediately so a course switch never shows the previous course's list
     setQuizzes([]);
+    setAssignments([]);
     setMaterials(await getMaterials(course._id));
     setQuizzes(await listQuizzesForCourse(course._id));
+    setAssignments(await listAssignments(course._id));
+  }
+
+  async function handleSubmitAssignment(assignmentId) {
+    const file = submitFile[assignmentId];
+    if (!file) return;
+    setSubmittingId(assignmentId);
+    setError("");
+    try {
+      await apiSubmitAssignment(assignmentId, file);
+      setSubmitFile((prev) => ({ ...prev, [assignmentId]: null }));
+      setAssignments(await listAssignments(selectedCourse._id));
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to submit assignment");
+    } finally {
+      setSubmittingId(null);
+    }
   }
 
   if (loading) return <LoadingState label="Loading courses…" />;
@@ -117,6 +143,77 @@ export default function StudentCourses() {
               </div>
             ))}
             {quizzes.length === 0 && <EmptyState icon={<IconNotes size={32} className="text-text-muted" />} title="No quizzes available yet." />}
+          </div>
+        </Card>
+      )}
+
+      {selectedCourse && (
+        <Card>
+          <h2 className="text-[13px] font-bold text-navy mb-3">Assignments — {selectedCourse.code}</h2>
+          <div className="space-y-3">
+            {assignments.map((a) => {
+              const sub = a.mySubmission;
+              const locked = sub && sub.gradeStatus === "graded";
+              return (
+                <div key={a._id} className="border-b border-line pb-3 last:border-b-0 last:pb-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="text-text-main font-medium text-xs">{a.title}</div>
+                      <div className="text-[11px] text-text-muted">
+                        Due {new Date(a.dueDate).toLocaleString()} · Max {a.maxScore}
+                        {a.isPastDue && !sub && <span className="text-badge-red-text"> · Past due</span>}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => downloadAssignmentFile(a._id, a.fileName)}
+                      className="text-navy-light hover:underline text-xs whitespace-nowrap"
+                    >
+                      Download
+                    </button>
+                  </div>
+
+                  {a.description && <p className="text-[11px] text-text-muted mt-1">{a.description}</p>}
+
+                  <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                    {sub ? (
+                      <>
+                        <Badge variant={sub.isLate ? "red" : "green"}>{sub.isLate ? "Submitted late" : "Submitted on time"}</Badge>
+                        {sub.gradeStatus === "graded" ? (
+                          <Badge variant="green">
+                            {sub.score}/{a.maxScore}
+                          </Badge>
+                        ) : (
+                          <Badge variant="amber">Pending review</Badge>
+                        )}
+                      </>
+                    ) : (
+                      <Badge variant="gray">Not submitted</Badge>
+                    )}
+                  </div>
+
+                  {!locked && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <input
+                        type="file"
+                        accept=".pdf,.pptx,.docx"
+                        onChange={(e) => setSubmitFile((prev) => ({ ...prev, [a._id]: e.target.files[0] }))}
+                        className="text-xs"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleSubmitAssignment(a._id)}
+                        disabled={submittingId === a._id || !submitFile[a._id]}
+                      >
+                        {submittingId === a._id ? "Submitting…" : sub ? "Resubmit" : a.isPastDue ? "Submit Late" : "Submit"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {assignments.length === 0 && (
+              <EmptyState icon={<IconClipboardList size={32} className="text-text-muted" />} title="No assignments posted yet." />
+            )}
           </div>
         </Card>
       )}

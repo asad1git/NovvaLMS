@@ -1,7 +1,7 @@
 const express = require("express");
 const { protect } = require("../middleware/authMiddleware");
 const { authorize } = require("../middleware/rbacMiddleware");
-const { uploadMaterialFile, uploadCSV } = require("../middleware/uploadMiddleware");
+const { uploadMaterialFile, uploadCSV, uploadAssignmentQuestionFile } = require("../middleware/uploadMiddleware");
 const {
   createCourse,
   getCourses,
@@ -13,6 +13,7 @@ const { uploadMaterial, getMaterials } = require("../controllers/materialControl
 const { createQuiz, generateQuizQuestions, getQuizzesForCourse } = require("../controllers/quizController");
 const { getMessages, sendMessage } = require("../controllers/chatController");
 const { createSession, listSessions } = require("../controllers/attendanceController");
+const { createAssignment, getAssignmentsForCourse } = require("../controllers/assignmentController");
 
 const router = express.Router();
 
@@ -45,5 +46,13 @@ router.post("/:id/chat/messages", authorize("student"), sendMessage);
 
 router.post("/:id/attendance", authorize("admin", "teacher"), createSession);
 router.get("/:id/attendance", listSessions);
+
+router.post(
+  "/:id/assignments",
+  authorize("admin", "teacher"),
+  uploadAssignmentQuestionFile.single("file"),
+  createAssignment
+);
+router.get("/:id/assignments", getAssignmentsForCourse);
 
 module.exports = router;

@@ -83,11 +83,12 @@ to OpenAI/Gemini. Only academic content goes in the prompt.
 
 ---
 
-## Database — 18 MongoDB Collections
+## Database — 20 MongoDB Collections
 
 `Users, Courses, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
 Answers, ChatSessions, Messages, FeeChallans, SalarySlips, ParentLinks,
-ParentChatSessions, ParentMessages, Notifications, AttendanceSessions, AttendanceRecords`
+ParentChatSessions, ParentMessages, Notifications, AttendanceSessions, AttendanceRecords,
+Assignments, AssignmentSubmissions`
 
 `ParentLinks` (added for the parent-portal feature, post-backlog) maps a
 `parent`-role User to a `student`-role User — same join-collection shape as
@@ -530,6 +531,8 @@ same `{ sessions, overall }` envelope regardless of role, with role-appropriate 
 Teacher/Admin gets every session's present/total headcount plus a course-wide average attendance
 rate; a Student gets only their own status per session plus their own percentage (computed
 server-side, one source of truth, same principle as `computeAnalyticsForStudent`).
+`Assignments`/`AssignmentSubmissions` (post-backlog) back the Assignments epic — same
+join-collection shape as `Quiz`/`QuizAttempt`, one assignment then one submission per student.
 `PUT /api/attendance/sessions/:sessionId` bulk-updates every student's status in one call —
 matching how a teacher actually works through a class list, not one request per student.
 `TeacherCourses.jsx` gained a "New Session" + click-to-mark UI; `Attendance.jsx` is a new
@@ -784,6 +787,78 @@ recording so a future pass doesn't "fix" something that was actually already cor
 Verified after every batch via Playwright across all four roles (every nav item on every
 dashboard, every `TeacherCourses` tab, a real end-to-end create-user action, a real end-to-end
 login landing on `/student`) with zero console errors.
+
+**Assignments, post-backlog — a new epic beyond the original 47-point backlog and beyond
+Attendance.** File-based, deadline-driven, HITL-graded — the one major content type the original
+backlog never covered (Quizzes are auto-scored/HITL-subjective, Materials are read-only; nothing
+previously modeled "teacher posts a document with a deadline, student uploads a response").
+
+Two new collections, both scoped exactly like their closest existing analogue: `Assignment`
+(course, title, description, dueDate, maxScore, plus the same fileName/fileUrl/fileType/fileSize/
+textExtractionWarning shape as `Material`, since the question document goes through the identical
+signature-verification + extraction-check pipeline) and `AssignmentSubmission` (assignment,
+student, the same file fields, `submittedAt`, `isLate`, and — mirroring `Answer`'s HITL fields
+exactly — `gradeStatus`/`score`/`feedback`/`aiDraftScore`/`aiDraftJustification`/`gradedBy`/
+`gradedAt`, unique per `(assignment, student)` same as `QuizAttempt`'s unique `(quiz, student)`).
+`backend/utils/checkExtractability.js` is a new small extraction, factored out of
+`materialController.js` (previously private to it) since Assignments needed the identical check
+for both the question doc and every submission — no behavior change to Materials, pure dedup.
+
+**No hard cutoff at the deadline** — a submission after `dueDate` is still accepted, only flagged.
+`isLate` is computed once at submit time (`submittedAt > assignment.dueDate`) and stored, not
+recomputed on every read, since the deadline it was measured against is a fixed historical fact.
+The frontend surfaces this as a flipped action button rather than hiding anything: before the
+deadline the student sees "Submit", after it the exact same control reads "Submit Late" — the
+question document and the ability to respond are never removed, only the label changes, so a
+teacher always sees an accurate on-time/late record instead of losing late submissions entirely.
+Resubmission is allowed any time before grading (replaces the file in place, same `_id`, same
+pattern as `replaceMaterial`) and is locked the moment a Teacher grades it — once HITL has acted,
+that decision is final, matching this project's grading philosophy everywhere else.
+
+**HITL grading reuses the existing AI contract with zero new provider methods.**
+`assignmentController.draftAssignmentGradeInBackground` mirrors
+`attemptController.draftGradeInBackground` move for move: fires after the HTTP response is
+already sent (a real Gemini call is ~20s; nothing about submitting an assignment should make a
+student wait for it), extracts both the question document's and the submission's text, and calls
+the same `provider.gradeSubjective({ question, maxScore, answer })` every subjective quiz answer
+already uses — "grade this free text against this prompt, out of this max score" was already
+exactly the right shape. The draft lands in `aiDraftScore`/`aiDraftJustification` only; a Teacher's
+own submission on `PUT /api/assignments/submissions/:id` (pre-filled from the draft, editable or
+overridable) is the only thing that ever becomes the real grade — confirmed live exactly the same
+way US-06 originally was: the AI drafted 10/10 with a real justification quoting the student's
+actual submitted text, and a Teacher then deliberately overrode it to 9/10, and the override (not
+the draft) is what persisted and is what the student sees.
+
+**Novva Assistant reads assignments too**, extending `chatController.sendMessage`'s existing
+context-section pattern rather than bolting on something separate: `buildAssignmentChunks`
+chunks every assignment's question document exactly like `buildCourseChunks` does for materials,
+but tags each chunk `assignmentId`/`assignmentTitle` instead of `materialId`/`materialTitle` and
+is deliberately kept out of `sourceMaterialIds` — `Message.sources` is `ref: "Material"` only, so
+pushing an Assignment's `_id` there would silently fail to resolve on `.populate()`. Three new
+context sections mirror the materials ones exactly: ASSIGNMENT EXCERPTS (keyword-relevance
+matched, like LECTURE EXCERPTS), REQUESTED ASSIGNMENT(S) (full text when a student names one
+directly — "what is Assignment 2 asking" — reusing `ragEngine.findMentionedMaterials` as-is,
+since it only needs `.title`/`._id` and doesn't care which Mongoose model those came from), and
+ASSIGNMENTS (title + due date, always included, for "what's due" questions). The zero-cost
+refusal gate was widened accordingly (now also checks `hasAssignmentExcerpts` /
+`hasRequestedAssignment` / `hasAssignments` before ever giving up). All three AI providers'
+`CHAT_SYSTEM_PROMPT` (`gemini`/`openai`/`nvidia`, kept byte-identical to each other exactly as
+before) gained a new rule 3 for assignment-content questions, renumbering the old rules 3/4 to
+4/5. Confirmed live: a real Gemini call asked "what assignments are due... and what is the
+On-Time Test Assignment asking me to do" came back with an accurate due-date list AND a direct
+quote pulled from that assignment's actual uploaded PDF content — grounded, not fabricated.
+
+New nav surface is a tab, not a new page — `TeacherCourses.jsx` gained "Assignments" alongside
+Materials/Quizzes/Attendance/Results (post form + a roster view listing every submission with an
+on-time/late badge, a "not submitted" chip list built from the same enrolled-roster-visibility
+principle as Attendance's auto-seeding, and the AI-prefilled grade form). `StudentCourses.jsx`
+doesn't use a tab bar at all (it stacks Materials/Quizzes as plain cards) — Assignments was added
+as a third stacked card in that same established shape rather than introducing an inconsistent
+tab UI onto a page that never had one, a deliberate adaptation of the "new tab" plan to the page's
+actual existing pattern rather than a literal one. Verified end-to-end via Playwright: an
+on-time and a past-due submission both correctly flagged, the teacher's roster showing both the
+submission and the one still-missing student, AI-draft-then-override grading, and the chatbot
+exchange above — zero console errors throughout.
 
 ---
 

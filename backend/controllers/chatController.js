@@ -3,9 +3,10 @@ const asyncHandler = require("express-async-handler");
 const Course = require("../models/Course");
 const Enrollment = require("../models/Enrollment");
 const Material = require("../models/Material");
+const Assignment = require("../models/Assignment");
 const ChatSession = require("../models/ChatSession");
 const Message = require("../models/Message");
-const { MATERIALS_DIR } = require("../middleware/uploadMiddleware");
+const { MATERIALS_DIR, ASSIGNMENT_QUESTIONS_DIR } = require("../middleware/uploadMiddleware");
 const { extractText, chunkText, selectRelevantChunks, findMentionedMaterials } = require("../services/ragEngine");
 const { getAIProvider } = require("../services/ai");
 const { computeAnalyticsForStudent } = require("./analyticsController");
@@ -72,6 +73,68 @@ function formatMaterialsList(materials) {
   return materials.map((m) => `- ${m.title} (${m.fileType})`).join("\n");
 }
 
+/**
+ * Chunks every assignment's question document, same shape as
+ * buildCourseChunks but tagged assignmentId/assignmentTitle (never
+ * materialId/materialTitle — Message.sources is `ref: "Material"` only, so
+ * an assignment's _id must never be pushed into that array; assignment
+ * content grounds answers here without ever becoming a citation pill).
+ */
+async function buildAssignmentChunks(courseId) {
+  const assignments = await Assignment.find({ course: courseId });
+  const chunksWithSource = [];
+
+  for (const assignment of assignments) {
+    const filePath = path.join(ASSIGNMENT_QUESTIONS_DIR, assignment.fileUrl);
+    let text;
+    try {
+      text = await extractText(filePath, assignment.fileType);
+    } catch (err) {
+      continue; // skip unreadable/corrupt files rather than fail the whole chat
+    }
+    for (const chunk of chunkText(text)) {
+      chunksWithSource.push({ text: chunk, assignmentId: assignment._id, assignmentTitle: assignment.title });
+    }
+  }
+
+  return chunksWithSource;
+}
+
+/**
+ * Every assignment in the course, for "what assignments are due" /
+ * "what's due this week" meta-questions — always included, same principle
+ * as formatMaterialsList, so this works without a content chunk matching.
+ */
+function formatAssignmentsList(assignments) {
+  if (assignments.length === 0) return "(none posted yet)";
+  const now = new Date();
+  return assignments
+    .map((a) => `- ${a.title} (due ${new Date(a.dueDate).toLocaleString()}${now > a.dueDate ? ", past due" : ""})`)
+    .join("\n");
+}
+
+/**
+ * Full text of any assignment the student named directly ("what is
+ * Assignment 2 asking", "summarize the essay assignment"), mirroring
+ * buildRequestedMaterialSection — a title reference rarely shares
+ * vocabulary with the question document's own body text, so relevance
+ * scoring alone would usually miss it.
+ */
+function buildRequestedAssignmentSection(mentionedAssignments, assignmentChunksWithSource) {
+  if (mentionedAssignments.length === 0) return "";
+
+  const blocks = mentionedAssignments.map((a) => {
+    const chunks = assignmentChunksWithSource.filter((c) => String(c.assignmentId) === String(a._id));
+    if (chunks.length === 0) {
+      return `"${a.title}" — no extracted text could be found for this file (it may be empty, corrupted, or an image-only scan with no text layer).`;
+    }
+    const fullText = chunks.map((c) => c.text).join(" ").slice(0, MAX_REQUESTED_MATERIAL_CHARS);
+    return `"${a.title}" (due ${new Date(a.dueDate).toLocaleString()}, full content since the student named it directly):\n${fullText}`;
+  });
+
+  return blocks.join("\n\n---\n\n");
+}
+
 const MAX_REQUESTED_MATERIAL_CHARS = 20000; // per material, mirrors quizController's MAX_SOURCE_CHARS pattern
 
 /**
@@ -128,15 +191,20 @@ const getMessages = asyncHandler(async (req, res) => {
  * file's actual body text and would otherwise miss `selectRelevantChunks`'s
  * keyword scoring entirely. None of "what's been uploaded", "where am I
  * weak", or "summarize <material>" are lecture-content questions, so the
- * RAG chunk gate shouldn't block any of them.
+ * RAG chunk gate shouldn't block any of them. Assignments (question docs +
+ * due dates) get the exact same treatment via a parallel, separately-tagged
+ * chunk pool (`buildAssignmentChunks`) — kept out of `sourceMaterialIds`
+ * since `Message.sources` is `ref: "Material"` only, so an Assignment's
+ * `_id` would never resolve there.
  *
  * The zero-cost refusal (no AI call at all) is reserved for the genuinely
- * empty case — no matched chunks, no named-material match, no materials at
- * all, AND no quiz history — "correctness by construction" for a course
- * with nothing to discuss at all. Once there's *anything* to ground on, the
- * AI is trusted to route the right section to the right question per its
- * system prompt's strict per-section rules (still refusing content
- * questions neither LECTURE EXCERPTS nor REQUESTED MATERIAL(S) cover,
+ * empty case — no matched chunks, no named-material/assignment match, no
+ * materials or assignments at all, AND no quiz history — "correctness by
+ * construction" for a course with nothing to discuss at all. Once there's
+ * *anything* to ground on, the AI is trusted to route the right section to
+ * the right question per its system prompt's strict per-section rules
+ * (still refusing content questions none of LECTURE EXCERPTS, REQUESTED
+ * MATERIAL(S), ASSIGNMENT EXCERPTS, or REQUESTED ASSIGNMENT(S) cover,
  * verbatim).
  */
 const sendMessage = asyncHandler(async (req, res) => {
@@ -158,24 +226,42 @@ const sendMessage = asyncHandler(async (req, res) => {
     .then((docs) => docs.reverse());
   const history = priorMessages.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
 
-  const [chunksWithSource, materials, analytics] = await Promise.all([
+  const [chunksWithSource, materials, assignmentChunksWithSource, assignments, analytics] = await Promise.all([
     buildCourseChunks(course._id),
     Material.find({ course: course._id }).select("title fileType"),
+    buildAssignmentChunks(course._id),
+    Assignment.find({ course: course._id }).select("title dueDate description"),
     computeAnalyticsForStudent(req.user._id, { courseId: course._id }),
   ]);
   const relevant = selectRelevantChunks(chunksWithSource, content, 5);
   const mentionedMaterials = findMentionedMaterials(content, materials);
   const requestedMaterial = buildRequestedMaterialSection(mentionedMaterials, chunksWithSource);
 
+  const relevantAssignmentExcerpts = selectRelevantChunks(assignmentChunksWithSource, content, 3);
+  const mentionedAssignments = findMentionedMaterials(content, assignments);
+  const requestedAssignmentText = buildRequestedAssignmentSection(mentionedAssignments, assignmentChunksWithSource);
+
   const hasLectureExcerpts = relevant.length > 0;
   const hasRequestedMaterial = requestedMaterial.text !== "";
   const hasMaterials = materials.length > 0;
+  const hasAssignmentExcerpts = relevantAssignmentExcerpts.length > 0;
+  const hasRequestedAssignment = requestedAssignmentText !== "";
+  const hasAssignments = assignments.length > 0;
   const hasPerformanceData = analytics.overall.totalAttempts > 0;
 
   let answer;
   let sourceMaterialIds = [];
 
-  if (!hasLectureExcerpts && !hasRequestedMaterial && !hasMaterials && !hasPerformanceData) {
+  const hasAnyContext =
+    hasLectureExcerpts ||
+    hasRequestedMaterial ||
+    hasMaterials ||
+    hasAssignmentExcerpts ||
+    hasRequestedAssignment ||
+    hasAssignments ||
+    hasPerformanceData;
+
+  if (!hasAnyContext) {
     answer = NO_CONTEXT_REPLY;
   } else {
     sourceMaterialIds = [
@@ -189,6 +275,9 @@ const sendMessage = asyncHandler(async (req, res) => {
       `LECTURE EXCERPTS:\n${hasLectureExcerpts ? relevant.map((c) => c.text).join("\n---\n") : "(none matched this question)"}`,
       hasRequestedMaterial ? `REQUESTED MATERIAL(S):\n${requestedMaterial.text}` : "",
       `COURSE MATERIALS:\n${formatMaterialsList(materials)}`,
+      `ASSIGNMENT EXCERPTS:\n${hasAssignmentExcerpts ? relevantAssignmentExcerpts.map((c) => c.text).join("\n---\n") : "(none matched this question)"}`,
+      hasRequestedAssignment ? `REQUESTED ASSIGNMENT(S):\n${requestedAssignmentText}` : "",
+      `ASSIGNMENTS:\n${formatAssignmentsList(assignments)}`,
       `YOUR PERFORMANCE:\n${formatAnalyticsSummary(analytics)}`,
     ]
       .filter(Boolean)

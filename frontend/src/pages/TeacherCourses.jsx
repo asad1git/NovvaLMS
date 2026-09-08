@@ -29,13 +29,29 @@ import {
   getSessionDetail,
   updateSessionRecords,
 } from "../api/attendance";
+import {
+  listAssignments,
+  createAssignment as apiCreateAssignment,
+  getSubmissionsForAssignment,
+  gradeSubmission as apiGradeSubmission,
+  downloadSubmissionFile,
+} from "../api/assignments";
 import { Card, Button, IconButton, Badge, EmptyState, LoadingState, CourseCard, Tabs } from "../components/ui";
 
 const inputClass =
   "border-[1.5px] border-line rounded-input px-3 py-2 text-[13px] transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light";
 
-const TABS = ["Materials", "Quizzes", "Attendance", "Results"];
+const TABS = ["Materials", "Assignments", "Quizzes", "Attendance", "Results"];
+
+// Same "AI draft pre-fills, teacher's actual submit wins" resolution as
+// GradeApprovals.jsx's resolveField — kept local since this screen doesn't
+// otherwise share state with that one.
+function resolveGradeField(draft, field, submission, aiField) {
+  if (draft[field] !== undefined) return draft[field];
+  if (submission[aiField] !== null && submission[aiField] !== undefined && submission[aiField] !== "") return submission[aiField];
+  return "";
+}
 
 const BLANK_QUESTION = () => ({
   type: "mcq",
@@ -91,6 +107,20 @@ export default function TeacherCourses() {
   const [markingRecords, setMarkingRecords] = useState([]);
   const [savingMarks, setSavingMarks] = useState(false);
 
+  const [assignments, setAssignments] = useState([]);
+  const [showAssignmentForm, setShowAssignmentForm] = useState(false);
+  const [assignmentTitle, setAssignmentTitle] = useState("");
+  const [assignmentDescription, setAssignmentDescription] = useState("");
+  const [assignmentDueDate, setAssignmentDueDate] = useState("");
+  const [assignmentMaxScore, setAssignmentMaxScore] = useState(100);
+  const [assignmentFile, setAssignmentFile] = useState(null);
+  const [creatingAssignment, setCreatingAssignment] = useState(false);
+  const [viewingAssignment, setViewingAssignment] = useState(null);
+  const [submissionsData, setSubmissionsData] = useState(null);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [gradeDrafts, setGradeDrafts] = useState({});
+  const [savingGradeId, setSavingGradeId] = useState(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -110,15 +140,19 @@ export default function TeacherCourses() {
     setResultsQuizId("");
     setResults([]);
     setMarkingSession(null);
+    setViewingAssignment(null);
+    setSubmissionsData(null);
     setMaterials([]); // clear immediately so a course switch never shows the previous course's list
     setQuizzes([]);
     setAttendanceSessions([]);
+    setAssignments([]);
     setMaterials(await getMaterials(course._id));
     const qs = await listQuizzesForCourse(course._id);
     setQuizzes(qs);
     const attendance = await listAttendanceSessions(course._id);
     setAttendanceSessions(attendance.sessions);
     setAttendanceOverall(attendance.overall);
+    setAssignments(await listAssignments(course._id));
   }
 
   async function loadResults(quizId) {
@@ -320,6 +354,69 @@ export default function TeacherCourses() {
     }
   }
 
+  async function handleCreateAssignment(e) {
+    e.preventDefault();
+    if (!assignmentFile || !selectedCourse) return;
+    setCreatingAssignment(true);
+    setError("");
+    try {
+      await apiCreateAssignment(selectedCourse._id, {
+        title: assignmentTitle,
+        description: assignmentDescription,
+        dueDate: assignmentDueDate,
+        maxScore: assignmentMaxScore,
+        file: assignmentFile,
+      });
+      setAssignmentTitle("");
+      setAssignmentDescription("");
+      setAssignmentDueDate("");
+      setAssignmentMaxScore(100);
+      setAssignmentFile(null);
+      setShowAssignmentForm(false);
+      setAssignments(await listAssignments(selectedCourse._id));
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to post assignment");
+    } finally {
+      setCreatingAssignment(false);
+    }
+  }
+
+  async function handleViewSubmissions(assignment) {
+    setViewingAssignment(assignment);
+    setSubmissionsData(null);
+    setLoadingSubmissions(true);
+    setError("");
+    try {
+      setSubmissionsData(await getSubmissionsForAssignment(assignment._id));
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load submissions");
+    } finally {
+      setLoadingSubmissions(false);
+    }
+  }
+
+  function updateGradeDraft(submissionId, patch) {
+    setGradeDrafts((prev) => ({ ...prev, [submissionId]: { ...prev[submissionId], ...patch } }));
+  }
+
+  async function handleGradeSubmission(submission) {
+    const draft = gradeDrafts[submission._id] || {};
+    const score = resolveGradeField(draft, "score", submission, "aiDraftScore");
+    const feedback = resolveGradeField(draft, "feedback", submission, "aiDraftJustification");
+    if (score === "") return;
+    setSavingGradeId(submission._id);
+    setError("");
+    try {
+      await apiGradeSubmission(submission._id, Number(score), feedback);
+      setSubmissionsData(await getSubmissionsForAssignment(viewingAssignment._id));
+      setAssignments(await listAssignments(selectedCourse._id));
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to save grade");
+    } finally {
+      setSavingGradeId(null);
+    }
+  }
+
   if (loading) return <LoadingState label="Loading courses…" />;
 
   const errorBanner = error && (
@@ -486,6 +583,236 @@ export default function TeacherCourses() {
             </div>
           )}
         </Card>
+      )}
+
+      {activeTab === "Assignments" && (
+        viewingAssignment ? (
+          <div className="space-y-4">
+            <button
+              onClick={() => {
+                setViewingAssignment(null);
+                setSubmissionsData(null);
+              }}
+              className="flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-navy transition-colors duration-150"
+            >
+              <IconArrowLeft size={15} /> Back to Assignments
+            </button>
+            <h3 className="text-[15px] font-bold text-navy">{viewingAssignment.title} — Submissions</h3>
+
+            {loadingSubmissions || !submissionsData ? (
+              <LoadingState label="Loading submissions…" />
+            ) : (
+              <Card>
+                {submissionsData.submissions.length === 0 ? (
+                  <EmptyState icon="📥" title="No submissions yet." />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[13px]">
+                      <thead>
+                        <tr>
+                          <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">Student</th>
+                          <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">Submitted</th>
+                          <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">Status</th>
+                          <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">File</th>
+                          <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">Grade</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {submissionsData.submissions.map((s) => {
+                          const draft = gradeDrafts[s._id] || {};
+                          const scoreValue = resolveGradeField(draft, "score", s, "aiDraftScore");
+                          const feedbackValue = resolveGradeField(draft, "feedback", s, "aiDraftJustification");
+                          return (
+                            <tr key={s._id} className="hover:bg-bg-page align-top">
+                              <td className="px-3 py-2.5 border-b border-[#f1f3f6] font-semibold text-text-main whitespace-nowrap">
+                                {s.student?.name}
+                              </td>
+                              <td className="px-3 py-2.5 border-b border-[#f1f3f6] text-text-muted whitespace-nowrap">
+                                {new Date(s.submittedAt).toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                                <Badge variant={s.isLate ? "red" : "green"}>{s.isLate ? "Late" : "On time"}</Badge>
+                              </td>
+                              <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                                <IconButton onClick={() => downloadSubmissionFile(s._id, s.fileName)} title="Download">
+                                  <IconDownload size={16} />
+                                </IconButton>
+                              </td>
+                              <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                                {s.gradeStatus === "graded" ? (
+                                  <Badge variant="green">
+                                    {s.score}/{viewingAssignment.maxScore}
+                                  </Badge>
+                                ) : (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {s.aiDraftScore !== null && s.aiDraftScore !== undefined && (
+                                      <Badge variant="amber" title={s.aiDraftJustification}>
+                                        AI: {s.aiDraftScore}/{viewingAssignment.maxScore}
+                                      </Badge>
+                                    )}
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max={viewingAssignment.maxScore}
+                                      className={`w-16 ${inputClass} px-2 py-1`}
+                                      value={scoreValue}
+                                      onChange={(e) => updateGradeDraft(s._id, { score: e.target.value })}
+                                    />
+                                    <input
+                                      type="text"
+                                      placeholder="Feedback (optional)"
+                                      className={`w-40 ${inputClass} px-2 py-1`}
+                                      value={feedbackValue}
+                                      onChange={(e) => updateGradeDraft(s._id, { feedback: e.target.value })}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleGradeSubmission(s)}
+                                      disabled={savingGradeId === s._id || scoreValue === ""}
+                                    >
+                                      {savingGradeId === s._id ? "Saving…" : "Grade"}
+                                    </Button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {submissionsData.notSubmitted.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-line">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted mb-2">
+                      Not submitted ({submissionsData.notSubmitted.length})
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {submissionsData.notSubmitted.map((st) => (
+                        <Badge key={st._id} variant="gray">
+                          {st.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
+          </div>
+        ) : (
+          <Card>
+            <div className="flex items-center justify-between mb-3.5">
+              <h3 className="text-[13px] font-semibold text-text-main">Assignments</h3>
+              <Button
+                size="sm"
+                variant={showAssignmentForm ? "secondary" : "primary"}
+                onClick={() => setShowAssignmentForm((v) => !v)}
+              >
+                {!showAssignmentForm && <IconPlus size={14} />}
+                {showAssignmentForm ? "Cancel" : "New Assignment"}
+              </Button>
+            </div>
+
+            {showAssignmentForm && (
+              <form onSubmit={handleCreateAssignment} className="border border-line rounded-card p-3.5 mb-4 space-y-3 animate-[fadeIn_0.15s_ease-in]">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-text-muted mb-1">Title</label>
+                    <input
+                      className={`w-full ${inputClass}`}
+                      value={assignmentTitle}
+                      onChange={(e) => setAssignmentTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-text-muted mb-1">Max Score</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className={`w-full ${inputClass}`}
+                      value={assignmentMaxScore}
+                      onChange={(e) => setAssignmentMaxScore(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] text-text-muted mb-1">Description (optional)</label>
+                  <textarea
+                    rows={2}
+                    className={`w-full ${inputClass}`}
+                    value={assignmentDescription}
+                    onChange={(e) => setAssignmentDescription(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-text-muted mb-1">Due Date</label>
+                    <input
+                      type="datetime-local"
+                      className={`w-full ${inputClass}`}
+                      value={assignmentDueDate}
+                      onChange={(e) => setAssignmentDueDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-text-muted mb-1">Question File (PDF/DOCX/PPTX)</label>
+                    <input
+                      type="file"
+                      accept=".pdf,.pptx,.docx"
+                      onChange={(e) => setAssignmentFile(e.target.files[0])}
+                      className="text-xs mt-1.5"
+                      required
+                    />
+                  </div>
+                </div>
+                <Button type="submit" disabled={creatingAssignment}>
+                  {creatingAssignment ? "Posting…" : "Post Assignment"}
+                </Button>
+              </form>
+            )}
+
+            {assignments.length === 0 ? (
+              <EmptyState icon="📋" title="No assignments posted yet." />
+            ) : (
+              <div className="space-y-2">
+                {assignments.map((a) => (
+                  <div
+                    key={a._id}
+                    onClick={() => handleViewSubmissions(a)}
+                    className="flex items-center justify-between px-3.5 py-2.5 rounded-[6px] border border-line cursor-pointer hover:bg-bg-page transition-colors duration-150"
+                  >
+                    <div>
+                      <div className="text-[13px] font-semibold text-text-main">{a.title}</div>
+                      <div className="text-[11px] text-text-muted">
+                        Due {new Date(a.dueDate).toLocaleString()} · Max {a.maxScore}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="blue">
+                        {a.submissionStats.submittedCount}/{a.submissionStats.totalEnrolled} submitted
+                      </Badge>
+                      {a.submissionStats.lateCount > 0 && <Badge variant="red">{a.submissionStats.lateCount} late</Badge>}
+                      <Badge
+                        variant={
+                          a.submissionStats.submittedCount > 0 &&
+                          a.submissionStats.gradedCount === a.submissionStats.submittedCount
+                            ? "green"
+                            : "amber"
+                        }
+                      >
+                        {a.submissionStats.gradedCount}/{a.submissionStats.submittedCount} graded
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )
       )}
 
       {activeTab === "Quizzes" && (
