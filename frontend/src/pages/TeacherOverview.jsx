@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { IconBooks, IconUsers, IconFileCheck, IconClockExclamation } from "@tabler/icons-react";
-import { listCourses, getEnrollments } from "../api/courses";
+import { IconBooks, IconUsers, IconFileCheck, IconClockExclamation, IconFolderOpen } from "@tabler/icons-react";
+import { listCourses, getEnrollments, getMaterials } from "../api/courses";
 import { listQuizzesForCourse, getPendingGrades } from "../api/quizzes";
-import { StatCard, Card, EmptyState, LoadingState } from "../components/ui";
+import { StatCard, Card, CourseCard, Button, EmptyState, LoadingState } from "../components/ui";
 
 export default function TeacherOverview({ onNavigate }) {
   const [stats, setStats] = useState(null);
@@ -14,9 +14,10 @@ export default function TeacherOverview({ onNavigate }) {
     (async () => {
       try {
         const [courseList, pending] = await Promise.all([listCourses(), getPendingGrades()]);
-        const [enrollmentCounts, quizCounts] = await Promise.all([
+        const [enrollmentCounts, quizCounts, materialCounts] = await Promise.all([
           Promise.all(courseList.map((c) => getEnrollments(c._id).then((e) => e.length).catch(() => 0))),
           Promise.all(courseList.map((c) => listQuizzesForCourse(c._id).then((q) => q.length).catch(() => 0))),
+          Promise.all(courseList.map((c) => getMaterials(c._id).then((m) => m.length).catch(() => 0))),
         ]);
         setStats({
           courses: courseList.length,
@@ -24,7 +25,14 @@ export default function TeacherOverview({ onNavigate }) {
           quizzes: quizCounts.reduce((a, b) => a + b, 0),
           pendingGrades: pending.length,
         });
-        setCourses(courseList.slice(0, 5));
+        setCourses(
+          courseList.slice(0, 5).map((c, i) => ({
+            ...c,
+            studentCount: enrollmentCounts[i],
+            quizCount: quizCounts[i],
+            materialCount: materialCounts[i],
+          }))
+        );
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load dashboard");
       } finally {
@@ -37,7 +45,7 @@ export default function TeacherOverview({ onNavigate }) {
   if (error) return <p className="text-xs text-badge-red-text">{error}</p>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="grid grid-cols-4 gap-4">
         <StatCard label="My Courses" value={stats.courses} icon={IconBooks} tone="blue" />
         <StatCard label="Enrolled Students" value={stats.students} icon={IconUsers} tone="navy" />
@@ -50,43 +58,48 @@ export default function TeacherOverview({ onNavigate }) {
         />
       </div>
 
-      <Card>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-gray-900">My Courses</h2>
-          <button onClick={() => onNavigate?.("My Courses")} className="text-xs text-navy-light hover:underline">
-            View all
-          </button>
-        </div>
-        {courses.length === 0 ? (
-          <EmptyState icon="📚" title="No courses assigned yet" subtitle="Courses you're assigned to teach will show up here." />
-        ) : (
-          <div className="space-y-1">
-            {courses.map((c) => (
-              <div key={c._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
-                <span className="text-gray-900 font-medium">{c.code ? `${c.code} — ` : ""}{c.title}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <div className="flex gap-3">
-        <QuickLink label="My Courses" onClick={() => onNavigate?.("My Courses")} />
-        <QuickLink label="Grade Approvals" onClick={() => onNavigate?.("Grade Approvals")} accent={stats.pendingGrades > 0} />
+      <div className="flex items-center justify-between">
+        <h2 className="text-[15px] font-bold text-navy">My Courses</h2>
+        <Button variant="secondary" size="sm" onClick={() => onNavigate?.("My Courses")}>
+          View All
+        </Button>
       </div>
-    </div>
-  );
-}
 
-function QuickLink({ label, onClick, accent }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 bg-white border rounded-card shadow-card px-4 py-3 text-xs font-medium text-left transition-all duration-150 hover:shadow-card-hover ${
-        accent ? "border-badge-red-text/40 text-badge-red-text" : "border-gray-200 text-navy hover:border-navy-light"
-      }`}
-    >
-      {label} →
-    </button>
+      {courses.length === 0 ? (
+        <Card>
+          <EmptyState icon="📚" title="No courses assigned yet" subtitle="Courses you're assigned to teach will show up here." />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+          {courses.map((c) => (
+            <CourseCard
+              key={c._id}
+              code={c.code}
+              name={c.title}
+              subtitle={c.description}
+              onClick={() => onNavigate?.("My Courses")}
+              stats={[
+                { label: "Students", value: c.studentCount },
+                { label: "Materials", value: c.materialCount },
+                { label: "Quizzes", value: c.quizCount },
+              ]}
+              actions={
+                <Button
+                  size="sm"
+                  className="w-full justify-center"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNavigate?.("My Courses");
+                  }}
+                >
+                  <IconFolderOpen size={15} />
+                  Open
+                </Button>
+              }
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
