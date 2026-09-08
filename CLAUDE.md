@@ -597,19 +597,28 @@ has nothing to apply. Not introduced by `pdf-parse`.
 | Token | Value |
 |---|---|
 | Primary (navy) | `#1F3864` |
-| Secondary (blue) | `#2E75B6` |
-| Page background | `#F4F6F9` |
+| Secondary (blue) | `navy-light` `#2E75B6` |
+| Page background | `bg-page` `#F4F6F9` |
+| Primary text | `text-main` `#1a2332` |
+| Muted text | `text-muted` `#64748b` |
+| Border | `line` `#e2e8f0` |
+| Success (icon/text) | `success` `#1E8449` |
 | Student badge | bg `#FAEEDA` / text `#633806` |
 | Teacher badge | bg `#E6F1FB` / text `#0C447C` |
 | Success badge | bg `#EAF3DE` / text `#27500A` |
-| Danger/weak | bg `#FCEBEB` / text `#791F1F` |
-| Font | Arial / Inter |
-| Border radius | 8px cards, 4px inputs/buttons |
+| Danger/weak | bg `#fdf0f0` / text `#A32D2D` |
+| Font | Inter (Google Fonts, linked in `index.html`) |
+| Icons | Tabler Icons — `@tabler/icons-react`, never emoji |
+| Border radius | `rounded-card` 8px, `rounded-input` 4px |
+| Card shadow | `shadow-card` `0 1px 4px rgba(0,0,0,.07)`, `shadow-card-hover` `0 4px 20px rgba(0,0,0,.1)` |
 | Sidebar width | 200px, dark navy, matches `DashboardShell.jsx` |
 
 All 7 high-fidelity screen prototypes (Login, Admin/Teacher/Student Dashboard,
 Quiz Attempt, AI Chatbot, Performance Analytics) were designed against this
 exact system — match them pixel-for-pixel when building out each dashboard.
+**As of the ground-up frontend redesign below, this is no longer aspirational —
+every page in the app is now built directly from the real prototype HTML files
+in `design-system/`, not a description of them.**
 
 **Visual-polish pass, post-backlog — completes Sprint 9's originally-deferred "polish" item.**
 Same layout and locked palette throughout, just elevated execution. Two additive tokens in
@@ -648,6 +657,78 @@ Verified via Playwright across all four roles (admin/teacher/student login flows
 touched page, plus both standalone auth pages directly) with zero console errors. The full
 frontend now uses the shared `ui/` primitives consistently — no page still carries the pre-polish
 hand-rolled card/button/badge markup.
+
+**Ground-up frontend redesign, post-backlog — built directly from `design-system/*.html`.**
+The visual-polish passes above elevated execution within the *existing* hand-rolled markup; this
+is a different kind of change. The user supplied 7 real static HTML/CSS prototype files
+(`design-system/Login Page.html`, `Admin/Teacher/Student Dashboard.html`, `Quiz Attempt.html`,
+`AI Chatbot.html`, `Performance Analytics.html`) — these turned out to be the exact 7 prototypes
+this file has referenced since Sprint 1 as "match them pixel-for-pixel," never actually built that
+way until now. Their `:root` CSS custom properties are the *same* brand (navy `#1F3864`, blue
+`#2E75B6`, identical badge colors) just more precisely specified than what was previously encoded
+in `tailwind.config.js` — `badge-red-bg`/`badge-red-text` were a close-but-different approximation
+(`#FCEBEB`/`#791F1F` vs. the reference's actual `#fdf0f0`/`#A32D2D`) that this pass corrected.
+Rebuilding from the real source, not a description of it, per Claude Code's own recreate-from-
+source guidance.
+
+Foundation: added `@tabler/icons-react` (the reference's icon library — the tree-shaken React
+package, not the webfont CDN the static prototypes use) replacing every emoji icon app-wide; added
+Inter via a real Google Fonts `<link>` in `index.html` (the font was already named in
+`tailwind.config.js`'s `fontFamily.sans` but nothing had ever actually loaded the font file, so it
+silently fell back to system fonts the whole time); added `text-main`/`text-muted`/`line` tokens
+and a `rounded-input` (4px) radius token matching this file's own long-documented-but-never-wired
+"4px inputs/buttons" row. Rebuilt `Badge` (pill shape), `Button`, `Card`, `StatCard` (44px icon
+chip, tone-based color) to the reference's exact spec; added `IconButton`, `CourseCard`, and `Tabs`
+as new shared primitives.
+
+This pass changed real interaction patterns, not just colors, matching what the reference actually
+does:
+- **`TeacherCourses.jsx`** went from one long page with everything stacked (course list + inline
+  materials/quizzes/attendance) to the reference's actual pattern: a `CourseCard` grid, click
+  through to a full detail view with `Materials`/`Quizzes`/`Attendance`/`Results` as real `Tabs`
+  (Attendance isn't in the reference — a post-backlog feature — but gets the same tab treatment
+  for consistency). Materials tab gained genuine drag-and-drop (not just a file input). Results is
+  now its own tab with a quiz-selector dropdown, matching the reference exactly, instead of an
+  inline per-quiz-click panel.
+- **`GradeApprovals.jsx`** moved to the reference's split view — a 300px selectable submission
+  list beside a review panel — replacing the old stacked list-with-inline-forms.
+- **`QuizAttempt.jsx`** became a dedicated full-screen quiz-taking experience with no
+  `DashboardShell` sidebar during the quiz itself (matching the reference's own full-focus
+  design) — one question at a time via a question-navigator sidebar (answered/current/unanswered
+  dots, progress bar) instead of every question on one scrolling page, plus a submit-confirmation
+  modal and an animated SVG score ring on the result screen (`stroke-dashoffset` transition, exact
+  circumference math from the reference: `377 = 2·π·60`).
+- **`ChatBot.jsx`** (Novva Assistant) gained the reference's course-switcher sidebar, a proper AI
+  avatar with an online indicator, a disclaimer banner, suggested-question chips, and asymmetric
+  message-bubble corners with source-citation pills. It also now genuinely renders the reference's
+  light `**bold**` convention — `formatMessage()` builds real React nodes (never
+  `dangerouslySetInnerHTML`, since a student's own typed message renders through the same bubble
+  component) — which required updating all three AI providers' `CHAT_SYSTEM_PROMPT` (student chat
+  only; `ParentChat`'s prompt is untouched, out of scope for this pass) to actually permit `**bold**`
+  for key-term emphasis while still forbidding every other markdown construct.
+- **`Analytics.jsx`** gained the reference's 196px course-filter sidebar and a hand-drawn SVG
+  score-trend chart (grid lines, area fill, polyline, point labels — built as real SVG elements,
+  the same conceptual approach as the reference's string-built version). `GET /api/analytics/me`
+  gained an optional `?courseId=` query param threading into `computeAnalyticsForStudent`'s
+  already-existing course-scoping (previously only used by the chatbot's course-scoped context) —
+  this is what powers the new filter sidebar. The reference's weak-topic cards claim an
+  "AI-generated" study tip; since there's no backend actually generating that text per-topic, the
+  tip was replaced with an honest generic one instead of fabricating an AI-origin claim.
+- Every remaining page (`StudentCourses`, `MyResults`, `ParentDashboard`, `Attendance`, all 5 admin
+  CRUD screens, `AccountSettings`, `ForgotPassword`/`ResetPassword`, `NotificationBell`) got the
+  same token/icon treatment for consistency, even though none of them have a dedicated reference
+  screen — every remaining emoji icon became a Tabler icon, and every `text-gray-*`/`border-gray-*`/
+  `bg-gray-*` class (visually close to the new tokens but not the same value) became
+  `text-main`/`text-muted`/`line`/`bg-page`. `ForgotPassword.jsx`/`ResetPassword.jsx` also picked
+  up `Login.jsx`'s exact input styling (`border-line`, `rounded-input`) and logo/icon treatment,
+  since the three pages share one layout and any drift between them would show.
+
+Verified after every batch via Playwright across all four roles with zero console errors,
+including live functional passes: created and published a fresh 2-question quiz and attempted it
+end-to-end as a student (question navigation, autosave, submit modal, animated result ring, HITL
+pending-review banner all confirmed against real data); a real Gemini chat exchange that came back
+with 12 genuine `<strong>` elements after the prompt change; course-filtered analytics confirmed
+against real quiz-attempt data.
 
 ---
 
