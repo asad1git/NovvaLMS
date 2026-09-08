@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { IconCertificate, IconSchool, IconBooks, IconCreditCard } from "@tabler/icons-react";
 import { listUsers } from "../api/users";
 import { listCourses } from "../api/courses";
 import { listFeeChallans } from "../api/finance";
@@ -40,10 +41,15 @@ export default function AdminOverview({ onNavigate }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Students" value={stats.students} icon="🎓" />
-        <StatCard label="Teachers" value={stats.teachers} icon="🧑‍🏫" />
-        <StatCard label="Courses" value={stats.courses} icon="📚" />
-        <StatCard label="Unpaid Challans" value={stats.unpaidChallans} accent={stats.unpaidChallans > 0} icon="💳" />
+        <StatCard label="Students" value={stats.students} icon={IconCertificate} tone="amber" />
+        <StatCard label="Teachers" value={stats.teachers} icon={IconSchool} tone="navy" />
+        <StatCard label="Courses" value={stats.courses} icon={IconBooks} tone="success" />
+        <StatCard
+          label="Unpaid Challans"
+          value={stats.unpaidChallans}
+          icon={IconCreditCard}
+          tone={stats.unpaidChallans > 0 ? "danger" : "success"}
+        />
       </div>
 
       <Card>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { IconBooks, IconUsers, IconFileCheck, IconClockExclamation } from "@tabler/icons-react";
 import { listCourses, getEnrollments } from "../api/courses";
 import { listQuizzesForCourse, getPendingGrades } from "../api/quizzes";
 import { StatCard, Card, EmptyState, LoadingState } from "../components/ui";
@@ -38,10 +39,15 @@ export default function TeacherOverview({ onNavigate }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="My Courses" value={stats.courses} icon="📚" />
-        <StatCard label="Enrolled Students" value={stats.students} icon="🎓" />
-        <StatCard label="Quizzes Created" value={stats.quizzes} icon="📝" />
-        <StatCard label="Pending Grades" value={stats.pendingGrades} accent={stats.pendingGrades > 0} icon="⏳" />
+        <StatCard label="My Courses" value={stats.courses} icon={IconBooks} tone="blue" />
+        <StatCard label="Enrolled Students" value={stats.students} icon={IconUsers} tone="navy" />
+        <StatCard label="Quizzes Created" value={stats.quizzes} icon={IconFileCheck} tone="success" />
+        <StatCard
+          label="Pending Grades"
+          value={stats.pendingGrades}
+          icon={IconClockExclamation}
+          tone={stats.pendingGrades > 0 ? "amber" : "success"}
+        />
       </div>
 
       <Card>

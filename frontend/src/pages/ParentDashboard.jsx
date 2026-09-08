@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { IconFileCheck, IconChartLine, IconAlertTriangle } from "@tabler/icons-react";
 import DashboardShell from "../components/DashboardShell";
 import AccountSettings from "./AccountSettings";
 import { getMyChildren, getChildAnalytics } from "../api/parentLinks";
@@ -59,13 +60,19 @@ function ChildAnalytics({ child, analytics }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Quizzes Taken" value={overall.totalAttempts} icon="📝" />
+        <StatCard label="Quizzes Taken" value={overall.totalAttempts} icon={IconFileCheck} tone="success" />
         <StatCard
           label="Average Score"
           value={overall.averagePercentage !== null ? `${overall.averagePercentage}%` : "—"}
-          icon="📊"
+          icon={IconChartLine}
+          tone="navy"
         />
-        <StatCard label="Weak Topics" value={overall.weakTopics.length} accent={overall.weakTopics.length > 0} icon="⚠️" />
+        <StatCard
+          label="Weak Topics"
+          value={overall.weakTopics.length}
+          icon={IconAlertTriangle}
+          tone={overall.weakTopics.length > 0 ? "danger" : "success"}
+        />
       </div>
 
       {overall.weakTopics.length > 0 && (

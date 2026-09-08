@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { IconCalendarStats, IconCheckbox, IconChartLine } from "@tabler/icons-react";
 import { listCourses } from "../api/courses";
 import { listSessions } from "../api/attendance";
 import { StatCard, Card, EmptyState, LoadingState } from "../components/ui";
@@ -70,13 +71,17 @@ export default function Attendance() {
       ) : (
         <>
           <div className="grid grid-cols-3 gap-4">
-            <StatCard label="Sessions Recorded" value={data.overall.totalSessions} icon="🗓️" />
-            <StatCard label="Sessions Attended" value={data.overall.presentCount} icon="✅" />
+            <StatCard label="Sessions Recorded" value={data.overall.totalSessions} icon={IconCalendarStats} tone="blue" />
+            <StatCard label="Sessions Attended" value={data.overall.presentCount} icon={IconCheckbox} tone="success" />
             <StatCard
               label="Attendance Rate"
               value={data.overall.percentage !== null ? `${data.overall.percentage}%` : "—"}
-              accent={data.overall.percentage !== null && data.overall.percentage < LOW_ATTENDANCE_THRESHOLD}
-              icon="📊"
+              icon={IconChartLine}
+              tone={
+                data.overall.percentage !== null && data.overall.percentage < LOW_ATTENDANCE_THRESHOLD
+                  ? "danger"
+                  : "navy"
+              }
             />
           </div>
 

@@ -3,7 +3,7 @@
 // emit later in its compiled stylesheet, since class *order in the string*
 // doesn't control CSS cascade order. A variant prop sidesteps that entirely.
 const VARIANTS = {
-  default: "bg-white border-gray-200",
+  default: "bg-white border-line",
   danger: "bg-badge-red-bg border-badge-red-text/20",
   warning: "bg-badge-amber-bg border-badge-amber-text/20",
   success: "bg-badge-green-bg border-badge-green-text/20",

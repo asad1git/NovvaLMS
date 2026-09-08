@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { IconBooks, IconFileCheck, IconChartLine, IconAlertTriangle } from "@tabler/icons-react";
 import { listCourses } from "../api/courses";
 import { getMyAnalytics } from "../api/analytics";
 import { StatCard, Card, EmptyState, LoadingState } from "../components/ui";
@@ -32,14 +33,20 @@ export default function StudentOverview({ onNavigate }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Enrolled Courses" value={courses.length} icon="📚" />
-        <StatCard label="Quizzes Taken" value={overall.totalAttempts} icon="📝" />
+        <StatCard label="Enrolled Courses" value={courses.length} icon={IconBooks} tone="blue" />
+        <StatCard label="Quizzes Taken" value={overall.totalAttempts} icon={IconFileCheck} tone="success" />
         <StatCard
           label="Average Score"
           value={overall.averagePercentage !== null ? `${overall.averagePercentage}%` : "—"}
-          icon="📊"
+          icon={IconChartLine}
+          tone="navy"
         />
-        <StatCard label="Weak Topics" value={overall.weakTopics.length} accent={overall.weakTopics.length > 0} icon="⚠️" />
+        <StatCard
+          label="Weak Topics"
+          value={overall.weakTopics.length}
+          icon={IconAlertTriangle}
+          tone={overall.weakTopics.length > 0 ? "danger" : "success"}
+        />
       </div>
 
       {overall.weakTopics.length > 0 && (

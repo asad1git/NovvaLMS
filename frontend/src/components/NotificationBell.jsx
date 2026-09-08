@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { IconBell, IconBellOff } from "@tabler/icons-react";
 import { listNotifications, markAsRead, markAllAsRead } from "../api/notifications";
 
 const POLL_INTERVAL_MS = 30000;
@@ -75,7 +76,7 @@ export default function NotificationBell() {
         onClick={handleOpen}
         className="relative w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-150 active:scale-95"
       >
-        <span className="text-base">🔔</span>
+        <IconBell size={19} stroke={1.9} />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 bg-badge-red-text text-white text-[9px] font-medium rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-0.5 shadow-sm">
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -98,7 +99,7 @@ export default function NotificationBell() {
           </div>
           {notifications.length === 0 ? (
             <div className="text-center py-8 px-4">
-              <span className="text-2xl opacity-40">🔕</span>
+              <IconBellOff size={26} stroke={1.6} className="opacity-40" />
               <p className="text-xs text-gray-500 mt-2">No notifications yet.</p>
             </div>
           ) : (

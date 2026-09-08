@@ -1,20 +1,35 @@
 import Card from "./Card";
 
+// Exact spec from design-system/*.html's .stat-card / .stat-icon (44px,
+// radius 10px) / .stat-val (26px/700) / .stat-lbl (12px/muted).
+const TONES = {
+  blue: { bg: "bg-badge-blue-bg", color: "text-navy-light" },
+  success: { bg: "bg-badge-green-bg", color: "text-success" },
+  amber: { bg: "bg-badge-amber-bg", color: "text-badge-amber-text" },
+  danger: { bg: "bg-badge-red-bg", color: "text-badge-red-text" },
+  navy: { bg: "bg-[#e8f0fb]", color: "text-navy" },
+};
+
 /**
- * The label+value stat tile pattern was duplicated with slightly different
- * markup across AdminOverview/TeacherOverview/StudentOverview/Analytics/
- * ParentDashboard/Attendance — one shared component now, so the elevated
- * styling (and any future tweak) applies everywhere at once.
+ * `icon` is a Tabler icon component (e.g. `IconBooks` from
+ * @tabler/icons-react), rendered inside a 44px colored chip — never an
+ * emoji, per the reference design.
  */
-export default function StatCard({ label, value, accent = false, icon }) {
+export default function StatCard({ label, value, icon: Icon, tone = "blue", delta }) {
+  const t = TONES[tone] || TONES.blue;
   return (
-    <Card hoverable>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[11px] text-gray-500 mb-1 truncate">{label}</p>
-          <p className={`text-2xl font-semibold ${accent ? "text-badge-red-text" : "text-gray-900"}`}>{value}</p>
+    <Card className="flex items-center gap-3.5" padding="p-[18px_20px]">
+      {Icon && (
+        <div className={`w-11 h-11 rounded-[10px] flex items-center justify-center flex-shrink-0 ${t.bg}`}>
+          <Icon size={20} stroke={1.9} className={t.color} />
         </div>
-        {icon && <span className="text-lg opacity-60 flex-shrink-0">{icon}</span>}
+      )}
+      <div className="min-w-0">
+        <div className="text-2xl font-bold text-text-main leading-none">{value}</div>
+        <div className="text-xs text-text-muted mt-[3px]">{label}</div>
+        {delta && (
+          <div className="flex items-center gap-1 text-[11px] font-medium text-success mt-1">{delta}</div>
+        )}
       </div>
     </Card>
   );
