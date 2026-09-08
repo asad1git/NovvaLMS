@@ -4,5 +4,6 @@ export { default as IconButton } from "./IconButton";
 export { default as Card } from "./Card";
 export { default as StatCard } from "./StatCard";
 export { default as CourseCard } from "./CourseCard";
+export { default as Tabs } from "./Tabs";
 export { default as EmptyState } from "./EmptyState";
 export { default as LoadingState } from "./LoadingState";

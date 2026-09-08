@@ -1,4 +1,20 @@
 import { useEffect, useState } from "react";
+import {
+  IconArrowLeft,
+  IconFolderOpen,
+  IconCloudUpload,
+  IconFileTypePdf,
+  IconFileTypeDoc,
+  IconFileTypePpt,
+  IconTrash,
+  IconDownload,
+  IconRefresh,
+  IconSparkles,
+  IconEyeOff,
+  IconSend,
+  IconPlus,
+  IconCalendarPlus,
+} from "@tabler/icons-react";
 import { listCourses, getMaterials, uploadMaterial, replaceMaterial, deleteMaterial, downloadMaterial } from "../api/courses";
 import {
   listQuizzesForCourse,
@@ -13,11 +29,13 @@ import {
   getSessionDetail,
   updateSessionRecords,
 } from "../api/attendance";
-import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
+import { Card, Button, IconButton, Badge, EmptyState, LoadingState, CourseCard, Tabs } from "../components/ui";
 
 const inputClass =
-  "border border-gray-300 rounded px-3 py-1.5 text-xs transition-colors duration-150 " +
-  "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
+  "border-[1.5px] border-line rounded-input px-3 py-2 text-[13px] transition-colors duration-150 " +
+  "focus:outline-none focus:border-navy-light";
+
+const TABS = ["Materials", "Quizzes", "Attendance", "Results"];
 
 const BLANK_QUESTION = () => ({
   type: "mcq",
@@ -28,18 +46,26 @@ const BLANK_QUESTION = () => ({
   topic: "",
 });
 
+const FILE_CHIP = {
+  pdf: { icon: IconFileTypePdf, bg: "bg-[#fff0f0]", color: "text-[#c0392b]" },
+  docx: { icon: IconFileTypeDoc, bg: "bg-[#e8f0fb]", color: "text-[#2980b9]" },
+  pptx: { icon: IconFileTypePpt, bg: "bg-[#fff3e0]", color: "text-[#e67e22]" },
+};
+
 export default function TeacherCourses() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [activeTab, setActiveTab] = useState("Materials");
   const [materials, setMaterials] = useState([]);
   const [title, setTitle] = useState("");
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadWarning, setUploadWarning] = useState("");
   const [replacingId, setReplacingId] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
 
   const [quizzes, setQuizzes] = useState([]);
   const [showQuizForm, setShowQuizForm] = useState(false);
@@ -47,8 +73,9 @@ export default function TeacherCourses() {
   const [quizDuration, setQuizDuration] = useState(30);
   const [questions, setQuestions] = useState([BLANK_QUESTION()]);
   const [creatingQuiz, setCreatingQuiz] = useState(false);
-  const [resultsQuiz, setResultsQuiz] = useState(null);
+  const [resultsQuizId, setResultsQuizId] = useState("");
   const [results, setResults] = useState([]);
+  const [loadingResults, setLoadingResults] = useState(false);
 
   const [generateMaterialId, setGenerateMaterialId] = useState("");
   const [generateNumQuestions, setGenerateNumQuestions] = useState(5);
@@ -78,17 +105,41 @@ export default function TeacherCourses() {
 
   async function openCourse(course) {
     setSelectedCourse(course);
+    setActiveTab("Materials");
     setError("");
-    setResultsQuiz(null);
+    setResultsQuizId("");
+    setResults([]);
     setMarkingSession(null);
     setMaterials([]); // clear immediately so a course switch never shows the previous course's list
     setQuizzes([]);
     setAttendanceSessions([]);
     setMaterials(await getMaterials(course._id));
-    setQuizzes(await listQuizzesForCourse(course._id));
+    const qs = await listQuizzesForCourse(course._id);
+    setQuizzes(qs);
     const attendance = await listAttendanceSessions(course._id);
     setAttendanceSessions(attendance.sessions);
     setAttendanceOverall(attendance.overall);
+  }
+
+  async function loadResults(quizId) {
+    setResultsQuizId(quizId);
+    if (!quizId) {
+      setResults([]);
+      return;
+    }
+    setLoadingResults(true);
+    try {
+      setResults(await getAttemptsForQuiz(quizId));
+    } finally {
+      setLoadingResults(false);
+    }
+  }
+
+  function handleTabChange(tab) {
+    setActiveTab(tab);
+    if (tab === "Results" && !resultsQuizId && quizzes.length > 0) {
+      loadResults(quizzes[0]._id);
+    }
   }
 
   async function refreshAttendance() {
@@ -147,26 +198,37 @@ export default function TeacherCourses() {
     }
   }
 
-  async function handleUpload(e) {
-    e.preventDefault();
-    if (!file || !selectedCourse) return;
+  async function doUpload(chosenFile) {
+    if (!chosenFile || !selectedCourse) return;
     setUploading(true);
     setError("");
     setUploadWarning("");
     try {
-      const uploaded = await uploadMaterial(selectedCourse._id, file, title);
+      const uploaded = await uploadMaterial(selectedCourse._id, chosenFile, title);
       if (uploaded.textExtractionWarning) {
         setUploadWarning(`"${uploaded.title}": ${uploaded.textExtractionWarning}`);
       }
       setTitle("");
       setFile(null);
-      e.target.reset();
       setMaterials(await getMaterials(selectedCourse._id));
     } catch (err) {
       setError(err.response?.data?.message || "Upload failed");
     } finally {
       setUploading(false);
     }
+  }
+
+  function handleUpload(e) {
+    e.preventDefault();
+    doUpload(file);
+    e.target.reset();
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setDragActive(false);
+    const dropped = e.dataTransfer.files?.[0];
+    if (dropped) doUpload(dropped);
   }
 
   async function handleDelete(materialId) {
@@ -258,345 +320,427 @@ export default function TeacherCourses() {
     }
   }
 
-  async function handleViewResults(quiz) {
-    setResultsQuiz(quiz);
-    setResults(await getAttemptsForQuiz(quiz._id));
-  }
-
   if (loading) return <LoadingState label="Loading courses…" />;
 
-  return (
-    <div className="space-y-5">
-      {error && (
-        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
-          {error}
-        </div>
-      )}
+  const errorBanner = error && (
+    <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-input px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
+      {error}
+    </div>
+  );
 
-      <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">My Courses</h2>
-        <div className="space-y-2">
-          {courses.length === 0 && (
+  // ── Course grid (no course selected) ──
+  if (!selectedCourse) {
+    return (
+      <div className="space-y-5">
+        {errorBanner}
+        <h2 className="text-[15px] font-bold text-navy">My Courses</h2>
+        {courses.length === 0 ? (
+          <Card>
             <EmptyState icon="📚" title="No courses assigned yet." />
-          )}
-          {courses.map((c) => (
-            <div
-              key={c._id}
-              onClick={() => openCourse(c)}
-              className={`px-3 py-2 rounded cursor-pointer border transition-colors duration-150 ${
-                selectedCourse?._id === c._id
-                  ? "border-navy-light bg-badge-blue-bg"
-                  : "border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              <div className="text-xs font-medium text-gray-900">
-                {c.code} — {c.title}
-              </div>
-              {c.description && <div className="text-[11px] text-gray-500">{c.description}</div>}
-            </div>
-          ))}
+          </Card>
+        ) : (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+            {courses.map((c) => (
+              <CourseCard
+                key={c._id}
+                code={c.code}
+                name={c.title}
+                subtitle={c.description}
+                onClick={() => openCourse(c)}
+                actions={
+                  <Button
+                    size="sm"
+                    className="w-full justify-center"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCourse(c);
+                    }}
+                  >
+                    <IconFolderOpen size={15} />
+                    Open
+                  </Button>
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Course detail ──
+  return (
+    <div className="space-y-4">
+      {errorBanner}
+
+      <button
+        onClick={() => setSelectedCourse(null)}
+        className="flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-navy transition-colors duration-150"
+      >
+        <IconArrowLeft size={15} /> Back to My Courses
+      </button>
+
+      <div>
+        <div className="flex items-center gap-3 mb-1">
+          <code className="text-sm font-mono font-bold bg-[#f0f4fa] text-text-main px-2 py-0.5 rounded">
+            {selectedCourse.code}
+          </code>
+          <h2 className="text-xl font-bold text-navy">{selectedCourse.title}</h2>
         </div>
-      </Card>
+        {selectedCourse.description && <p className="text-[13px] text-text-muted">{selectedCourse.description}</p>}
+      </div>
 
-      {selectedCourse && (
+      <Tabs tabs={TABS} active={activeTab} onChange={handleTabChange} />
+
+      {activeTab === "Materials" && (
         <Card>
-          <h2 className="text-sm font-medium text-gray-900 mb-3">Materials — {selectedCourse.code}</h2>
-
-          <form onSubmit={handleUpload} className="flex items-center gap-2 mb-2">
-            <input
-              type="text"
-              placeholder="Title (optional)"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className={inputClass}
-            />
-            <input
-              type="file"
-              accept=".pdf,.pptx,.docx"
-              onChange={(e) => setFile(e.target.files[0])}
-              className="text-xs"
-            />
-            <Button type="submit" disabled={uploading || !file} className="px-3 py-1.5">
-              {uploading ? "Uploading…" : "Upload"}
-            </Button>
+          <form
+            onSubmit={handleUpload}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-card p-8 text-center mb-4 transition-colors duration-200 ${
+              dragActive ? "border-navy-light bg-badge-blue-bg" : "border-line"
+            }`}
+          >
+            <IconCloudUpload size={36} stroke={1.5} className="mx-auto text-text-muted mb-2" />
+            <div className="text-sm font-semibold text-text-main mb-1">Drag &amp; drop lecture files here</div>
+            <div className="text-xs text-text-muted mb-3">PDF, DOCX, PPTX up to 20MB</div>
+            <div className="flex items-center justify-center gap-2">
+              <input
+                type="text"
+                placeholder="Title (optional)"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className={`${inputClass} py-1.5`}
+              />
+              <input
+                type="file"
+                accept=".pdf,.pptx,.docx"
+                onChange={(e) => setFile(e.target.files[0])}
+                className="text-xs"
+              />
+              <Button type="submit" size="sm" disabled={uploading || !file}>
+                {uploading ? "Uploading…" : "Upload"}
+              </Button>
+            </div>
           </form>
-          <p className="text-[11px] text-gray-500 mb-3">PDF, PPTX, or DOCX — max 20MB.</p>
+
           {uploadWarning && (
-            <div className="bg-badge-amber-bg text-badge-amber-text text-[11px] rounded px-3 py-2 mb-3 animate-[fadeIn_0.15s_ease-in]">
+            <div className="bg-badge-amber-bg text-badge-amber-text text-[11px] rounded-input px-3 py-2 mb-3 animate-[fadeIn_0.15s_ease-in]">
               ⚠ {uploadWarning}
             </div>
           )}
 
-          <div className="space-y-1">
-            {materials.map((m) => (
-              <div
-                key={m._id}
-                className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
-              >
-                <div>
-                  <div className="text-gray-900 font-medium flex items-center gap-1.5">
-                    {m.title}
-                    {m.textExtractionWarning && (
-                      <Badge variant="amber" title={m.textExtractionWarning} className="cursor-help">
-                        ⚠ no readable text
-                      </Badge>
-                    )}
+          {materials.length === 0 ? (
+            <EmptyState icon="📄" title="No materials uploaded yet." />
+          ) : (
+            <div>
+              {materials.map((m) => {
+                const chip = FILE_CHIP[m.fileType] || FILE_CHIP.pdf;
+                const ChipIcon = chip.icon;
+                return (
+                  <div key={m._id} className="flex items-center gap-3 px-3.5 py-2.5 rounded-[6px] border border-line mb-2 bg-white">
+                    <div className={`w-9 h-9 rounded-[8px] flex items-center justify-center flex-shrink-0 ${chip.bg} ${chip.color}`}>
+                      <ChipIcon size={18} stroke={1.8} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-medium text-text-main flex items-center gap-1.5 truncate">
+                        {m.title}
+                        {m.textExtractionWarning && (
+                          <Badge variant="amber" title={m.textExtractionWarning} className="cursor-help flex-shrink-0">
+                            ⚠ no readable text
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-text-muted uppercase">
+                        {m.fileType} · {(m.fileSize / 1024).toFixed(0)} KB
+                      </div>
+                    </div>
+                    <IconButton onClick={() => downloadMaterial(m._id, m.fileName)} title="Download">
+                      <IconDownload size={16} />
+                    </IconButton>
+                    <label className="p-1.5 rounded-input text-text-muted hover:bg-bg-page hover:text-navy transition-colors duration-150 cursor-pointer inline-flex items-center justify-center">
+                      <IconRefresh size={16} className={replacingId === m._id ? "animate-spin" : ""} />
+                      <input
+                        type="file"
+                        accept=".pdf,.pptx,.docx"
+                        className="hidden"
+                        disabled={replacingId === m._id}
+                        onChange={(e) => {
+                          const selected = e.target.files[0];
+                          e.target.value = "";
+                          handleReplace(m._id, selected);
+                        }}
+                      />
+                    </label>
+                    <IconButton danger onClick={() => handleDelete(m._id)} title="Delete">
+                      <IconTrash size={16} />
+                    </IconButton>
                   </div>
-                  <div className="text-[11px] text-gray-400 uppercase">
-                    {m.fileType} · {(m.fileSize / 1024).toFixed(0)} KB
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => downloadMaterial(m._id, m.fileName)} className="text-navy-light hover:underline">
-                    Download
-                  </button>
-                  <label className="text-navy-light hover:underline cursor-pointer">
-                    {replacingId === m._id ? "Replacing…" : "Replace"}
-                    <input
-                      type="file"
-                      accept=".pdf,.pptx,.docx"
-                      className="hidden"
-                      disabled={replacingId === m._id}
-                      onChange={(e) => {
-                        const selected = e.target.files[0];
-                        e.target.value = ""; // allow re-selecting the same filename later
-                        handleReplace(m._id, selected);
-                      }}
-                    />
-                  </label>
-                  <button onClick={() => handleDelete(m._id)} className="text-badge-red-text hover:underline">
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-            {materials.length === 0 && <EmptyState icon="📄" title="No materials uploaded yet." />}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
       )}
 
-      {selectedCourse && (
-        <Card>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-gray-900">Quizzes — {selectedCourse.code}</h2>
-            <Button onClick={() => setShowQuizForm((v) => !v)} variant={showQuizForm ? "secondary" : "primary"} className="px-3 py-1.5">
-              {showQuizForm ? "Cancel" : "New Quiz"}
-            </Button>
-          </div>
-
-          {showQuizForm && (
-            <form onSubmit={handleCreateQuiz} className="border border-gray-200 rounded p-3 mb-4 space-y-3 animate-[fadeIn_0.15s_ease-in]">
-              <div className="bg-badge-blue-bg border border-navy-light/20 rounded p-3 flex items-center gap-2">
+      {activeTab === "Quizzes" && (
+        <div className="space-y-5">
+          <div className="bg-[#f8faff] border-[1.5px] border-badge-blue-bg rounded-card p-[18px]">
+            <div className="flex items-center gap-2 text-[13px] font-bold text-navy mb-3.5">
+              <IconSparkles size={16} className="text-navy-light" />
+              AI Quiz Generation
+            </div>
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-text-main mb-1.5">
+                  Source Material
+                </label>
                 <select
-                  className={`flex-1 bg-white ${inputClass}`}
+                  className={`w-full bg-white ${inputClass}`}
                   value={generateMaterialId}
                   onChange={(e) => setGenerateMaterialId(e.target.value)}
                 >
-                  <option value="">Generate from material…</option>
+                  <option value="">Select material…</option>
                   {materials.map((m) => (
                     <option key={m._id} value={m._id}>
                       {m.title}
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-text-main mb-1.5">
+                  Questions
+                </label>
                 <input
                   type="number"
                   min="1"
                   max="20"
-                  className={`w-16 ${inputClass}`}
+                  className={`w-full ${inputClass}`}
                   value={generateNumQuestions}
                   onChange={(e) => setGenerateNumQuestions(e.target.value)}
                 />
+              </div>
+              <div className="flex items-end">
                 <Button
                   type="button"
                   onClick={handleGenerate}
                   disabled={generating || !generateMaterialId}
-                  variant="secondary"
-                  className="px-3 py-1.5"
+                  className="w-full justify-center"
                 >
+                  <IconSparkles size={15} />
                   {generating ? "Generating…" : "Generate with AI"}
                 </Button>
               </div>
-              {materials.length === 0 && (
-                <p className="text-[10px] text-gray-400 -mt-2">
-                  Upload a material above to enable AI generation.
-                </p>
-              )}
-
-              <div className="flex gap-2">
-                <input
-                  className={`flex-1 ${inputClass} py-2`}
-                  placeholder="Quiz title"
-                  value={quizTitle}
-                  onChange={(e) => setQuizTitle(e.target.value)}
-                  required
-                />
-                <input
-                  type="number"
-                  min="1"
-                  className={`w-32 ${inputClass} py-2`}
-                  placeholder="Minutes"
-                  value={quizDuration}
-                  onChange={(e) => setQuizDuration(e.target.value)}
-                  required
-                />
-              </div>
-
-              {questions.map((q, qi) => (
-                <div key={qi} className="border border-gray-100 rounded p-3 space-y-2 bg-gray-50">
-                  <div className="flex items-center gap-2">
-                    <select
-                      className={`bg-white ${inputClass}`}
-                      value={q.type}
-                      onChange={(e) => updateQuestion(qi, { type: e.target.value })}
-                    >
-                      <option value="mcq">Multiple choice</option>
-                      <option value="subjective">Subjective (manually graded)</option>
-                    </select>
-                    <input
-                      className={`flex-1 ${inputClass}`}
-                      placeholder={`Question ${qi + 1}`}
-                      value={q.text}
-                      onChange={(e) => updateQuestion(qi, { text: e.target.value })}
-                      required
-                    />
-                    {questions.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeQuestion(qi)}
-                        className="text-[11px] text-badge-red-text hover:underline"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-
-                  <input
-                    className={`w-48 ${inputClass} px-2 py-1 text-[11px]`}
-                    placeholder="Topic (optional, e.g. Arrays)"
-                    value={q.topic || ""}
-                    onChange={(e) => updateQuestion(qi, { topic: e.target.value })}
-                    maxLength={60}
-                  />
-
-                  {q.type === "subjective" ? (
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-gray-600">Max score:</label>
-                      <input
-                        type="number"
-                        min="1"
-                        className={`w-20 ${inputClass} px-2 py-1`}
-                        value={q.maxScore}
-                        onChange={(e) => updateQuestion(qi, { maxScore: Number(e.target.value) })}
-                        required
-                      />
-                      <p className="text-[10px] text-gray-400">
-                        The student types a free-text answer; you'll grade it under Grade Approvals.
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-2 gap-2">
-                        {q.options.map((opt, oi) => (
-                          <label key={oi} className="flex items-center gap-2 text-xs">
-                            <input
-                              type="radio"
-                              name={`correct-${qi}`}
-                              checked={q.correctOptionIndex === oi}
-                              onChange={() => updateQuestion(qi, { correctOptionIndex: oi })}
-                            />
-                            <input
-                              className={`flex-1 ${inputClass} px-2 py-1`}
-                              placeholder={`Option ${oi + 1}`}
-                              value={opt}
-                              onChange={(e) => updateOption(qi, oi, e.target.value)}
-                              required
-                            />
-                          </label>
-                        ))}
-                      </div>
-                      <p className="text-[10px] text-gray-400">Select the radio button next to the correct option.</p>
-                    </>
-                  )}
-                </div>
-              ))}
-
-              <div className="flex items-center justify-between">
-                <button type="button" onClick={addQuestion} className="text-xs text-navy-light hover:underline">
-                  + Add another question
-                </button>
-                <Button type="submit" disabled={creatingQuiz}>
-                  {creatingQuiz ? "Creating…" : "Create Quiz"}
-                </Button>
-              </div>
-            </form>
-          )}
-
-          <div className="space-y-1">
-            {quizzes.length === 0 && <EmptyState icon="📝" title="No quizzes yet." />}
-            {quizzes.map((q) => (
-              <div
-                key={q._id}
-                className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
-              >
-                <div>
-                  <div className="text-gray-900 font-medium">{q.title}</div>
-                  <div className="text-[11px] text-gray-400">{q.durationMinutes} min</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant={q.isPublished ? "green" : "amber"}>{q.isPublished ? "Published" : "Draft"}</Badge>
-                  <button onClick={() => handleTogglePublish(q)} className="text-navy-light hover:underline">
-                    {q.isPublished ? "Unpublish" : "Publish"}
-                  </button>
-                  <button onClick={() => handleViewResults(q)} className="text-navy-light hover:underline">
-                    Results
-                  </button>
-                </div>
-              </div>
-            ))}
+            </div>
+            {materials.length === 0 && (
+              <p className="text-[11px] text-text-muted">Upload a material first to enable AI generation.</p>
+            )}
           </div>
 
-          {resultsQuiz && (
-            <div className="mt-4 border-t border-gray-100 pt-3 animate-[fadeIn_0.15s_ease-in]">
-              <h3 className="text-xs font-medium text-gray-900 mb-2">Results — {resultsQuiz.title}</h3>
-              <div className="space-y-1">
-                {results.length === 0 && <EmptyState icon="🗒️" title="No attempts yet." />}
-                {results.map((r) => (
-                  <div key={r._id} className="flex justify-between text-xs border-b border-gray-100 py-1">
-                    <span>{r.student?.name}</span>
-                    <span className="text-gray-500">
-                      {!r.submittedAt
-                        ? "In progress"
-                        : r.gradingComplete
-                        ? `${r.score}/${r.maxScore}`
-                        : `${r.score}/${r.maxScore} (pending review)`}
-                    </span>
+          <Card>
+            <div className="flex items-center justify-between mb-3.5">
+              <h3 className="text-[13px] font-semibold text-text-main">Quizzes</h3>
+              <Button
+                size="sm"
+                variant={showQuizForm ? "secondary" : "primary"}
+                onClick={() => setShowQuizForm((v) => !v)}
+              >
+                {!showQuizForm && <IconPlus size={14} />}
+                {showQuizForm ? "Cancel" : "New Quiz"}
+              </Button>
+            </div>
+
+            {showQuizForm && (
+              <form onSubmit={handleCreateQuiz} className="border border-line rounded-card p-3.5 mb-4 space-y-3 animate-[fadeIn_0.15s_ease-in]">
+                <div className="flex gap-2">
+                  <input
+                    className={`flex-1 ${inputClass}`}
+                    placeholder="Quiz title"
+                    value={quizTitle}
+                    onChange={(e) => setQuizTitle(e.target.value)}
+                    required
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    className={`w-32 ${inputClass}`}
+                    placeholder="Minutes"
+                    value={quizDuration}
+                    onChange={(e) => setQuizDuration(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {questions.map((q, qi) => (
+                  <div key={qi} className="border border-line rounded-[6px] p-3 space-y-2 bg-bg-page">
+                    <div className="flex items-center gap-2">
+                      <select
+                        className={`bg-white ${inputClass}`}
+                        value={q.type}
+                        onChange={(e) => updateQuestion(qi, { type: e.target.value })}
+                      >
+                        <option value="mcq">Multiple choice</option>
+                        <option value="subjective">Subjective (manually graded)</option>
+                      </select>
+                      <input
+                        className={`flex-1 ${inputClass}`}
+                        placeholder={`Question ${qi + 1}`}
+                        value={q.text}
+                        onChange={(e) => updateQuestion(qi, { text: e.target.value })}
+                        required
+                      />
+                      {questions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeQuestion(qi)}
+                          className="text-[11px] text-badge-red-text hover:underline"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <input
+                      className={`w-48 ${inputClass} px-2 py-1 text-[11px]`}
+                      placeholder="Topic (optional, e.g. Arrays)"
+                      value={q.topic || ""}
+                      onChange={(e) => updateQuestion(qi, { topic: e.target.value })}
+                      maxLength={60}
+                    />
+
+                    {q.type === "subjective" ? (
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-text-muted">Max score:</label>
+                        <input
+                          type="number"
+                          min="1"
+                          className={`w-20 ${inputClass} px-2 py-1`}
+                          value={q.maxScore}
+                          onChange={(e) => updateQuestion(qi, { maxScore: Number(e.target.value) })}
+                          required
+                        />
+                        <p className="text-[10px] text-text-muted">
+                          The student types a free-text answer; you'll grade it under Grade Approvals.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          {q.options.map((opt, oi) => (
+                            <label key={oi} className="flex items-center gap-2 text-xs">
+                              <input
+                                type="radio"
+                                name={`correct-${qi}`}
+                                checked={q.correctOptionIndex === oi}
+                                onChange={() => updateQuestion(qi, { correctOptionIndex: oi })}
+                              />
+                              <input
+                                className={`flex-1 ${inputClass} px-2 py-1`}
+                                placeholder={`Option ${oi + 1}`}
+                                value={opt}
+                                onChange={(e) => updateOption(qi, oi, e.target.value)}
+                                required
+                              />
+                            </label>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-text-muted">Select the radio button next to the correct option.</p>
+                      </>
+                    )}
                   </div>
                 ))}
+
+                <div className="flex items-center justify-between">
+                  <button type="button" onClick={addQuestion} className="text-xs text-navy-light hover:underline">
+                    + Add another question
+                  </button>
+                  <Button type="submit" disabled={creatingQuiz}>
+                    {creatingQuiz ? "Creating…" : "Create Quiz"}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {quizzes.length === 0 ? (
+              <EmptyState icon="📝" title="No quizzes yet." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr>
+                      <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                        Quiz Title
+                      </th>
+                      <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                        Duration
+                      </th>
+                      <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                        Status
+                      </th>
+                      <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quizzes.map((q) => (
+                      <tr key={q._id} className="hover:bg-bg-page">
+                        <td className="px-3 py-2.5 border-b border-[#f1f3f6] font-semibold text-text-main">{q.title}</td>
+                        <td className="px-3 py-2.5 border-b border-[#f1f3f6] text-text-muted">{q.durationMinutes} min</td>
+                        <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                          <Badge variant={q.isPublished ? "green" : "amber"}>{q.isPublished ? "Published" : "Draft"}</Badge>
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                          <div className="flex items-center gap-1">
+                            <IconButton onClick={() => handleTogglePublish(q)} title={q.isPublished ? "Unpublish" : "Publish"}>
+                              {q.isPublished ? <IconEyeOff size={16} /> : <IconSend size={16} />}
+                            </IconButton>
+                            <button
+                              onClick={() => {
+                                setActiveTab("Results");
+                                loadResults(q._id);
+                              }}
+                              className="text-xs text-navy-light hover:underline"
+                            >
+                              Results
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          )}
-        </Card>
+            )}
+          </Card>
+        </div>
       )}
 
-      {selectedCourse && (
+      {activeTab === "Attendance" && (
         <Card>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-gray-900">
-              Attendance — {selectedCourse.code}
+          <div className="flex items-center justify-between mb-3.5">
+            <h3 className="text-[13px] font-semibold text-text-main">
+              Sessions
               {attendanceOverall?.averageAttendanceRate != null && (
-                <span className="text-[11px] text-gray-500 font-normal ml-2">
+                <span className="text-xs text-text-muted font-normal ml-2">
                   ({attendanceOverall.averageAttendanceRate}% average)
                 </span>
               )}
-            </h2>
-            <Button onClick={() => setShowSessionForm((s) => !s)} variant={showSessionForm ? "secondary" : "primary"} className="px-3 py-1.5">
+            </h3>
+            <Button size="sm" variant={showSessionForm ? "secondary" : "primary"} onClick={() => setShowSessionForm((s) => !s)}>
+              {!showSessionForm && <IconCalendarPlus size={14} />}
               {showSessionForm ? "Cancel" : "New Session"}
             </Button>
           </div>
 
           {showSessionForm && (
-            <form onSubmit={handleCreateSession} className="flex items-center gap-2 mb-4 border border-gray-200 rounded p-3 animate-[fadeIn_0.15s_ease-in]">
+            <form onSubmit={handleCreateSession} className="flex items-center gap-2 mb-4 border border-line rounded-card p-3.5 animate-[fadeIn_0.15s_ease-in]">
               <input
                 type="date"
                 value={sessionDate}
@@ -611,31 +755,31 @@ export default function TeacherCourses() {
                 onChange={(e) => setSessionTopic(e.target.value)}
                 className={`flex-1 ${inputClass}`}
               />
-              <Button type="submit" disabled={creatingSession} variant="secondary" className="px-3 py-1.5">
+              <Button type="submit" disabled={creatingSession} variant="secondary">
                 {creatingSession ? "Creating…" : "Create"}
               </Button>
             </form>
           )}
 
           {markingSession ? (
-            <div className="border border-gray-200 rounded p-3 animate-[fadeIn_0.15s_ease-in]">
+            <div className="border border-line rounded-card p-3.5 animate-[fadeIn_0.15s_ease-in]">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-medium text-gray-900">
+                <h4 className="text-[13px] font-semibold text-text-main">
                   Mark attendance — {new Date(markingSession.date).toLocaleDateString()}
                   {markingSession.topic && ` (${markingSession.topic})`}
-                </h3>
-                <button onClick={() => setMarkingSession(null)} className="text-[11px] text-gray-500 hover:underline">
+                </h4>
+                <button onClick={() => setMarkingSession(null)} className="text-xs text-text-muted hover:underline">
                   Close
                 </button>
               </div>
               <div className="space-y-1 mb-3">
                 {markingRecords.map((r) => (
-                  <div key={r._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-1.5">
-                    <span className="text-gray-900">{r.student.name}</span>
+                  <div key={r._id} className="flex items-center justify-between text-[13px] border-b border-[#f1f3f6] py-1.5">
+                    <span className="text-text-main">{r.student.name}</span>
                     <select
                       value={r.status}
                       onChange={(e) => updateRecordStatus(r.student._id, e.target.value)}
-                      className={`text-[11px] border rounded px-2 py-1 transition-colors duration-150 ${
+                      className={`text-xs border rounded-input px-2 py-1 transition-colors duration-150 ${
                         r.status === "present"
                           ? "bg-badge-green-bg text-badge-green-text border-transparent"
                           : r.status === "absent"
@@ -655,20 +799,21 @@ export default function TeacherCourses() {
                 {savingMarks ? "Saving…" : "Save Attendance"}
               </Button>
             </div>
+          ) : attendanceSessions.length === 0 ? (
+            <EmptyState icon="🗓️" title="No sessions recorded yet." />
           ) : (
             <div className="space-y-1">
-              {attendanceSessions.length === 0 && <EmptyState icon="🗓️" title="No sessions recorded yet." />}
               {attendanceSessions.map((s) => (
                 <div
                   key={s._id}
                   onClick={() => handleOpenSession(s._id)}
-                  className="flex items-center justify-between text-xs border-b border-gray-100 py-2 cursor-pointer transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+                  className="flex items-center justify-between text-[13px] border-b border-[#f1f3f6] py-2.5 cursor-pointer transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
                 >
                   <div>
-                    <div className="text-gray-900 font-medium">{new Date(s.date).toLocaleDateString()}</div>
-                    {s.topic && <div className="text-[11px] text-gray-400">{s.topic}</div>}
+                    <div className="text-text-main font-semibold">{new Date(s.date).toLocaleDateString()}</div>
+                    {s.topic && <div className="text-xs text-text-muted">{s.topic}</div>}
                   </div>
-                  <span className="text-[11px] text-gray-500">
+                  <span className="text-xs text-text-muted">
                     {s.presentCount}/{s.totalStudents} present
                   </span>
                 </div>
@@ -676,6 +821,102 @@ export default function TeacherCourses() {
             </div>
           )}
         </Card>
+      )}
+
+      {activeTab === "Results" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="text-[13px] font-medium text-text-main whitespace-nowrap">Select Quiz:</label>
+            <select
+              className={`max-w-[300px] bg-white ${inputClass}`}
+              value={resultsQuizId}
+              onChange={(e) => loadResults(e.target.value)}
+            >
+              <option value="">Select a quiz…</option>
+              {quizzes.map((q) => (
+                <option key={q._id} value={q._id}>
+                  {q.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Card>
+            {loadingResults ? (
+              <LoadingState label="Loading results…" />
+            ) : !resultsQuizId ? (
+              <EmptyState icon="🗒️" title="Select a quiz above to view results." />
+            ) : results.length === 0 ? (
+              <EmptyState icon="🗒️" title="No attempts yet." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr>
+                      <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                        Student
+                      </th>
+                      <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                        Score
+                      </th>
+                      <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                        Percentage
+                      </th>
+                      <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.map((r) => {
+                      const pct = r.maxScore ? Math.round((r.score / r.maxScore) * 100) : null;
+                      return (
+                        <tr key={r._id} className="hover:bg-bg-page">
+                          <td className="px-3 py-2.5 border-b border-[#f1f3f6] font-semibold text-text-main">
+                            {r.student?.name}
+                          </td>
+                          <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                            {!r.submittedAt ? (
+                              <span className="text-text-muted">In progress</span>
+                            ) : (
+                              <strong>
+                                {r.score}/{r.maxScore}
+                              </strong>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                            {pct !== null && (
+                              <div className="flex items-center gap-2 min-w-[120px]">
+                                <div className="flex-1 h-1.5 bg-[#e9ecef] rounded-full overflow-hidden min-w-[60px]">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      pct >= 70 ? "bg-success" : pct >= 50 ? "bg-[#f39c12]" : "bg-badge-red-text"
+                                    }`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-text-muted">{pct}%</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                            {!r.submittedAt ? (
+                              <span className="text-text-muted text-xs">—</span>
+                            ) : r.gradingComplete ? (
+                              <Badge variant="green">Graded</Badge>
+                            ) : (
+                              <Badge variant="amber">Pending Review</Badge>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
       )}
     </div>
   );
