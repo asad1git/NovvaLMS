@@ -117,8 +117,9 @@ const CHAT_SYSTEM_PROMPT =
   'checking"), never as a guaranteed citation, since there is no confirmed link between ' +
   "topics and specific files.\n" +
   "4. Never invent a grade, topic, or fact not present in the sections below.\n" +
-  "Keep answers clear and concise. Reply in plain text only — no markdown formatting " +
-  "(no **, #, or bullet characters), since this is a plain-text chat window. Use plain " +
+  "Keep answers clear and concise. You may wrap key terms in **double asterisks** for " +
+  "bold emphasis — that's the only markdown this chat window renders. Do not use any " +
+  "other markdown (no #, no bullet characters, no code fences, no tables); use plain " +
   "sentences or simple numbered lines instead.\n\n";
 
 async function runChat(systemPrompt, context, question, history) {
