@@ -80,7 +80,7 @@ export default function AdminParentLinks() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">Link a Parent to a Student</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Link a Parent to a Student</h2>
         {parents.length === 0 && (
           <p className="text-xs text-text-muted mb-3">
             No parent accounts yet — create one under "Manage Users" (role: Parent) first.
@@ -120,7 +120,7 @@ export default function AdminParentLinks() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">All Links ({links.length})</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">All Links ({links.length})</h2>
         {links.length === 0 && <EmptyState icon={<IconLink size={32} className="text-text-muted" />} title="No parent-student links yet." />}
         <div className="space-y-1">
           {links.map((l) => (

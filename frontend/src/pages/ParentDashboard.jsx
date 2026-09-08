@@ -77,7 +77,7 @@ function ChildAnalytics({ child, analytics }) {
 
       {overall.weakTopics.length > 0 && (
         <Card variant="danger">
-          <h2 className="text-sm font-medium text-badge-red-text mb-2">
+          <h2 className="text-sm font-semibold text-badge-red-text mb-2">
             {child.name} is scoring below 60% on these topics
           </h2>
           <div className="flex flex-wrap gap-2">
@@ -91,7 +91,7 @@ function ChildAnalytics({ child, analytics }) {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">Quiz Results ({attempts.length})</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Quiz Results ({attempts.length})</h2>
         {attempts.length === 0 ? (
           <EmptyState icon={<IconNotes size={32} className="text-text-muted" />} title="No submitted quizzes yet" />
         ) : (
@@ -122,7 +122,7 @@ function ChildAnalytics({ child, analytics }) {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">Performance by Topic</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Performance by Topic</h2>
         {topics.length === 0 ? (
           <EmptyState icon={<IconChartBar size={32} className="text-text-muted" />} title="No topic breakdown yet" subtitle="This appears once quizzes are scored." />
         ) : (

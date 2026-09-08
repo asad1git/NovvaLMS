@@ -75,7 +75,7 @@ export default function AccountSettings() {
   return (
     <div className="space-y-4 max-w-lg">
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">Profile</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Profile</h2>
         <form onSubmit={handleProfileSubmit} className="space-y-3">
           <div>
             <label className="block text-[11px] text-text-muted mb-1">Email</label>
@@ -94,7 +94,7 @@ export default function AccountSettings() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">Change Password</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Change Password</h2>
         <form onSubmit={handlePasswordSubmit} className="space-y-3">
           <div>
             <label className="block text-[11px] text-text-muted mb-1">Current Password</label>

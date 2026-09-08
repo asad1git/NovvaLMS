@@ -10,7 +10,7 @@ import {
 } from "@tabler/icons-react";
 import { getMyAnalytics } from "../api/analytics";
 import { listCourses } from "../api/courses";
-import { Card, EmptyState, LoadingState } from "../components/ui";
+import { Card, StatCard, EmptyState, LoadingState } from "../components/ui";
 
 function barColor(pct) {
   if (pct >= 70) return "linear-gradient(90deg,#27ae60,#1e8449)";
@@ -169,45 +169,40 @@ export default function Analytics() {
           <LoadingState />
         ) : (
           <div className="space-y-5">
-            <div className="grid grid-cols-4 gap-3.5">
-              <MetricCard
+            <div className="grid grid-cols-4 gap-4">
+              <StatCard
                 icon={IconChecklist}
-                iconBg="#e8f0fb"
-                iconColor="#2E75B6"
+                tone="blue"
                 value={overall.totalAttempts}
                 label="Quizzes Attempted"
-                trendLabel={`+${overall.totalAttempts}`}
-                trendTone="up"
+                trend={{ label: `+${overall.totalAttempts}`, tone: "up" }}
               />
-              <MetricCard
+              <StatCard
                 icon={IconChartLine}
-                iconBg="#f0f7f0"
-                iconColor="#1E8449"
+                tone="success"
                 value={overall.averagePercentage !== null ? `${overall.averagePercentage}%` : "—"}
                 valueColor={overall.averagePercentage !== null ? valueColor(overall.averagePercentage) : undefined}
                 label="Overall Average"
-                trendLabel={overall.averagePercentage >= 70 ? "Good" : "Below avg"}
-                trendTone={overall.averagePercentage >= 70 ? "up" : "down"}
+                trend={{ label: overall.averagePercentage >= 70 ? "Good" : "Below avg", tone: overall.averagePercentage >= 70 ? "up" : "down" }}
               />
-              <MetricCard
+              <StatCard
                 icon={IconTrophy}
-                iconBg="#FAEEDA"
-                iconColor="#633806"
+                tone="amber"
                 value={`${bestScore}%`}
                 valueColor="#633806"
                 label="Best Score"
-                trendLabel="Best"
-                trendTone="up"
+                trend={{ label: "Best", tone: "up" }}
               />
-              <MetricCard
+              <StatCard
                 icon={overall.weakTopics.length ? IconAlertTriangle : IconCircleCheck}
-                iconBg={overall.weakTopics.length ? "#fdf0f0" : "#EAF3DE"}
-                iconColor={overall.weakTopics.length ? "#A32D2D" : "#1E8449"}
+                tone={overall.weakTopics.length ? "danger" : "success"}
                 value={overall.weakTopics.length}
                 valueColor={overall.weakTopics.length ? "#A32D2D" : "#1E8449"}
                 label="Weak Topics"
-                trendLabel={overall.weakTopics.length ? `${overall.weakTopics.length} found` : "None!"}
-                trendTone={overall.weakTopics.length ? "down" : "up"}
+                trend={{
+                  label: overall.weakTopics.length ? `${overall.weakTopics.length} found` : "None!",
+                  tone: overall.weakTopics.length ? "down" : "up",
+                }}
               />
             </div>
 
@@ -330,28 +325,5 @@ function LegendChip({ color, label }) {
       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
       <span className="text-[11px] text-text-muted">{label}</span>
     </div>
-  );
-}
-
-function MetricCard({ icon: Icon, iconBg, iconColor, value, valueColor, label, trendLabel, trendTone }) {
-  return (
-    <Card>
-      <div className="flex items-start justify-between mb-2.5">
-        <div className="w-[38px] h-[38px] rounded-[9px] flex items-center justify-center flex-shrink-0" style={{ background: iconBg }}>
-          <Icon size={18} stroke={1.9} style={{ color: iconColor }} />
-        </div>
-        <span
-          className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 ${
-            trendTone === "up" ? "bg-badge-green-bg text-success" : "bg-badge-red-bg text-badge-red-text"
-          }`}
-        >
-          {trendLabel}
-        </span>
-      </div>
-      <div className="text-[28px] font-extrabold leading-none mb-1" style={{ color: valueColor || "#1a2332" }}>
-        {value}
-      </div>
-      <div className="text-xs text-text-muted">{label}</div>
-    </Card>
   );
 }

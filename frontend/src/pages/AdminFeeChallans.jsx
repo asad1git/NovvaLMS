@@ -68,7 +68,7 @@ export default function AdminFeeChallans() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">Create Fee Challan</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Create Fee Challan</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
           <select
             className={`bg-white ${inputClass}`}
@@ -112,7 +112,7 @@ export default function AdminFeeChallans() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">All Fee Challans ({challans.length})</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">All Fee Challans ({challans.length})</h2>
         <div className="space-y-1">
           {challans.length === 0 && <EmptyState icon={<IconReceipt2 size={32} className="text-text-muted" />} title="No fee challans yet." />}
           {challans.map((c) => (

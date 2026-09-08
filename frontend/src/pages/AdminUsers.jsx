@@ -93,7 +93,7 @@ export default function AdminUsers() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">Create User</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Create User</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-3 gap-3">
           <input
             className={inputClass}
@@ -131,7 +131,7 @@ export default function AdminUsers() {
 
       <Card>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-text-main">All Users ({users.length})</h2>
+          <h2 className="text-[13px] font-bold text-navy">All Users ({users.length})</h2>
           <select
             className={`bg-white ${inputClass} py-1`}
             value={roleFilter}

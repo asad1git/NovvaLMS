@@ -88,7 +88,7 @@ export default function AdminCourses() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">Create Course</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Create Course</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
           <input
             className={inputClass}
@@ -130,7 +130,7 @@ export default function AdminCourses() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">All Courses</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">All Courses</h2>
         <div className="space-y-2">
           {courses.length === 0 && <EmptyState icon={<IconBooks size={32} className="text-text-muted" />} title="No courses yet." />}
           {courses.map((c) => (
@@ -157,7 +157,7 @@ export default function AdminCourses() {
 
       {selectedCourse && (
         <Card>
-          <h2 className="text-sm font-medium text-text-main mb-3">Bulk Enroll — {selectedCourse.code}</h2>
+          <h2 className="text-[13px] font-bold text-navy mb-3">Bulk Enroll — {selectedCourse.code}</h2>
           <form onSubmit={handleEnroll} className="flex items-center gap-2 mb-2">
             <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files[0])} className="text-xs" />
             <Button type="submit" disabled={enrolling || !csvFile} variant="secondary" className="px-3 py-1.5">
@@ -182,7 +182,7 @@ export default function AdminCourses() {
             </div>
           )}
 
-          <h3 className="text-xs font-medium text-text-main mb-2">Roster ({roster.length})</h3>
+          <h3 className="text-[13px] font-semibold text-text-main mb-2">Roster ({roster.length})</h3>
           <div className="space-y-1">
             {roster.map((e) => (
               <div key={e._id} className="text-xs text-text-muted flex justify-between border-b border-line py-1">

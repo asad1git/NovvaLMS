@@ -46,7 +46,7 @@ export default function StudentCourses() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">My Courses</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">My Courses</h2>
         <div className="space-y-2">
           {courses.length === 0 && (
             <EmptyState icon={<IconBooks size={32} className="text-text-muted" />} title="You are not enrolled in any courses yet." />
@@ -72,7 +72,7 @@ export default function StudentCourses() {
 
       {selectedCourse && (
         <Card>
-          <h2 className="text-sm font-medium text-text-main mb-3">Materials — {selectedCourse.code}</h2>
+          <h2 className="text-[13px] font-bold text-navy mb-3">Materials — {selectedCourse.code}</h2>
           <div className="space-y-1">
             {materials.map((m) => (
               <div
@@ -100,7 +100,7 @@ export default function StudentCourses() {
 
       {selectedCourse && (
         <Card>
-          <h2 className="text-sm font-medium text-text-main mb-3">Quizzes — {selectedCourse.code}</h2>
+          <h2 className="text-[13px] font-bold text-navy mb-3">Quizzes — {selectedCourse.code}</h2>
           <div className="space-y-1">
             {quizzes.map((q) => (
               <div

@@ -64,7 +64,7 @@ export default function AdminSalarySlips() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">Create Salary Slip</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Create Salary Slip</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
           <select
             className={`bg-white ${inputClass}`}
@@ -118,7 +118,7 @@ export default function AdminSalarySlips() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-text-main mb-3">All Salary Slips ({slips.length})</h2>
+        <h2 className="text-[13px] font-bold text-navy mb-3">All Salary Slips ({slips.length})</h2>
         <div className="space-y-1">
           {slips.length === 0 && <EmptyState icon={<IconCash size={32} className="text-text-muted" />} title="No salary slips yet." />}
           {slips.map((s) => (

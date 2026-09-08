@@ -93,7 +93,7 @@ export default function Attendance() {
           )}
 
           <Card>
-            <h2 className="text-sm font-medium text-text-main mb-3">Session History</h2>
+            <h2 className="text-[13px] font-bold text-navy mb-3">Session History</h2>
             {data.sessions.length === 0 ? (
               <EmptyState icon={<IconCalendarStats size={32} className="text-text-muted" />} title="No sessions recorded yet" subtitle="Attendance sessions your teacher creates will show up here." />
             ) : (
