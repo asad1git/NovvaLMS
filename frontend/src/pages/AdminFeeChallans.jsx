@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { IconReceipt2 } from "@tabler/icons-react";
 import { listStudents, listFeeChallans, createFeeChallan, setFeeChallanStatus, downloadFeeChallanPdf } from "../api/finance";
 import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
 
 const inputClass =
-  "border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "border border-line rounded px-3 py-2 text-xs transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AdminFeeChallans() {
@@ -67,7 +68,7 @@ export default function AdminFeeChallans() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Create Fee Challan</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">Create Fee Challan</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
           <select
             className={`bg-white ${inputClass}`}
@@ -111,19 +112,19 @@ export default function AdminFeeChallans() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">All Fee Challans ({challans.length})</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">All Fee Challans ({challans.length})</h2>
         <div className="space-y-1">
-          {challans.length === 0 && <EmptyState icon="🧾" title="No fee challans yet." />}
+          {challans.length === 0 && <EmptyState icon={<IconReceipt2 size={32} className="text-text-muted" />} title="No fee challans yet." />}
           {challans.map((c) => (
             <div
               key={c._id}
-              className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+              className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
             >
               <div>
-                <div className="text-gray-900 font-medium">
+                <div className="text-text-main font-medium">
                   {c.challanNumber} — {c.student?.name}
                 </div>
-                <div className="text-[11px] text-gray-500">
+                <div className="text-[11px] text-text-muted">
                   Rs. {c.amount.toLocaleString()} · due {new Date(c.dueDate).toLocaleDateString()}
                 </div>
               </div>

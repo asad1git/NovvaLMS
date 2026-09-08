@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { IconSchool, IconAlertCircle } from "@tabler/icons-react";
 import { resetPassword } from "../api/auth";
 import { Button } from "../components/ui";
 
 const inputClass =
-  "w-full text-sm px-3 py-2 border border-gray-300 rounded-md transition-colors duration-150 " +
+  "w-full text-sm px-3 py-2 border-[1.5px] border-line rounded-input transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light focus:ring-2 focus:ring-navy-light/25";
 
 export default function ResetPassword() {
@@ -53,14 +54,14 @@ export default function ResetPassword() {
           "#F4F6F9",
       }}
     >
-      <div className="w-full max-w-sm bg-white rounded-card border border-gray-200 shadow-card-hover px-8 py-10">
+      <div className="w-full max-w-sm bg-white rounded-card border border-line shadow-card-hover px-8 py-10">
         <div className="flex items-center justify-center gap-2 mb-1">
-          <div className="w-9 h-9 bg-navy rounded-lg flex items-center justify-center shadow-md">
-            <span className="text-white text-lg">🎓</span>
+          <div className="w-9 h-9 bg-navy-light rounded-lg flex items-center justify-center shadow-md">
+            <IconSchool size={18} className="text-white" />
           </div>
-          <span className="text-xl font-medium text-gray-900 tracking-tight">Novva LMS</span>
+          <span className="text-xl font-medium text-text-main tracking-tight">Novva LMS</span>
         </div>
-        <p className="text-xs text-gray-500 text-center mb-7">Choose a new password</p>
+        <p className="text-xs text-text-muted text-center mb-7">Choose a new password</p>
 
         {done ? (
           <div className="text-center space-y-4 animate-[fadeIn_0.15s_ease-in]">
@@ -73,8 +74,8 @@ export default function ResetPassword() {
           </div>
         ) : !token ? (
           <div className="text-center space-y-4">
-            <div className="flex items-center gap-2 text-xs text-red-700 bg-badge-red-bg rounded-md px-3 py-2">
-              <span>⚠</span>
+            <div className="flex items-center gap-2 text-xs text-badge-red-text bg-badge-red-bg rounded-md px-3 py-2">
+              <IconAlertCircle size={15} className="flex-shrink-0" />
               <span>This link is missing its reset token. Request a new one.</span>
             </div>
             <Link to="/forgot-password" className="text-xs text-navy-light hover:underline">
@@ -84,13 +85,13 @@ export default function ResetPassword() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="flex items-center gap-2 text-xs text-red-700 bg-badge-red-bg rounded-md px-3 py-2 animate-[fadeIn_0.15s_ease-in]">
-                <span>⚠</span>
+              <div className="flex items-center gap-2 text-xs text-badge-red-text bg-badge-red-bg rounded-md px-3 py-2 animate-[fadeIn_0.15s_ease-in]">
+                <IconAlertCircle size={15} className="flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">New Password</label>
+              <label className="block text-xs text-text-muted mb-1">New Password</label>
               <input
                 type="password"
                 value={newPassword}
@@ -99,10 +100,10 @@ export default function ResetPassword() {
                 required
                 className={inputClass}
               />
-              <p className="text-[10px] text-gray-400 mt-1">At least 8 characters.</p>
+              <p className="text-[10px] text-text-muted mt-1">At least 8 characters.</p>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Confirm New Password</label>
+              <label className="block text-xs text-text-muted mb-1">Confirm New Password</label>
               <input
                 type="password"
                 value={confirmPassword}

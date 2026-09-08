@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { IconBooks, IconFileText, IconNotes } from "@tabler/icons-react";
 import { listCourses, getMaterials, downloadMaterial } from "../api/courses";
 import { listQuizzesForCourse } from "../api/quizzes";
 import { Card, Button, EmptyState, LoadingState } from "../components/ui";
@@ -45,10 +46,10 @@ export default function StudentCourses() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">My Courses</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">My Courses</h2>
         <div className="space-y-2">
           {courses.length === 0 && (
-            <EmptyState icon="📚" title="You are not enrolled in any courses yet." />
+            <EmptyState icon={<IconBooks size={32} className="text-text-muted" />} title="You are not enrolled in any courses yet." />
           )}
           {courses.map((c) => (
             <div
@@ -57,13 +58,13 @@ export default function StudentCourses() {
               className={`px-3 py-2 rounded cursor-pointer border transition-colors duration-150 ${
                 selectedCourse?._id === c._id
                   ? "border-navy-light bg-badge-blue-bg"
-                  : "border-gray-200 hover:bg-gray-50"
+                  : "border-line hover:bg-bg-page"
               }`}
             >
-              <div className="text-xs font-medium text-gray-900">
+              <div className="text-xs font-medium text-text-main">
                 {c.code} — {c.title}
               </div>
-              <div className="text-[11px] text-gray-500">Teacher: {c.teacher?.name || "—"}</div>
+              <div className="text-[11px] text-text-muted">Teacher: {c.teacher?.name || "—"}</div>
             </div>
           ))}
         </div>
@@ -71,16 +72,16 @@ export default function StudentCourses() {
 
       {selectedCourse && (
         <Card>
-          <h2 className="text-sm font-medium text-gray-900 mb-3">Materials — {selectedCourse.code}</h2>
+          <h2 className="text-sm font-medium text-text-main mb-3">Materials — {selectedCourse.code}</h2>
           <div className="space-y-1">
             {materials.map((m) => (
               <div
                 key={m._id}
-                className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+                className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
               >
                 <div>
-                  <div className="text-gray-900 font-medium">{m.title}</div>
-                  <div className="text-[11px] text-gray-400 uppercase">
+                  <div className="text-text-main font-medium">{m.title}</div>
+                  <div className="text-[11px] text-text-muted uppercase">
                     {m.fileType} · {(m.fileSize / 1024).toFixed(0)} KB
                   </div>
                 </div>
@@ -92,30 +93,30 @@ export default function StudentCourses() {
                 </button>
               </div>
             ))}
-            {materials.length === 0 && <EmptyState icon="📄" title="No materials uploaded yet." />}
+            {materials.length === 0 && <EmptyState icon={<IconFileText size={32} className="text-text-muted" />} title="No materials uploaded yet." />}
           </div>
         </Card>
       )}
 
       {selectedCourse && (
         <Card>
-          <h2 className="text-sm font-medium text-gray-900 mb-3">Quizzes — {selectedCourse.code}</h2>
+          <h2 className="text-sm font-medium text-text-main mb-3">Quizzes — {selectedCourse.code}</h2>
           <div className="space-y-1">
             {quizzes.map((q) => (
               <div
                 key={q._id}
-                className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+                className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
               >
                 <div>
-                  <div className="text-gray-900 font-medium">{q.title}</div>
-                  <div className="text-[11px] text-gray-400">{q.durationMinutes} min</div>
+                  <div className="text-text-main font-medium">{q.title}</div>
+                  <div className="text-[11px] text-text-muted">{q.durationMinutes} min</div>
                 </div>
                 <Button onClick={() => navigate(`/quiz/${q._id}`)} className="px-3 py-1.5">
                   Open
                 </Button>
               </div>
             ))}
-            {quizzes.length === 0 && <EmptyState icon="📝" title="No quizzes available yet." />}
+            {quizzes.length === 0 && <EmptyState icon={<IconNotes size={32} className="text-text-muted" />} title="No quizzes available yet." />}
           </div>
         </Card>
       )}

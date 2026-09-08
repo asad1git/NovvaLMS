@@ -11,7 +11,7 @@ function statusBadgeClass(status) {
   if (status === "absent") return "bg-badge-red-bg text-badge-red-text";
   if (status === "late") return "bg-badge-amber-bg text-badge-amber-text";
   if (status === "excused") return "bg-badge-blue-bg text-badge-blue-text";
-  return "bg-gray-100 text-gray-500";
+  return "bg-bg-page text-text-muted";
 }
 
 export default function Attendance() {
@@ -49,9 +49,9 @@ export default function Attendance() {
   return (
     <div className="space-y-4">
       <Card padding="p-4">
-        <label className="text-xs text-gray-600 mr-2">Course:</label>
+        <label className="text-xs text-text-muted mr-2">Course:</label>
         <select
-          className="border border-gray-300 rounded px-2 py-1.5 text-xs bg-white transition-colors duration-150 focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30"
+          className="border border-line rounded px-2 py-1.5 text-xs bg-white transition-colors duration-150 focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30"
           value={courseId}
           onChange={(e) => setCourseId(e.target.value)}
         >
@@ -93,16 +93,16 @@ export default function Attendance() {
           )}
 
           <Card>
-            <h2 className="text-sm font-medium text-gray-900 mb-3">Session History</h2>
+            <h2 className="text-sm font-medium text-text-main mb-3">Session History</h2>
             {data.sessions.length === 0 ? (
-              <EmptyState icon="🗓️" title="No sessions recorded yet" subtitle="Attendance sessions your teacher creates will show up here." />
+              <EmptyState icon={<IconCalendarStats size={32} className="text-text-muted" />} title="No sessions recorded yet" subtitle="Attendance sessions your teacher creates will show up here." />
             ) : (
               <div className="space-y-1">
                 {data.sessions.map((s) => (
-                  <div key={s._id} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
+                  <div key={s._id} className="flex items-center justify-between text-xs border-b border-line py-2">
                     <div>
-                      <div className="text-gray-900 font-medium">{new Date(s.date).toLocaleDateString()}</div>
-                      {s.topic && <div className="text-[11px] text-gray-400">{s.topic}</div>}
+                      <div className="text-text-main font-medium">{new Date(s.date).toLocaleDateString()}</div>
+                      {s.topic && <div className="text-[11px] text-text-muted">{s.topic}</div>}
                     </div>
                     <span className={`text-[10px] px-2 py-0.5 rounded font-medium capitalize ${statusBadgeClass(s.status)}`}>
                       {s.status || "not marked"}

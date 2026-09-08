@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
+import { IconLink } from "@tabler/icons-react";
 import { listUsers } from "../api/users";
 import { listParentLinks, linkParent, unlinkParent } from "../api/parentLinks";
 import { Card, Button, EmptyState, LoadingState } from "../components/ui";
 
 const inputClass =
-  "border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "border border-line rounded px-3 py-2 text-xs transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AdminParentLinks() {
@@ -79,9 +80,9 @@ export default function AdminParentLinks() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Link a Parent to a Student</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">Link a Parent to a Student</h2>
         {parents.length === 0 && (
-          <p className="text-xs text-gray-500 mb-3">
+          <p className="text-xs text-text-muted mb-3">
             No parent accounts yet — create one under "Manage Users" (role: Parent) first.
           </p>
         )}
@@ -119,20 +120,20 @@ export default function AdminParentLinks() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">All Links ({links.length})</h2>
-        {links.length === 0 && <EmptyState icon="🔗" title="No parent-student links yet." />}
+        <h2 className="text-sm font-medium text-text-main mb-3">All Links ({links.length})</h2>
+        {links.length === 0 && <EmptyState icon={<IconLink size={32} className="text-text-muted" />} title="No parent-student links yet." />}
         <div className="space-y-1">
           {links.map((l) => (
             <div
               key={l._id}
-              className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+              className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
             >
-              <div className="text-gray-900">
+              <div className="text-text-main">
                 <span className="font-medium">{l.parent?.name}</span>
-                <span className="text-gray-400"> ({l.parent?.email}) </span>
-                <span className="text-gray-500">→ child: </span>
+                <span className="text-text-muted"> ({l.parent?.email}) </span>
+                <span className="text-text-muted">→ child: </span>
                 <span className="font-medium">{l.student?.name}</span>
-                <span className="text-gray-400"> ({l.student?.email})</span>
+                <span className="text-text-muted"> ({l.student?.email})</span>
               </div>
               <button onClick={() => handleUnlink(l._id)} className="text-badge-red-text hover:underline">
                 Unlink

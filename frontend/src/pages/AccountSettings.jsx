@@ -4,7 +4,7 @@ import { getMe, updateProfile, changePassword } from "../api/account";
 import { Card, Button } from "../components/ui";
 
 const inputClass =
-  "w-full border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "w-full border border-line rounded px-3 py-2 text-xs transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AccountSettings() {
@@ -75,14 +75,14 @@ export default function AccountSettings() {
   return (
     <div className="space-y-4 max-w-lg">
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Profile</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">Profile</h2>
         <form onSubmit={handleProfileSubmit} className="space-y-3">
           <div>
-            <label className="block text-[11px] text-gray-500 mb-1">Email</label>
-            <input className={`${inputClass} bg-gray-50 text-gray-500`} value={email} disabled />
+            <label className="block text-[11px] text-text-muted mb-1">Email</label>
+            <input className={`${inputClass} bg-bg-page text-text-muted`} value={email} disabled />
           </div>
           <div>
-            <label className="block text-[11px] text-gray-500 mb-1">Name</label>
+            <label className="block text-[11px] text-text-muted mb-1">Name</label>
             <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           {profileError && <p className="text-xs text-badge-red-text animate-[fadeIn_0.15s_ease-in]">{profileError}</p>}
@@ -94,10 +94,10 @@ export default function AccountSettings() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Change Password</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">Change Password</h2>
         <form onSubmit={handlePasswordSubmit} className="space-y-3">
           <div>
-            <label className="block text-[11px] text-gray-500 mb-1">Current Password</label>
+            <label className="block text-[11px] text-text-muted mb-1">Current Password</label>
             <input
               type="password"
               className={inputClass}
@@ -107,7 +107,7 @@ export default function AccountSettings() {
             />
           </div>
           <div>
-            <label className="block text-[11px] text-gray-500 mb-1">New Password</label>
+            <label className="block text-[11px] text-text-muted mb-1">New Password</label>
             <input
               type="password"
               className={inputClass}
@@ -116,10 +116,10 @@ export default function AccountSettings() {
               minLength={8}
               required
             />
-            <p className="text-[10px] text-gray-400 mt-1">At least 8 characters.</p>
+            <p className="text-[10px] text-text-muted mt-1">At least 8 characters.</p>
           </div>
           <div>
-            <label className="block text-[11px] text-gray-500 mb-1">Confirm New Password</label>
+            <label className="block text-[11px] text-text-muted mb-1">Confirm New Password</label>
             <input
               type="password"
               className={inputClass}

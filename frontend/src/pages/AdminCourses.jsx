@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { IconBooks, IconCertificate } from "@tabler/icons-react";
 import { listCourses, createCourse, listTeachers, bulkEnrollCSV, getEnrollments } from "../api/courses";
 import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
 
 const inputClass =
-  "border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "border border-line rounded px-3 py-2 text-xs transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AdminCourses() {
@@ -87,7 +88,7 @@ export default function AdminCourses() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Create Course</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">Create Course</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
           <input
             className={inputClass}
@@ -129,9 +130,9 @@ export default function AdminCourses() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">All Courses</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">All Courses</h2>
         <div className="space-y-2">
-          {courses.length === 0 && <EmptyState icon="📚" title="No courses yet." />}
+          {courses.length === 0 && <EmptyState icon={<IconBooks size={32} className="text-text-muted" />} title="No courses yet." />}
           {courses.map((c) => (
             <div
               key={c._id}
@@ -139,14 +140,14 @@ export default function AdminCourses() {
               className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer border transition-colors duration-150 ${
                 selectedCourse?._id === c._id
                   ? "border-navy-light bg-badge-blue-bg"
-                  : "border-gray-200 hover:bg-gray-50"
+                  : "border-line hover:bg-bg-page"
               }`}
             >
               <div>
-                <div className="text-xs font-medium text-gray-900">
+                <div className="text-xs font-medium text-text-main">
                   {c.code} — {c.title}
                 </div>
-                <div className="text-[11px] text-gray-500">Teacher: {c.teacher?.name || "—"}</div>
+                <div className="text-[11px] text-text-muted">Teacher: {c.teacher?.name || "—"}</div>
               </div>
               <Badge variant={c.isActive ? "green" : "red"}>{c.isActive ? "Active" : "Inactive"}</Badge>
             </div>
@@ -156,14 +157,14 @@ export default function AdminCourses() {
 
       {selectedCourse && (
         <Card>
-          <h2 className="text-sm font-medium text-gray-900 mb-3">Bulk Enroll — {selectedCourse.code}</h2>
+          <h2 className="text-sm font-medium text-text-main mb-3">Bulk Enroll — {selectedCourse.code}</h2>
           <form onSubmit={handleEnroll} className="flex items-center gap-2 mb-2">
             <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files[0])} className="text-xs" />
             <Button type="submit" disabled={enrolling || !csvFile} variant="secondary" className="px-3 py-1.5">
               {enrolling ? "Uploading…" : "Upload CSV"}
             </Button>
           </form>
-          <p className="text-[11px] text-gray-500 mb-3">
+          <p className="text-[11px] text-text-muted mb-3">
             CSV must have an "email" column of existing student accounts.
           </p>
 
@@ -181,15 +182,15 @@ export default function AdminCourses() {
             </div>
           )}
 
-          <h3 className="text-xs font-medium text-gray-900 mb-2">Roster ({roster.length})</h3>
+          <h3 className="text-xs font-medium text-text-main mb-2">Roster ({roster.length})</h3>
           <div className="space-y-1">
             {roster.map((e) => (
-              <div key={e._id} className="text-xs text-gray-600 flex justify-between border-b border-gray-100 py-1">
+              <div key={e._id} className="text-xs text-text-muted flex justify-between border-b border-line py-1">
                 <span>{e.student?.name}</span>
-                <span className="text-gray-400">{e.student?.email}</span>
+                <span className="text-text-muted">{e.student?.email}</span>
               </div>
             ))}
-            {roster.length === 0 && <EmptyState icon="🧑‍🎓" title="No students enrolled yet." />}
+            {roster.length === 0 && <EmptyState icon={<IconCertificate size={32} className="text-text-muted" />} title="No students enrolled yet." />}
           </div>
         </Card>
       )}

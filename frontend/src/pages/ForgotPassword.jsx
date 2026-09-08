@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { IconSchool, IconAlertCircle } from "@tabler/icons-react";
 import { forgotPassword } from "../api/auth";
 import { Button } from "../components/ui";
 
 const inputClass =
-  "w-full text-sm px-3 py-2 border border-gray-300 rounded-md transition-colors duration-150 " +
+  "w-full text-sm px-3 py-2 border-[1.5px] border-line rounded-input transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light focus:ring-2 focus:ring-navy-light/25";
 
 export default function ForgotPassword() {
@@ -39,14 +40,14 @@ export default function ForgotPassword() {
           "#F4F6F9",
       }}
     >
-      <div className="w-full max-w-sm bg-white rounded-card border border-gray-200 shadow-card-hover px-8 py-10">
+      <div className="w-full max-w-sm bg-white rounded-card border border-line shadow-card-hover px-8 py-10">
         <div className="flex items-center justify-center gap-2 mb-1">
-          <div className="w-9 h-9 bg-navy rounded-lg flex items-center justify-center shadow-md">
-            <span className="text-white text-lg">🎓</span>
+          <div className="w-9 h-9 bg-navy-light rounded-lg flex items-center justify-center shadow-md">
+            <IconSchool size={18} className="text-white" />
           </div>
-          <span className="text-xl font-medium text-gray-900 tracking-tight">Novva LMS</span>
+          <span className="text-xl font-medium text-text-main tracking-tight">Novva LMS</span>
         </div>
-        <p className="text-xs text-gray-500 text-center mb-7">Reset your password</p>
+        <p className="text-xs text-text-muted text-center mb-7">Reset your password</p>
 
         {submitted ? (
           <div className="text-center space-y-4 animate-[fadeIn_0.15s_ease-in]">
@@ -61,13 +62,13 @@ export default function ForgotPassword() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="flex items-center gap-2 text-xs text-red-700 bg-badge-red-bg rounded-md px-3 py-2 animate-[fadeIn_0.15s_ease-in]">
-                <span>⚠</span>
+              <div className="flex items-center gap-2 text-xs text-badge-red-text bg-badge-red-bg rounded-md px-3 py-2 animate-[fadeIn_0.15s_ease-in]">
+                <IconAlertCircle size={15} className="flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Institutional Email</label>
+              <label className="block text-xs text-text-muted mb-1">Institutional Email</label>
               <input
                 type="email"
                 value={email}

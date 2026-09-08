@@ -74,7 +74,7 @@ export default function NotificationBell() {
     <div className="relative" ref={panelRef}>
       <button
         onClick={handleOpen}
-        className="relative w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors duration-150 active:scale-95"
+        className="relative w-7 h-7 flex items-center justify-center rounded-full hover:bg-bg-page transition-colors duration-150 active:scale-95"
       >
         <IconBell size={19} stroke={1.9} />
         {unreadCount > 0 && (
@@ -86,11 +86,11 @@ export default function NotificationBell() {
 
       {open && (
         <div
-          className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-card shadow-card-hover z-50 max-h-96 overflow-y-auto"
+          className="absolute right-0 mt-2 w-80 bg-white border border-line rounded-card shadow-card-hover z-50 max-h-96 overflow-y-auto"
           style={{ animation: "slideDown 0.15s ease-out" }}
         >
-          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
-            <span className="text-xs font-medium text-gray-900">Notifications</span>
+          <div className="flex items-center justify-between px-3 py-2 border-b border-line">
+            <span className="text-xs font-medium text-text-main">Notifications</span>
             {unreadCount > 0 && (
               <button onClick={handleMarkAllRead} className="text-[10px] text-navy-light hover:underline">
                 Mark all as read
@@ -100,22 +100,22 @@ export default function NotificationBell() {
           {notifications.length === 0 ? (
             <div className="text-center py-8 px-4">
               <IconBellOff size={26} stroke={1.6} className="opacity-40" />
-              <p className="text-xs text-gray-500 mt-2">No notifications yet.</p>
+              <p className="text-xs text-text-muted mt-2">No notifications yet.</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-line">
               {notifications.map((n) => (
                 <div
                   key={n._id}
                   onClick={() => handleNotificationClick(n)}
-                  className={`px-3 py-2 cursor-pointer transition-colors duration-150 hover:bg-gray-50 ${n.read ? "" : "bg-badge-blue-bg/40"}`}
+                  className={`px-3 py-2 cursor-pointer transition-colors duration-150 hover:bg-bg-page ${n.read ? "" : "bg-badge-blue-bg/40"}`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-medium text-gray-900">{n.title}</p>
+                    <p className="text-xs font-medium text-text-main">{n.title}</p>
                     {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-navy-light flex-shrink-0 mt-1" />}
                   </div>
-                  <p className="text-[11px] text-gray-600 mt-0.5">{n.message}</p>
-                  <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">{n.message}</p>
+                  <p className="text-[10px] text-text-muted mt-1">{timeAgo(n.createdAt)}</p>
                 </div>
               ))}
             </div>

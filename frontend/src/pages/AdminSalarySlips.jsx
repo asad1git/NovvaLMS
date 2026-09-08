@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
+import { IconCash } from "@tabler/icons-react";
 import { listTeachers } from "../api/courses";
 import { listSalarySlips, createSalarySlip, downloadSalarySlipPdf } from "../api/finance";
 import { Card, Button, EmptyState, LoadingState } from "../components/ui";
 
 const inputClass =
-  "border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "border border-line rounded px-3 py-2 text-xs transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AdminSalarySlips() {
@@ -63,7 +64,7 @@ export default function AdminSalarySlips() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Create Salary Slip</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">Create Salary Slip</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
           <select
             className={`bg-white ${inputClass}`}
@@ -117,19 +118,19 @@ export default function AdminSalarySlips() {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">All Salary Slips ({slips.length})</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">All Salary Slips ({slips.length})</h2>
         <div className="space-y-1">
-          {slips.length === 0 && <EmptyState icon="💰" title="No salary slips yet." />}
+          {slips.length === 0 && <EmptyState icon={<IconCash size={32} className="text-text-muted" />} title="No salary slips yet." />}
           {slips.map((s) => (
             <div
               key={s._id}
-              className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+              className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
             >
               <div>
-                <div className="text-gray-900 font-medium">
+                <div className="text-text-main font-medium">
                   {s.employee?.name} — {s.month}
                 </div>
-                <div className="text-[11px] text-gray-500">Net: Rs. {s.netSalary.toLocaleString()}</div>
+                <div className="text-[11px] text-text-muted">Net: Rs. {s.netSalary.toLocaleString()}</div>
               </div>
               <button
                 onClick={() => downloadSalarySlipPdf(s._id, s.employee?.name, s.month)}

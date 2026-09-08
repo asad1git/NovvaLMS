@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconFileCheck, IconChartLine, IconAlertTriangle } from "@tabler/icons-react";
+import { IconFileCheck, IconChartLine, IconAlertTriangle, IconUsers, IconNotes, IconChartBar } from "@tabler/icons-react";
 import DashboardShell from "../components/DashboardShell";
 import AccountSettings from "./AccountSettings";
 import { getMyChildren, getChildAnalytics } from "../api/parentLinks";
@@ -9,7 +9,7 @@ import { StatCard, Card, Button, EmptyState, LoadingState } from "../components/
 const NAV_ITEMS = ["Dashboard", "AI Assistant", "Account Settings"];
 
 function scoreBadgeClass(pct) {
-  if (pct === null) return "bg-gray-100 text-gray-500";
+  if (pct === null) return "bg-bg-page text-text-muted";
   if (pct >= 80) return "bg-badge-green-bg text-badge-green-text";
   if (pct >= 50) return "bg-badge-blue-bg text-badge-blue-text";
   return "bg-badge-red-bg text-badge-red-text";
@@ -32,7 +32,7 @@ function ChildPicker({ children, selectedId, setSelectedId }) {
           className={`text-xs font-medium px-4 py-2 rounded-card border transition-all duration-150 ${
             c._id === selectedId
               ? "bg-navy text-white border-navy shadow-card"
-              : "bg-white text-gray-700 border-gray-200 hover:border-navy-light hover:shadow-card"
+              : "bg-white text-text-main border-line hover:border-navy-light hover:shadow-card"
           }`}
         >
           {c.name}
@@ -46,7 +46,7 @@ function NoLinkedChildren() {
   return (
     <Card>
       <EmptyState
-        icon="👨‍👩‍👧"
+        icon={<IconUsers size={32} className="text-text-muted" />}
         title="No students linked to your account yet"
         subtitle="Contact your institution's admin to get linked to your child's account."
       />
@@ -91,16 +91,16 @@ function ChildAnalytics({ child, analytics }) {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Quiz Results ({attempts.length})</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">Quiz Results ({attempts.length})</h2>
         {attempts.length === 0 ? (
-          <EmptyState icon="📝" title="No submitted quizzes yet" />
+          <EmptyState icon={<IconNotes size={32} className="text-text-muted" />} title="No submitted quizzes yet" />
         ) : (
           <div className="space-y-1">
             {attempts.map((r) => (
-              <div key={r.attemptId} className="flex items-center justify-between text-xs border-b border-gray-100 py-2">
+              <div key={r.attemptId} className="flex items-center justify-between text-xs border-b border-line py-2">
                 <div>
-                  <div className="text-gray-900 font-medium">{r.quizTitle}</div>
-                  <div className="text-[11px] text-gray-500">
+                  <div className="text-text-main font-medium">{r.quizTitle}</div>
+                  <div className="text-[11px] text-text-muted">
                     {r.courseTitle} · submitted {new Date(r.submittedAt).toLocaleDateString()}
                   </div>
                 </div>
@@ -122,20 +122,20 @@ function ChildAnalytics({ child, analytics }) {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Performance by Topic</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">Performance by Topic</h2>
         {topics.length === 0 ? (
-          <EmptyState icon="📊" title="No topic breakdown yet" subtitle="This appears once quizzes are scored." />
+          <EmptyState icon={<IconChartBar size={32} className="text-text-muted" />} title="No topic breakdown yet" subtitle="This appears once quizzes are scored." />
         ) : (
           <div className="space-y-3">
             {topics.map((t) => (
               <div key={t.topic}>
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-gray-900 font-medium">{t.topic}</span>
-                  <span className="text-gray-500">
+                  <span className="text-text-main font-medium">{t.topic}</span>
+                  <span className="text-text-muted">
                     {t.pointsEarned}/{t.pointsPossible} ({t.percentage}%)
                   </span>
                 </div>
-                <div className="w-full h-1.5 bg-gray-100 rounded overflow-hidden">
+                <div className="w-full h-1.5 bg-bg-page rounded overflow-hidden">
                   <div
                     className={`h-1.5 rounded transition-[width] duration-500 ease-out ${barColor(t.percentage)}`}
                     style={{ width: `${Math.min(100, t.percentage)}%` }}
@@ -230,7 +230,7 @@ function ParentChat({ children, selectedId, setSelectedId }) {
       )}
 
       <Card padding="p-4" className="mb-3">
-        <p className="text-[10px] text-gray-400">
+        <p className="text-[10px] text-text-muted">
           Ask about {selectedChild?.name}'s quiz scores, weak topics, or overall progress. Answers
           are drawn only from {selectedChild?.name}'s recorded performance data.
         </p>
@@ -238,7 +238,7 @@ function ParentChat({ children, selectedId, setSelectedId }) {
 
       <Card padding="p-4" className="flex-1 overflow-y-auto mb-3 space-y-3">
         {messages.length === 0 && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-text-muted">
             Ask a question, e.g. "Where is {selectedChild?.name} struggling?" or "How is the average score trending?"
           </p>
         )}
@@ -246,7 +246,7 @@ function ParentChat({ children, selectedId, setSelectedId }) {
           <div key={m._id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} animate-[fadeIn_0.2s_ease-in]`}>
             <div
               className={`max-w-[80%] rounded-card px-3 py-2 text-xs shadow-sm ${
-                m.role === "user" ? "bg-navy text-white" : "bg-badge-blue-bg text-gray-900"
+                m.role === "user" ? "bg-navy text-white" : "bg-badge-blue-bg text-text-main"
               }`}
             >
               <p className="whitespace-pre-wrap">{m.content}</p>
@@ -255,7 +255,7 @@ function ParentChat({ children, selectedId, setSelectedId }) {
         ))}
         {sending && (
           <div className="flex justify-start">
-            <div className="bg-badge-blue-bg text-gray-500 rounded-card px-3 py-2 text-xs italic">Thinking…</div>
+            <div className="bg-badge-blue-bg text-text-muted rounded-card px-3 py-2 text-xs italic">Thinking…</div>
           </div>
         )}
         <div ref={bottomRef} />
@@ -263,7 +263,7 @@ function ParentChat({ children, selectedId, setSelectedId }) {
 
       <form onSubmit={handleSend} className="flex gap-2">
         <input
-          className="flex-1 border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30"
+          className="flex-1 border border-line rounded px-3 py-2 text-xs transition-colors duration-150 focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30"
           placeholder={`Ask about ${selectedChild?.name || "your child"}'s performance…`}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

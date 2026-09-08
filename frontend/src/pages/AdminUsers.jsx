@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { IconUser } from "@tabler/icons-react";
 import api from "../api/axios";
 import { listUsers, createUser, updateUser } from "../api/users";
 import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
@@ -11,7 +12,7 @@ const ROLE_BADGE_VARIANT = {
 };
 
 const inputClass =
-  "border border-gray-300 rounded px-3 py-2 text-xs transition-colors duration-150 " +
+  "border border-line rounded px-3 py-2 text-xs transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AdminUsers() {
@@ -92,7 +93,7 @@ export default function AdminUsers() {
       )}
 
       <Card>
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Create User</h2>
+        <h2 className="text-sm font-medium text-text-main mb-3">Create User</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-3 gap-3">
           <input
             className={inputClass}
@@ -123,14 +124,14 @@ export default function AdminUsers() {
             {creating ? "Creating…" : "Create User"}
           </Button>
         </form>
-        <p className="text-[11px] text-gray-500 mt-2">
+        <p className="text-[11px] text-text-muted mt-2">
           A temporary password is generated automatically and emailed to the user.
         </p>
       </Card>
 
       <Card>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-gray-900">All Users ({users.length})</h2>
+          <h2 className="text-sm font-medium text-text-main">All Users ({users.length})</h2>
           <select
             className={`bg-white ${inputClass} py-1`}
             value={roleFilter}
@@ -145,15 +146,15 @@ export default function AdminUsers() {
         </div>
 
         <div className="space-y-1">
-          {users.length === 0 && <EmptyState icon="👤" title="No users found." />}
+          {users.length === 0 && <EmptyState icon={<IconUser size={32} className="text-text-muted" />} title="No users found." />}
           {users.map((u) => (
             <div
               key={u._id}
-              className="flex items-center justify-between text-xs border-b border-gray-100 py-2 transition-colors duration-150 hover:bg-gray-50 -mx-2 px-2 rounded"
+              className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
             >
               <div>
-                <div className="text-gray-900 font-medium">{u.name}</div>
-                <div className="text-[11px] text-gray-400">{u.email}</div>
+                <div className="text-text-main font-medium">{u.name}</div>
+                <div className="text-[11px] text-text-muted">{u.email}</div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant={ROLE_BADGE_VARIANT[u.role] || "gray"} className="capitalize">
