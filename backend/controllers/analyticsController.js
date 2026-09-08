@@ -106,7 +106,7 @@ async function computeAnalyticsForStudent(studentId, { courseId } = {}) {
  * awaiting HITL review.
  */
 const getMyAnalytics = asyncHandler(async (req, res) => {
-  const data = await computeAnalyticsForStudent(req.user._id);
+  const data = await computeAnalyticsForStudent(req.user._id, { courseId: req.query.courseId || undefined });
   res.status(200).json({ success: true, data });
 });
 
