@@ -349,6 +349,31 @@ MongoDB has no vector search index and a full embeddings pipeline (generate + st
 cosine-similarity) is a much bigger lift than this scale needs. Chunks scoring zero are
 dropped rather than padded in, so a genuinely off-topic question yields zero context.
 
+**Automatic AI-provider failover, post-backlog.** A third provider, `nvidiaProvider.js`
+(NVIDIA's free NIM API, `nvidia/nemotron-3-ultra-550b-a55b` via
+`https://integrate.api.nvidia.com/v1/chat/completions`), was added alongside Gemini/OpenAI —
+confirmed live before wiring it in that the endpoint is genuinely OpenAI-compatible, including
+the same `response_format: {type: "json_schema", ...}` structured-output contract quiz
+generation and grading depend on, so `nvidiaProvider.js` mirrors `openaiProvider.js` almost
+line-for-line. It explicitly sets `chat_template_kwargs: {enable_thinking: false}` — Nemotron's
+reasoning mode returns chain-of-thought in a separate `reasoning_content` field, which must never
+leak into a JSON-schema response or a chat answer, and skipping it keeps latency down on a
+550B-parameter model used only as a fallback. `services/ai/index.js` changed from picking one
+provider to an ordered **failover chain**: `AI_PROVIDER_CHAIN` (comma-separated, e.g.
+`gemini,nvidia`) is tried left-to-right, and any failure — rate limit, server error, malformed
+response — automatically moves to the next provider in the list, logging which provider actually
+served each call. `AI_PROVIDER` (single provider) still works as a fallback default when
+`AI_PROVIDER_CHAIN` is unset. Critically, **no controller changed** — every call site already
+went through `getAIProvider()` returning an object with the same four methods, so the failover
+logic lives entirely inside `index.js`; a controller has no way to know or care which provider in
+the chain actually answered. Verified live with real calls to both providers: the normal path
+(valid Gemini key) serves every one of `generateQuiz`/`chat` from Gemini with no fallback log
+line; deliberately breaking `GEMINI_API_KEY` produces a real 400 from Gemini, which is caught and
+logged, and NVIDIA Nemotron transparently serves the same request with a correct, well-formed
+answer — confirmed via both a direct module-level test and the full HTTP
+`POST /api/courses/:id/quizzes/generate` path end-to-end (extraction → AI call → parsed
+questions), not just the isolated AI layer.
+
 **US-07 (AI chatbot) is fully built and live-verified**, including real Gemini calls.
 `POST /api/courses/:id/chat/messages` — RAG steps 1-5 per CLAUDE.md, end to end: extract
 every PDF material in the course → chunk → select the top 5 relevant chunks for the
