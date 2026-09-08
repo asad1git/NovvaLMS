@@ -35,6 +35,24 @@ async function verifyFileSignature(filePath, claimedType) {
     return null;
   }
 
+  // Plain text has no fixed magic bytes, so this checks for the thing a
+  // renamed binary file would actually give away instead: a null byte.
+  // Genuine ASCII/UTF-8 text essentially never contains one; every common
+  // binary format (images, archives, executables) does within the first
+  // few KB — a lightweight, reliable-enough heuristic without a full
+  // encoding validator.
+  if (claimedType === "txt") {
+    const sampleSize = 8000;
+    const sample = Buffer.alloc(sampleSize);
+    const fdTxt = fs.openSync(filePath, "r");
+    const bytesRead = fs.readSync(fdTxt, sample, 0, sampleSize, 0);
+    fs.closeSync(fdTxt);
+    if (sample.subarray(0, bytesRead).includes(0x00)) {
+      return "This file is named as a TXT but contains binary data, not plain text.";
+    }
+    return null;
+  }
+
   // DOCX, PPTX, and a plain ZIP are all ZIP archives — same outer magic
   // bytes (PK\x03\x04) — so telling DOCX/PPTX apart from an arbitrary
   // renamed file, and from each other, needs looking inside the archive,

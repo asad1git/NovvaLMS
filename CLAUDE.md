@@ -29,7 +29,7 @@ in full control of final grades.
 - **Database:** MongoDB (Mongoose ODM) — Atlas in production
 - **File Storage:** AWS S3 / Cloudinary (target); local disk (`backend/uploads/`) for
   now — vendor decision deliberately deferred, see Current Status (lecture materials,
-  max 20MB, PDF/PPTX/DOCX/JPG/PNG/ZIP)
+  max 20MB, PDF/PPTX/DOCX/TXT/JPG/PNG/ZIP)
 - **AI:** Google Gemini (primary, `AI_PROVIDER=gemini`) + OpenAI GPT-4o (swap-ready via
   `AI_PROVIDER=openai`), via RAG — see Current Status for `services/ai/`
 - **Auth:** JWT (7-day expiry) + bcrypt (salt rounds: 10) + RBAC middleware
@@ -896,6 +896,18 @@ upload succeeds and correctly shows the "no readable text" warning badge with an
 message; a plain-text file renamed to `.jpg` is correctly rejected by the new signature check; a
 ZIP-based assignment question and a PNG student submission both upload and flow through
 submission/grading normally.
+
+**TXT added as a sixth-then-seventh upload type, with genuine text extraction (not just another
+"no usable text" type like JPG/PNG/ZIP).** Unlike images or archives, plain text needs no parsing
+at all — `ragEngine.extractTextFromTxt` is a direct UTF-8 read, so a `.txt` material, assignment
+question, or submission genuinely feeds the RAG chatbot, quiz generation, and AI grading, same as
+a PDF/DOCX/PPTX would. Since TXT has no fixed magic bytes to check, `verifyFileSignature.js`
+verifies it a different way: samples the first 8KB and rejects if it contains a null byte — genuine
+ASCII/UTF-8 text essentially never does, while every common binary format does within that range,
+a lightweight heuristic rather than a full encoding validator. Verified live: a real `.txt` file
+uploads with no extraction warning (unlike an image), a real Gemini chat question was answered
+correctly grounded in that file's actual content, and a binary file renamed to `.txt` was
+correctly rejected by the new null-byte check.
 
 ---
 

@@ -58,10 +58,19 @@ async function extractTextFromPptx(filePath) {
 }
 
 /**
- * Dispatches to the right extractor for a Material's `fileType`. Only
- * pdf/docx/pptx have real text-extraction support — jpg/jpeg/png/zip are
- * valid upload types (see uploadMiddleware) but have no meaningful single
- * "extracted text" (an image needs OCR, a zip is a whole archive of
+ * Plain text needs no parsing at all — read it as UTF-8 directly. Unlike
+ * jpg/png/zip below, this is genuinely useful content for RAG/quiz
+ * generation/grading, not just another "no usable text" type.
+ */
+async function extractTextFromTxt(filePath) {
+  return fs.readFileSync(filePath, "utf-8");
+}
+
+/**
+ * Dispatches to the right extractor for a Material's `fileType`.
+ * pdf/docx/pptx/txt have real text-extraction support — jpg/jpeg/png/zip
+ * are valid upload types (see uploadMiddleware) but have no meaningful
+ * single "extracted text" (an image needs OCR, a zip is a whole archive of
  * arbitrary files), so this throws a clear, expected error for them
  * rather than attempting something. Every caller already treats an
  * extraction failure as non-fatal — checkExtractability turns it into a
@@ -73,6 +82,7 @@ async function extractText(filePath, fileType) {
   if (fileType === "pdf") return extractTextFromPdf(filePath);
   if (fileType === "docx") return extractTextFromDocx(filePath);
   if (fileType === "pptx") return extractTextFromPptx(filePath);
+  if (fileType === "txt") return extractTextFromTxt(filePath);
   if (["jpg", "jpeg", "png", "zip"].includes(fileType)) {
     throw new Error(`Text extraction is not supported for ${fileType.toUpperCase()} files`);
   }
@@ -188,6 +198,7 @@ module.exports = {
   extractTextFromPdf,
   extractTextFromDocx,
   extractTextFromPptx,
+  extractTextFromTxt,
   extractText,
   chunkText,
   selectRelevantChunks,
