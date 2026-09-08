@@ -7,6 +7,12 @@ const VARIANTS = {
   danger: "bg-badge-red-bg border-badge-red-text/20",
   warning: "bg-badge-amber-bg border-badge-amber-text/20",
   success: "bg-badge-green-bg border-badge-green-text/20",
+  // Light-blue tint for informational/AI-assist surfaces (e.g. the AI quiz
+  // generation panel) — previously several pages hand-rolled this exact
+  // bg-[#f8faff]/border-badge-blue-bg combination as a raw div instead of
+  // going through Card, which is the same "className fighting the cascade"
+  // problem the variant prop exists to avoid in the first place.
+  info: "bg-[#f8faff] border-badge-blue-bg",
 };
 
 /**

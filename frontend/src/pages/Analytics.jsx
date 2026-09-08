@@ -271,7 +271,7 @@ export default function Analytics() {
               </div>
 
               {overall.weakTopics.length === 0 ? (
-                <div className="bg-badge-green-bg border-[1.5px] border-[#b7dca0] rounded-card p-5 flex items-center gap-4">
+                <Card variant="success" className="flex items-center gap-4">
                   <div className="w-[52px] h-[52px] bg-[#c8e6b8] rounded-full flex items-center justify-center flex-shrink-0">
                     <IconTrophy size={24} className="text-success" />
                   </div>
@@ -282,7 +282,7 @@ export default function Analytics() {
                       scores above 70%!
                     </div>
                   </div>
-                </div>
+                </Card>
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3.5">
                   {overall.weakTopics.map((t) => (

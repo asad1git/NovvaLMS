@@ -490,7 +490,7 @@ export default function TeacherCourses() {
 
       {activeTab === "Quizzes" && (
         <div className="space-y-5">
-          <div className="bg-[#f8faff] border-[1.5px] border-badge-blue-bg rounded-card p-[18px]">
+          <Card variant="info" padding="p-[18px]">
             <div className="flex items-center gap-2 text-[13px] font-bold text-navy mb-3.5">
               <IconSparkles size={16} className="text-navy-light" />
               AI Quiz Generation
@@ -541,7 +541,7 @@ export default function TeacherCourses() {
             {materials.length === 0 && (
               <p className="text-[11px] text-text-muted">Upload a material first to enable AI generation.</p>
             )}
-          </div>
+          </Card>
 
           <Card>
             <div className="flex items-center justify-between mb-3.5">
