@@ -160,7 +160,7 @@ export default function AdminCourses() {
           <h2 className="text-[13px] font-bold text-navy mb-3">Bulk Enroll — {selectedCourse.code}</h2>
           <form onSubmit={handleEnroll} className="flex items-center gap-2 mb-2">
             <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files[0])} className="text-xs" />
-            <Button type="submit" disabled={enrolling || !csvFile} variant="secondary" className="px-3 py-1.5">
+            <Button type="submit" disabled={enrolling || !csvFile} variant="secondary" size="sm">
               {enrolling ? "Uploading…" : "Upload CSV"}
             </Button>
           </form>

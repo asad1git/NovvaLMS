@@ -121,7 +121,7 @@ export default function Analytics() {
   return (
     <div className="flex -m-6" style={{ height: "calc(100vh - 58px)" }}>
       {/* Course filter sidebar */}
-      <div className="w-[196px] min-w-[196px] bg-white border-r border-line flex flex-col overflow-hidden flex-shrink-0">
+      <div className="w-[220px] min-w-[220px] bg-white border-r border-line flex flex-col overflow-hidden flex-shrink-0">
         <div className="px-[18px] pt-4 pb-3.5 border-b border-line flex-shrink-0">
           <div className="text-[13px] font-bold text-navy mb-0.5">Course Filter</div>
           <div className="text-[11px] text-text-muted">Filter analytics by course</div>

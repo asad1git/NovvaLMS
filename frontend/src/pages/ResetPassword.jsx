@@ -113,7 +113,12 @@ export default function ResetPassword() {
                 className={inputClass}
               />
             </div>
-            <Button type="submit" disabled={submitting} className="w-full !py-2.5 !text-sm">
+            <Button
+              type="submit"
+              size="lg"
+              disabled={submitting}
+              className="w-full justify-center shadow-[0_2px_8px_rgba(31,56,100,0.25)] hover:shadow-[0_4px_16px_rgba(31,56,100,0.3)]"
+            >
               {submitting ? "Resetting…" : "Reset Password"}
             </Button>
           </form>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { Button } from "../components/ui";
 import {
   IconSchool,
   IconBrain,
@@ -166,10 +167,11 @@ export default function Login() {
               </Link>
             </div>
 
-            <button
+            <Button
               type="submit"
+              size="lg"
               disabled={loading}
-              className="w-full py-3 px-5 bg-navy text-white rounded-input text-sm font-semibold flex items-center justify-center gap-2 shadow-[0_2px_8px_rgba(31,56,100,0.25)] transition-[background,box-shadow,transform] duration-150 hover:bg-navy-dark hover:shadow-[0_4px_16px_rgba(31,56,100,0.3)] active:scale-[0.99] disabled:opacity-75 disabled:cursor-not-allowed"
+              className="w-full justify-center shadow-[0_2px_8px_rgba(31,56,100,0.25)] hover:shadow-[0_4px_16px_rgba(31,56,100,0.3)]"
             >
               {loading ? (
                 <>
@@ -182,7 +184,7 @@ export default function Login() {
                   Sign In
                 </>
               )}
-            </button>
+            </Button>
           </form>
 
           <hr className="my-6 border-line" />

@@ -111,7 +111,7 @@ export default function StudentCourses() {
                   <div className="text-text-main font-medium">{q.title}</div>
                   <div className="text-[11px] text-text-muted">{q.durationMinutes} min</div>
                 </div>
-                <Button onClick={() => navigate(`/quiz/${q._id}`)} className="px-3 py-1.5">
+                <Button onClick={() => navigate(`/quiz/${q._id}`)} size="sm">
                   Open
                 </Button>
               </div>
