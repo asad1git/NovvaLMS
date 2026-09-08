@@ -58,13 +58,24 @@ async function extractTextFromPptx(filePath) {
 }
 
 /**
- * Dispatches to the right extractor for a Material's `fileType`
- * ("pdf" | "pptx" | "docx" — the three types uploadMiddleware accepts).
+ * Dispatches to the right extractor for a Material's `fileType`. Only
+ * pdf/docx/pptx have real text-extraction support — jpg/jpeg/png/zip are
+ * valid upload types (see uploadMiddleware) but have no meaningful single
+ * "extracted text" (an image needs OCR, a zip is a whole archive of
+ * arbitrary files), so this throws a clear, expected error for them
+ * rather than attempting something. Every caller already treats an
+ * extraction failure as non-fatal — checkExtractability turns it into a
+ * plain warning, buildCourseChunks/buildAssignmentChunks just skip the
+ * file — exactly the same tolerant handling an image-only PDF scan (zero
+ * extractable text, not an error) already gets.
  */
 async function extractText(filePath, fileType) {
   if (fileType === "pdf") return extractTextFromPdf(filePath);
   if (fileType === "docx") return extractTextFromDocx(filePath);
   if (fileType === "pptx") return extractTextFromPptx(filePath);
+  if (["jpg", "jpeg", "png", "zip"].includes(fileType)) {
+    throw new Error(`Text extraction is not supported for ${fileType.toUpperCase()} files`);
+  }
   throw new Error(`Unsupported file type for text extraction: ${fileType}`);
 }
 

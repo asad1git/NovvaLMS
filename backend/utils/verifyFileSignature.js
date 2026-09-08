@@ -21,12 +21,32 @@ async function verifyFileSignature(filePath, claimedType) {
     return null;
   }
 
-  // DOCX and PPTX are both ZIP archives (Office Open XML) — same outer
-  // magic bytes (PK\x03\x04) — so telling them apart from an arbitrary
+  if (claimedType === "jpg" || claimedType === "jpeg") {
+    if (header[0] !== 0xff || header[1] !== 0xd8 || header[2] !== 0xff) {
+      return "This file is named as a JPEG but its content does not match the JPEG format.";
+    }
+    return null;
+  }
+
+  if (claimedType === "png") {
+    if (header[0] !== 0x89 || header[1] !== 0x50 || header[2] !== 0x4e || header[3] !== 0x47) {
+      return "This file is named as a PNG but its content does not match the PNG format.";
+    }
+    return null;
+  }
+
+  // DOCX, PPTX, and a plain ZIP are all ZIP archives — same outer magic
+  // bytes (PK\x03\x04) — so telling DOCX/PPTX apart from an arbitrary
   // renamed file, and from each other, needs looking inside the archive,
-  // not just the first 4 bytes.
+  // not just the first 4 bytes. A plain ZIP has no such inner-structure
+  // requirement — any valid zip is accepted, since it's meant to hold
+  // arbitrary content (e.g. a code submission), not a specific document type.
   if (header[0] !== 0x50 || header[1] !== 0x4b) {
     return `This file is named as a ${claimedType.toUpperCase()} but its content does not match that format.`;
+  }
+
+  if (claimedType === "zip") {
+    return null;
   }
 
   try {

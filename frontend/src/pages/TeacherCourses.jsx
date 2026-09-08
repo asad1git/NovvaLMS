@@ -6,6 +6,9 @@ import {
   IconFileTypePdf,
   IconFileTypeDoc,
   IconFileTypePpt,
+  IconFileTypeJpg,
+  IconFileTypePng,
+  IconFileTypeZip,
   IconTrash,
   IconDownload,
   IconRefresh,
@@ -66,6 +69,10 @@ const FILE_CHIP = {
   pdf: { icon: IconFileTypePdf, bg: "bg-[#fff0f0]", color: "text-[#c0392b]" },
   docx: { icon: IconFileTypeDoc, bg: "bg-[#e8f0fb]", color: "text-[#2980b9]" },
   pptx: { icon: IconFileTypePpt, bg: "bg-[#fff3e0]", color: "text-[#e67e22]" },
+  jpg: { icon: IconFileTypeJpg, bg: "bg-[#f0eefc]", color: "text-[#8b6ac8]" },
+  jpeg: { icon: IconFileTypeJpg, bg: "bg-[#f0eefc]", color: "text-[#8b6ac8]" },
+  png: { icon: IconFileTypePng, bg: "bg-[#f0eefc]", color: "text-[#8b6ac8]" },
+  zip: { icon: IconFileTypeZip, bg: "bg-[#eef2f5]", color: "text-[#5a6b7a]" },
 };
 
 export default function TeacherCourses() {
@@ -505,7 +512,7 @@ export default function TeacherCourses() {
           >
             <IconCloudUpload size={36} stroke={1.5} className="mx-auto text-text-muted mb-2" />
             <div className="text-sm font-semibold text-text-main mb-1">Drag &amp; drop lecture files here</div>
-            <div className="text-xs text-text-muted mb-3">PDF, DOCX, PPTX up to 20MB</div>
+            <div className="text-xs text-text-muted mb-3">PDF, DOCX, PPTX, JPG, PNG, or ZIP up to 20MB</div>
             <div className="flex items-center justify-center gap-2">
               <input
                 type="text"
@@ -516,7 +523,7 @@ export default function TeacherCourses() {
               />
               <input
                 type="file"
-                accept=".pdf,.pptx,.docx"
+                accept=".pdf,.pptx,.docx,.jpg,.jpeg,.png,.zip"
                 onChange={(e) => setFile(e.target.files[0])}
                 className="text-xs"
               />
@@ -564,7 +571,7 @@ export default function TeacherCourses() {
                       <IconRefresh size={16} className={replacingId === m._id ? "animate-spin" : ""} />
                       <input
                         type="file"
-                        accept=".pdf,.pptx,.docx"
+                        accept=".pdf,.pptx,.docx,.jpg,.jpeg,.png,.zip"
                         className="hidden"
                         disabled={replacingId === m._id}
                         onChange={(e) => {
@@ -759,10 +766,10 @@ export default function TeacherCourses() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-text-muted mb-1">Question File (PDF/DOCX/PPTX)</label>
+                    <label className="block text-[11px] text-text-muted mb-1">Question File (PDF/DOCX/PPTX/JPG/PNG/ZIP)</label>
                     <input
                       type="file"
-                      accept=".pdf,.pptx,.docx"
+                      accept=".pdf,.pptx,.docx,.jpg,.jpeg,.png,.zip"
                       onChange={(e) => setAssignmentFile(e.target.files[0])}
                       className="text-xs mt-1.5"
                       required

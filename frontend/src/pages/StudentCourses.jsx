@@ -212,7 +212,7 @@ export default function StudentCourses() {
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <input
                         type="file"
-                        accept=".pdf,.pptx,.docx"
+                        accept=".pdf,.pptx,.docx,.jpg,.jpeg,.png,.zip"
                         onChange={(e) => setSubmitFile((prev) => ({ ...prev, [a._id]: e.target.files[0] }))}
                         className="text-xs"
                       />

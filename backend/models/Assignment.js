@@ -46,8 +46,8 @@ const assignmentSchema = new mongoose.Schema(
     fileType: {
       type: String,
       enum: {
-        values: ["pdf", "pptx", "docx"],
-        message: "File must be PDF, PPTX, or DOCX",
+        values: ["pdf", "pptx", "docx", "jpg", "jpeg", "png", "zip"],
+        message: "File must be PDF, PPTX, DOCX, JPG, PNG, or ZIP",
       },
       required: true,
     },

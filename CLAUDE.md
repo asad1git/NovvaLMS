@@ -29,7 +29,7 @@ in full control of final grades.
 - **Database:** MongoDB (Mongoose ODM) — Atlas in production
 - **File Storage:** AWS S3 / Cloudinary (target); local disk (`backend/uploads/`) for
   now — vendor decision deliberately deferred, see Current Status (lecture materials,
-  max 20MB, PDF/PPTX/DOCX)
+  max 20MB, PDF/PPTX/DOCX/JPG/PNG/ZIP)
 - **AI:** Google Gemini (primary, `AI_PROVIDER=gemini`) + OpenAI GPT-4o (swap-ready via
   `AI_PROVIDER=openai`), via RAG — see Current Status for `services/ai/`
 - **Auth:** JWT (7-day expiry) + bcrypt (salt rounds: 10) + RBAC middleware
@@ -852,13 +852,50 @@ New nav surface is a tab, not a new page — `TeacherCourses.jsx` gained "Assign
 Materials/Quizzes/Attendance/Results (post form + a roster view listing every submission with an
 on-time/late badge, a "not submitted" chip list built from the same enrolled-roster-visibility
 principle as Attendance's auto-seeding, and the AI-prefilled grade form). `StudentCourses.jsx`
-doesn't use a tab bar at all (it stacks Materials/Quizzes as plain cards) — Assignments was added
-as a third stacked card in that same established shape rather than introducing an inconsistent
-tab UI onto a page that never had one, a deliberate adaptation of the "new tab" plan to the page's
-actual existing pattern rather than a literal one. Verified end-to-end via Playwright: an
-on-time and a past-due submission both correctly flagged, the teacher's roster showing both the
-submission and the one still-missing student, AI-draft-then-override grading, and the chatbot
-exchange above — zero console errors throughout.
+originally didn't use a tab bar at all (it stacked Materials/Quizzes as plain cards), so
+Assignments was first added as a third stacked card in that shape — **later rebuilt** (see below)
+onto the same `Tabs` pattern as `TeacherCourses.jsx` for consistency. Verified end-to-end via
+Playwright: an on-time and a past-due submission both correctly flagged, the teacher's roster
+showing both the submission and the one still-missing student, AI-draft-then-override grading,
+and the chatbot exchange above — zero console errors throughout.
+
+**`StudentCourses.jsx` unified onto the same tabbed course-detail pattern as `TeacherCourses.jsx`,
+post-Assignments.** Caught via user review, not self-flagged: Teacher's course detail
+(Materials/Assignments/Quizzes/Attendance/Results) uses a real `Tabs` component because it was
+rebuilt from the design-system reference during the ground-up redesign; Student's course detail
+had no such reference screen and stayed on its original stacked-card layout, which only kept
+growing every time a section was added — most recently Assignments' third card. Rebuilt onto the
+same `CourseCard` grid → detail view → `Tabs` (Materials/Assignments/Quizzes) pattern, same
+back-button and course-header treatment, no behavior change to any section itself.
+
+**Fixed a real visual regression from the normalization pass, also caught via user review:**
+Analytics.jsx's "no weak topics" success banner was converted from a hand-rolled solid
+`border-[1.5px] border-[#b7dca0]` onto `Card`'s shared `variant="success"` — whose border was
+`border-badge-green-text/20`, a dark green diluted to 20% opacity over its own pale-green
+background, which reads as almost no outline at all (technically present, visually gone). Same
+weakness existed in `danger`/`warning`. Fixed by using solid pastel border colors instead of
+translucent text-color cuts, matched to tones already proven visible elsewhere for the same
+meaning (Analytics.jsx's individual weak-topic cards use this exact pink for "danger") — this also
+sharpened the Attendance/StudentOverview/ParentDashboard low-attendance and weak-topic callouts,
+which share the same component and had the same underlying flaw, even though they weren't part of
+the normalization pass itself.
+
+**Upload pipeline extended to JPG, PNG, and ZIP, on top of PDF/PPTX/DOCX** — covers a photographed
+handwritten answer or a code-submission archive, the two concrete cases that prompted this.
+`uploadMiddleware.ALLOWED_MATERIAL_EXTENSIONS` now includes all six; `verifyFileSignature.js`
+gained real magic-byte checks for each (JPEG `FF D8 FF`, PNG's 8-byte signature, and a plain ZIP's
+`PK\x03\x04` header) — a plain ZIP is accepted on signature alone, deliberately NOT held to
+DOCX/PPTX's stricter internal-structure check, since it's meant to hold arbitrary content, not a
+specific document type. `Material`/`Assignment`/`AssignmentSubmission`'s `fileType` enums all
+extended to match. Text extraction is intentionally NOT attempted for these three —
+`ragEngine.extractText` throws a clear, expected "not supported" error for them, which every
+existing caller already treats as non-fatal (`checkExtractability` turns it into a plain warning
+badge, `buildCourseChunks`/`buildAssignmentChunks` just skip the file) — the exact same tolerant
+handling an image-only PDF scan already got, not a new code path. Verified live: a JPG material
+upload succeeds and correctly shows the "no readable text" warning badge with an accurate
+message; a plain-text file renamed to `.jpg` is correctly rejected by the new signature check; a
+ZIP-based assignment question and a PNG student submission both upload and flow through
+submission/grading normally.
 
 ---
 

@@ -31,7 +31,7 @@ const MAX_GRADING_CONTEXT_CHARS = 20000;
 async function verifyAndCheckUpload(req, res, dir) {
   if (!req.file) {
     res.status(400);
-    throw new Error("A PDF, PPTX, or DOCX file is required (field name: file, max 20MB)");
+    throw new Error("A PDF, PPTX, DOCX, JPG, PNG, or ZIP file is required (field name: file, max 20MB)");
   }
 
   const fileType = path.extname(req.file.originalname).slice(1).toLowerCase();
