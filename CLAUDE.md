@@ -730,6 +730,61 @@ pending-review banner all confirmed against real data); a real Gemini chat excha
 with 12 genuine `<strong>` elements after the prompt change; course-filtered analytics confirmed
 against real quiz-attempt data.
 
+**Normalization pass, post-redesign — closes the alignment/symmetry gaps the redesign itself
+left behind.** The ground-up redesign above deliberately scoped its last batch narrow (tokens and
+icons only, not typography/layout) for the pages with no dedicated reference screen — a reasonable
+scoping choice at the time, but it meant two heading systems ran side by side: reference-matched
+pages used the prototype's card-title convention (`text-[13px] font-bold text-navy`), while the
+swept-only pages (`AdminUsers`, `AdminCourses`, `AdminFeeChallans`, `AdminSalarySlips`,
+`AdminParentLinks`, `MyResults`, `StudentCourses`, `Attendance`, `AccountSettings`) still carried
+the pre-redesign `text-sm font-medium text-text-main`. This pass found and closed that gap plus
+several smaller ones, in three batches:
+
+1. **Heading scale + one `StatCard`.** Unified all 19 old-convention headings onto the reference
+   scale. Folded `Analytics.jsx`'s separate `MetricCard` (built because the reference's Analytics
+   stat cards have a trend badge the shared `StatCard` didn't support) into `StatCard` itself via
+   a new optional `trend` prop — the reference actually specifies two *different* stat-card shapes
+   across its own screens (horizontal on the dashboards, vertical-with-trend on Analytics), which
+   this deliberately does NOT reproduce: one stat-card shape everywhere reads as more consistent
+   in this app than matching two different reference layouts would. Caught a real bug before it
+   shipped: a first attempt used a dynamically-built `text-[${hex}]` Tailwind arbitrary-value class
+   for a per-card value color — Tailwind's JIT scans source text for literal class strings, so a
+   runtime-interpolated class never makes it into the compiled CSS. Fixed to a plain inline
+   `style={{color}}` (`StatCard`'s new `valueColor` prop).
+2. **`Card` variant coverage.** Added an `info` variant (light-blue tint) so `TeacherCourses`' AI
+   Quiz Generation panel — previously a hand-rolled div duplicating `Card`'s own
+   bg/border/radius/shadow properties — goes through the shared component instead, and folded
+   `Analytics`' "no weak topics" success banner into the existing `variant="success"` rather than a
+   third hand-rolled green-tint div. Left the individual weak-topic cards (white bg + pink
+   border/shadow, repeated in a grid) as their own thing rather than forcing them into a variant —
+   that's a deliberate choice (a solid-red-tint card repeated many times in a grid reads as alarm
+   fatigue), not drift.
+3. **Two real "no functional reason to differ" gaps.** `ChatBot`'s course-switcher sidebar (220px)
+   and `Analytics`' course-filter sidebar (196px) — the same conceptual "picker" pattern, two
+   different widths — unified to 220px. More significantly: `Login.jsx`'s submit button turned out
+   to be a raw hand-rolled `<button>` (its own navy-tinted shadow, its own spinner) that never went
+   through the shared `Button` component, while `ForgotPassword`/`ResetPassword` approximated the
+   same look via `Button` + `!important` padding/font overrides — meaning the one button style
+   these three sibling pages are supposed to share in lockstep (documented as such earlier in this
+   file) was actually implemented three different ways, with the shadow not even matching between
+   them. Converted all three onto the shared `Button` component (`size="lg"` + the shadow as a
+   plain `className` addition), removing the `!important` hack entirely. Also swept two remaining
+   manual `className="px-3 py-1.5"` `Button` overrides to the `size="sm"` prop they should have
+   used, and added explicit `<label>`s to every admin CRUD create-form field (`AdminUsers`,
+   `AdminCourses`, `AdminFeeChallans`, `AdminSalarySlips`, `AdminParentLinks`) — these previously
+   relied on placeholder text alone, a real accessibility gap (a placeholder disappears the moment
+   a field is focused/filled) as well as a density inconsistency with the rest of the app's forms.
+
+Re-examined a few other flagged "inconsistencies" during this pass and found they weren't real:
+stat-card grids already used `gap-4` everywhere once (1) was done; the two `CourseCard` grids
+(`TeacherOverview`, `TeacherCourses`) already matched each other exactly; the weak-topics grid's
+smaller `minmax(240px)` floor is warranted by its genuinely smaller card content, not drift — worth
+recording so a future pass doesn't "fix" something that was actually already correct.
+
+Verified after every batch via Playwright across all four roles (every nav item on every
+dashboard, every `TeacherCourses` tab, a real end-to-end create-user action, a real end-to-end
+login landing on `/student`) with zero console errors.
+
 ---
 
 ## Sprint Plan (2 weeks each)
