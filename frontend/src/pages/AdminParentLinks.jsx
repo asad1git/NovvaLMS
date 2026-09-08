@@ -86,33 +86,39 @@ export default function AdminParentLinks() {
             No parent accounts yet — create one under "Manage Users" (role: Parent) first.
           </p>
         )}
-        <form onSubmit={handleLink} className="grid grid-cols-3 gap-3">
-          <select
-            className={`bg-white ${inputClass}`}
-            value={form.parentId}
-            onChange={(e) => setForm({ ...form, parentId: e.target.value })}
-            required
-          >
-            <option value="">Select parent…</option>
-            {parents.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.name} ({p.email})
-              </option>
-            ))}
-          </select>
-          <select
-            className={`bg-white ${inputClass}`}
-            value={form.studentId}
-            onChange={(e) => setForm({ ...form, studentId: e.target.value })}
-            required
-          >
-            <option value="">Select student…</option>
-            {students.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.name} ({s.email})
-              </option>
-            ))}
-          </select>
+        <form onSubmit={handleLink} className="grid grid-cols-3 gap-3 items-end">
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Parent</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={form.parentId}
+              onChange={(e) => setForm({ ...form, parentId: e.target.value })}
+              required
+            >
+              <option value="">Select parent…</option>
+              {parents.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.name} ({p.email})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Student</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={form.studentId}
+              onChange={(e) => setForm({ ...form, studentId: e.target.value })}
+              required
+            >
+              <option value="">Select student…</option>
+              {students.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name} ({s.email})
+                </option>
+              ))}
+            </select>
+          </div>
           <Button type="submit" disabled={creating || parents.length === 0 || students.length === 0}>
             {creating ? "Linking…" : "Link"}
           </Button>

@@ -95,31 +95,40 @@ export default function AdminUsers() {
       <Card>
         <h2 className="text-[13px] font-bold text-navy mb-3">Create User</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-3 gap-3">
-          <input
-            className={inputClass}
-            placeholder="Full name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-          />
-          <input
-            type="email"
-            className={inputClass}
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            required
-          />
-          <select
-            className={`bg-white ${inputClass}`}
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-          >
-            <option value="student">Student</option>
-            <option value="teacher">Teacher</option>
-            <option value="parent">Parent</option>
-            <option value="admin">Admin</option>
-          </select>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Full Name</label>
+            <input
+              className={inputClass}
+              placeholder="Full name"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Email</label>
+            <input
+              type="email"
+              className={inputClass}
+              placeholder="Email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Role</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}
+            >
+              <option value="student">Student</option>
+              <option value="teacher">Teacher</option>
+              <option value="parent">Parent</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
           <Button type="submit" disabled={creating} className="col-span-3 w-fit">
             {creating ? "Creating…" : "Create User"}
           </Button>

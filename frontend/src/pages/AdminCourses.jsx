@@ -90,39 +90,51 @@ export default function AdminCourses() {
       <Card>
         <h2 className="text-[13px] font-bold text-navy mb-3">Create Course</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
-          <input
-            className={inputClass}
-            placeholder="Course title"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            required
-          />
-          <input
-            className={inputClass}
-            placeholder="Course code (e.g. CS201)"
-            value={form.code}
-            onChange={(e) => setForm({ ...form, code: e.target.value })}
-            required
-          />
-          <select
-            className={`bg-white ${inputClass}`}
-            value={form.teacherId}
-            onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
-            required
-          >
-            <option value="">Assign teacher…</option>
-            {teachers.map((t) => (
-              <option key={t._id} value={t._id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          <input
-            className={inputClass}
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Course Title</label>
+            <input
+              className={inputClass}
+              placeholder="Course title"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Course Code</label>
+            <input
+              className={inputClass}
+              placeholder="e.g. CS201"
+              value={form.code}
+              onChange={(e) => setForm({ ...form, code: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Teacher</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={form.teacherId}
+              onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
+              required
+            >
+              <option value="">Assign teacher…</option>
+              {teachers.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Description (optional)</label>
+            <input
+              className={inputClass}
+              placeholder="Description"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </div>
           <Button type="submit" disabled={creating} className="col-span-2 w-fit">
             {creating ? "Creating…" : "Create Course"}
           </Button>

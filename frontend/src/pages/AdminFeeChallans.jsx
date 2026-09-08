@@ -70,41 +70,53 @@ export default function AdminFeeChallans() {
       <Card>
         <h2 className="text-[13px] font-bold text-navy mb-3">Create Fee Challan</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
-          <select
-            className={`bg-white ${inputClass}`}
-            value={form.studentId}
-            onChange={(e) => setForm({ ...form, studentId: e.target.value })}
-            required
-          >
-            <option value="">Select student…</option>
-            {students.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.name} ({s.email})
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            min="0"
-            className={inputClass}
-            placeholder="Amount (Rs.)"
-            value={form.amount}
-            onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            required
-          />
-          <input
-            type="date"
-            className={inputClass}
-            value={form.dueDate}
-            onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-            required
-          />
-          <input
-            className={inputClass}
-            placeholder="Description (e.g. Fall 2026 Semester Fee)"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Student</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={form.studentId}
+              onChange={(e) => setForm({ ...form, studentId: e.target.value })}
+              required
+            >
+              <option value="">Select student…</option>
+              {students.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name} ({s.email})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Amount (Rs.)</label>
+            <input
+              type="number"
+              min="0"
+              className={inputClass}
+              placeholder="Amount"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Due Date</label>
+            <input
+              type="date"
+              className={inputClass}
+              value={form.dueDate}
+              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Description (optional)</label>
+            <input
+              className={inputClass}
+              placeholder="e.g. Fall 2026 Semester Fee"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </div>
           <Button type="submit" disabled={creating} className="col-span-2 w-fit">
             {creating ? "Creating…" : "Create Challan"}
           </Button>

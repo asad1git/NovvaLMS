@@ -66,51 +66,66 @@ export default function AdminSalarySlips() {
       <Card>
         <h2 className="text-[13px] font-bold text-navy mb-3">Create Salary Slip</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
-          <select
-            className={`bg-white ${inputClass}`}
-            value={form.employeeId}
-            onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
-            required
-          >
-            <option value="">Select teacher…</option>
-            {employees.map((t) => (
-              <option key={t._id} value={t._id}>
-                {t.name} ({t.email})
-              </option>
-            ))}
-          </select>
-          <input
-            className={inputClass}
-            placeholder="Month (e.g. September 2026)"
-            value={form.month}
-            onChange={(e) => setForm({ ...form, month: e.target.value })}
-            required
-          />
-          <input
-            type="number"
-            min="0"
-            className={inputClass}
-            placeholder="Basic Salary (Rs.)"
-            value={form.basicSalary}
-            onChange={(e) => setForm({ ...form, basicSalary: e.target.value })}
-            required
-          />
-          <input
-            type="number"
-            min="0"
-            className={inputClass}
-            placeholder="Allowances (optional)"
-            value={form.allowances}
-            onChange={(e) => setForm({ ...form, allowances: e.target.value })}
-          />
-          <input
-            type="number"
-            min="0"
-            className={inputClass}
-            placeholder="Deductions (optional)"
-            value={form.deductions}
-            onChange={(e) => setForm({ ...form, deductions: e.target.value })}
-          />
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Teacher</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={form.employeeId}
+              onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+              required
+            >
+              <option value="">Select teacher…</option>
+              {employees.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name} ({t.email})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Month</label>
+            <input
+              className={inputClass}
+              placeholder="e.g. September 2026"
+              value={form.month}
+              onChange={(e) => setForm({ ...form, month: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Basic Salary (Rs.)</label>
+            <input
+              type="number"
+              min="0"
+              className={inputClass}
+              placeholder="Basic salary"
+              value={form.basicSalary}
+              onChange={(e) => setForm({ ...form, basicSalary: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Allowances (optional)</label>
+            <input
+              type="number"
+              min="0"
+              className={inputClass}
+              placeholder="Allowances"
+              value={form.allowances}
+              onChange={(e) => setForm({ ...form, allowances: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Deductions (optional)</label>
+            <input
+              type="number"
+              min="0"
+              className={inputClass}
+              placeholder="Deductions"
+              value={form.deductions}
+              onChange={(e) => setForm({ ...form, deductions: e.target.value })}
+            />
+          </div>
           <Button type="submit" disabled={creating} className="col-span-2 w-fit">
             {creating ? "Creating…" : "Create Slip"}
           </Button>
