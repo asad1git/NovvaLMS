@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconBooks, IconFileText, IconNotes, IconClipboardList } from "@tabler/icons-react";
+import { IconArrowLeft, IconFolderOpen, IconFileText, IconNotes, IconClipboardList, IconBooks } from "@tabler/icons-react";
 import { listCourses, getMaterials, downloadMaterial } from "../api/courses";
 import { listQuizzesForCourse } from "../api/quizzes";
 import {
@@ -8,14 +8,18 @@ import {
   downloadAssignmentFile,
   submitAssignment as apiSubmitAssignment,
 } from "../api/assignments";
-import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
+import { Card, Button, Badge, EmptyState, LoadingState, CourseCard, Tabs } from "../components/ui";
+
+const TABS = ["Materials", "Assignments", "Quizzes"];
 
 export default function StudentCourses() {
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [activeTab, setActiveTab] = useState("Materials");
   const [materials, setMaterials] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -36,6 +40,7 @@ export default function StudentCourses() {
 
   async function openCourse(course) {
     setSelectedCourse(course);
+    setActiveTab("Materials");
     setError("");
     setMaterials([]); // clear immediately so a course switch never shows the previous course's list
     setQuizzes([]);
@@ -63,42 +68,78 @@ export default function StudentCourses() {
 
   if (loading) return <LoadingState label="Loading courses…" />;
 
-  return (
-    <div className="space-y-5">
-      {error && (
-        <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-card px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
-          {error}
-        </div>
-      )}
+  const errorBanner = error && (
+    <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-input px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
+      {error}
+    </div>
+  );
 
-      <Card>
-        <h2 className="text-[13px] font-bold text-navy mb-3">My Courses</h2>
-        <div className="space-y-2">
-          {courses.length === 0 && (
+  // ── Course grid (no course selected) ──
+  if (!selectedCourse) {
+    return (
+      <div className="space-y-5">
+        {errorBanner}
+        <h2 className="text-[15px] font-bold text-navy">My Courses</h2>
+        {courses.length === 0 ? (
+          <Card>
             <EmptyState icon={<IconBooks size={32} className="text-text-muted" />} title="You are not enrolled in any courses yet." />
-          )}
-          {courses.map((c) => (
-            <div
-              key={c._id}
-              onClick={() => openCourse(c)}
-              className={`px-3 py-2 rounded cursor-pointer border transition-colors duration-150 ${
-                selectedCourse?._id === c._id
-                  ? "border-navy-light bg-badge-blue-bg"
-                  : "border-line hover:bg-bg-page"
-              }`}
-            >
-              <div className="text-xs font-medium text-text-main">
-                {c.code} — {c.title}
-              </div>
-              <div className="text-[11px] text-text-muted">Teacher: {c.teacher?.name || "—"}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+            {courses.map((c) => (
+              <CourseCard
+                key={c._id}
+                code={c.code}
+                name={c.title}
+                subtitle={`Teacher: ${c.teacher?.name || "—"}`}
+                onClick={() => openCourse(c)}
+                actions={
+                  <Button
+                    size="sm"
+                    className="w-full justify-center"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCourse(c);
+                    }}
+                  >
+                    <IconFolderOpen size={15} />
+                    Open
+                  </Button>
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
-      {selectedCourse && (
+  // ── Course detail ──
+  return (
+    <div className="space-y-4">
+      {errorBanner}
+
+      <button
+        onClick={() => setSelectedCourse(null)}
+        className="flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-navy transition-colors duration-150"
+      >
+        <IconArrowLeft size={15} /> Back to My Courses
+      </button>
+
+      <div>
+        <div className="flex items-center gap-3 mb-1">
+          <code className="text-sm font-mono font-bold bg-[#f0f4fa] text-text-main px-2 py-0.5 rounded">
+            {selectedCourse.code}
+          </code>
+          <h2 className="text-xl font-bold text-navy">{selectedCourse.title}</h2>
+        </div>
+        {selectedCourse.description && <p className="text-[13px] text-text-muted">{selectedCourse.description}</p>}
+      </div>
+
+      <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} />
+
+      {activeTab === "Materials" && (
         <Card>
-          <h2 className="text-[13px] font-bold text-navy mb-3">Materials — {selectedCourse.code}</h2>
           <div className="space-y-1">
             {materials.map((m) => (
               <div
@@ -124,32 +165,8 @@ export default function StudentCourses() {
         </Card>
       )}
 
-      {selectedCourse && (
+      {activeTab === "Assignments" && (
         <Card>
-          <h2 className="text-[13px] font-bold text-navy mb-3">Quizzes — {selectedCourse.code}</h2>
-          <div className="space-y-1">
-            {quizzes.map((q) => (
-              <div
-                key={q._id}
-                className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
-              >
-                <div>
-                  <div className="text-text-main font-medium">{q.title}</div>
-                  <div className="text-[11px] text-text-muted">{q.durationMinutes} min</div>
-                </div>
-                <Button onClick={() => navigate(`/quiz/${q._id}`)} size="sm">
-                  Open
-                </Button>
-              </div>
-            ))}
-            {quizzes.length === 0 && <EmptyState icon={<IconNotes size={32} className="text-text-muted" />} title="No quizzes available yet." />}
-          </div>
-        </Card>
-      )}
-
-      {selectedCourse && (
-        <Card>
-          <h2 className="text-[13px] font-bold text-navy mb-3">Assignments — {selectedCourse.code}</h2>
           <div className="space-y-3">
             {assignments.map((a) => {
               const sub = a.mySubmission;
@@ -214,6 +231,28 @@ export default function StudentCourses() {
             {assignments.length === 0 && (
               <EmptyState icon={<IconClipboardList size={32} className="text-text-muted" />} title="No assignments posted yet." />
             )}
+          </div>
+        </Card>
+      )}
+
+      {activeTab === "Quizzes" && (
+        <Card>
+          <div className="space-y-1">
+            {quizzes.map((q) => (
+              <div
+                key={q._id}
+                className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
+              >
+                <div>
+                  <div className="text-text-main font-medium">{q.title}</div>
+                  <div className="text-[11px] text-text-muted">{q.durationMinutes} min</div>
+                </div>
+                <Button onClick={() => navigate(`/quiz/${q._id}`)} size="sm">
+                  Open
+                </Button>
+              </div>
+            ))}
+            {quizzes.length === 0 && <EmptyState icon={<IconNotes size={32} className="text-text-muted" />} title="No quizzes available yet." />}
           </div>
         </Card>
       )}
