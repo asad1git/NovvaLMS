@@ -1,6 +1,42 @@
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import {
+  IconLayoutDashboard,
+  IconBooks,
+  IconChecklist,
+  IconSettings,
+  IconRobot,
+  IconClipboardList,
+  IconChartBar,
+  IconCalendarStats,
+  IconUsers,
+  IconLink,
+  IconReceipt2,
+  IconCash,
+  IconLogout,
+  IconSchool,
+} from "@tabler/icons-react";
 import NotificationBell from "./NotificationBell";
+
+// Exact spec from design-system/*.html's .sb-brand / .nav-link / .topbar —
+// icon lookup keyed by label so every DashboardShell caller (which only
+// ever passed plain label strings) keeps working unchanged.
+const NAV_ICONS = {
+  Dashboard: IconLayoutDashboard,
+  "My Courses": IconBooks,
+  "Manage Courses": IconBooks,
+  "Grade Approvals": IconChecklist,
+  "Manage Users": IconUsers,
+  "Parent Links": IconLink,
+  "Fee Challans": IconReceipt2,
+  "Salary Slips": IconCash,
+  "My Results": IconClipboardList,
+  Analytics: IconChartBar,
+  Attendance: IconCalendarStats,
+  "Novva Assistant": IconRobot,
+  "AI Assistant": IconRobot,
+  "Account Settings": IconSettings,
+};
 
 export default function DashboardShell({ role, navItems, activeNav, onNavClick, children }) {
   const { auth, logout } = useAuth();
@@ -19,43 +55,46 @@ export default function DashboardShell({ role, navItems, activeNav, onNavClick, 
     .toUpperCase();
 
   return (
-    <div className="flex h-screen bg-bg-page text-sm">
+    <div className="flex h-screen bg-bg-page text-sm text-text-main">
       {/* Sidebar */}
-      <aside className="w-52 bg-navy flex flex-col flex-shrink-0">
-        <div className="px-4 pt-5 pb-4 border-b border-white/10">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-white/15 rounded-md flex items-center justify-center text-white text-sm shadow-sm">
-              🎓
-            </div>
-            <span className="text-white text-sm font-medium tracking-tight">Novva LMS</span>
+      <aside className="w-[200px] min-w-[200px] bg-navy flex flex-col flex-shrink-0 overflow-y-auto">
+        <div className="flex items-center gap-2.5 px-4 pt-[18px] pb-4 border-b border-white/[0.08]">
+          <div className="w-9 h-9 bg-navy-light rounded-lg flex items-center justify-center flex-shrink-0">
+            <IconSchool size={19} stroke={2} className="text-white" />
           </div>
-          <div className="text-[10px] text-white/50 mt-1">{role} Panel</div>
+          <div>
+            <div className="text-sm font-bold text-white leading-tight">Novva LMS</div>
+            <div className="text-[11px] text-white/[0.42]">{role}</div>
+          </div>
         </div>
 
-        <nav className="flex-1 py-3 space-y-0.5 px-2">
+        <nav className="flex-1 py-2.5">
           {navItems.map((item, i) => {
             const isActive = activeNav ? activeNav === item : i === 0;
+            const Icon = NAV_ICONS[item];
             return (
               <div
                 key={item}
                 onClick={() => onNavClick?.(item)}
-                className={`px-3 py-2 text-xs rounded-md cursor-pointer transition-all duration-150 ${
+                className={`flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium cursor-pointer select-none border-l-[3px] transition-colors duration-150 ${
                   isActive
-                    ? "bg-white/12 text-white shadow-sm"
-                    : "text-white/70 hover:bg-white/5 hover:text-white"
+                    ? "bg-white/10 text-white border-l-navy-light"
+                    : "text-white/65 border-l-transparent hover:bg-white/[0.07] hover:text-white"
                 }`}
               >
+                {Icon && <Icon size={17} stroke={1.9} className="flex-shrink-0" />}
                 {item}
               </div>
             );
           })}
         </nav>
 
-        <div className="border-t border-white/10 py-3 px-2">
+        <div className="py-2.5 border-t border-white/[0.08]">
           <div
             onClick={handleLogout}
-            className="px-3 py-2 text-xs text-white/60 hover:text-white hover:bg-white/5 rounded-md cursor-pointer transition-colors duration-150"
+            className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-white/65 cursor-pointer select-none transition-colors duration-150 hover:bg-[#A32D2D]/20 hover:text-[#ff9999]"
           >
+            <IconLogout size={17} stroke={1.9} className="flex-shrink-0" />
             Logout
           </div>
         </div>
@@ -63,18 +102,21 @@ export default function DashboardShell({ role, navItems, activeNav, onNavClick, 
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between flex-shrink-0 shadow-sm z-10">
-          <span className="text-sm font-medium text-gray-900">{activeNav || "Dashboard Overview"}</span>
-          <div className="flex items-center gap-3">
+        <header className="h-[58px] flex-shrink-0 bg-white border-b border-line flex items-center justify-between px-6 shadow-card z-10">
+          <span className="text-lg font-bold text-navy">{activeNav || "Dashboard"}</span>
+          <div className="flex items-center gap-2.5">
             <NotificationBell />
-            <span className="text-xs text-gray-500">{auth?.name}</span>
-            <div className="w-7 h-7 bg-navy rounded-full flex items-center justify-center text-white text-[10px] font-medium ring-2 ring-navy/10">
+            <div className="text-right">
+              <div className="text-[13px] font-semibold text-text-main leading-tight">{auth?.name}</div>
+              <div className="text-[11px] text-text-muted leading-tight">{role}</div>
+            </div>
+            <div className="w-9 h-9 bg-navy-light rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
               {initials}
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-5">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
   );
