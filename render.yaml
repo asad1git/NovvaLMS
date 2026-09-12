@@ -1,0 +1,67 @@
+# Render Blueprint for the demo deploy — see CLAUDE.md's deployment discussion.
+# In the Render dashboard: New + -> Blueprint -> connect this repo -> branch "master"
+# (NOT "main", which is still just an initial commit).
+#
+# Every envVar marked `sync: false` is a secret/deployment-specific value Render
+# will prompt you to fill in during Blueprint creation — nothing sensitive lives
+# in this file. Demo phase deliberately has NO persistent disk on the backend
+# (Render disks require a paid instance type); uploaded files may not survive a
+# redeploy/restart until the production-ready S3 migration replaces local disk
+# storage entirely, at which point this stops mattering.
+
+services:
+  - type: web
+    name: novva-lms-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: AI_PROVIDER_CHAIN
+        value: gemini
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+      - key: ADMIN_NAME
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+  - type: web
+    name: novva-lms-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /**
+        destination: /index.html
