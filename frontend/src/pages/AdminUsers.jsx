@@ -129,7 +129,7 @@ export default function AdminUsers() {
               <option value="admin">Admin</option>
             </select>
           </div>
-          <Button type="submit" disabled={creating} className="col-span-3 w-fit">
+          <Button type="submit" disabled={creating} className="sm:col-span-3 w-fit">
             {creating ? "Creating…" : "Create User"}
           </Button>
         </form>

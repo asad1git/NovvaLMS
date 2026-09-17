@@ -117,7 +117,7 @@ export default function AdminFeeChallans() {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
           </div>
-          <Button type="submit" disabled={creating} className="col-span-2 w-fit">
+          <Button type="submit" disabled={creating} className="sm:col-span-2 w-fit">
             {creating ? "Creating…" : "Create Challan"}
           </Button>
         </form>

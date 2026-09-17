@@ -126,7 +126,7 @@ export default function AdminSalarySlips() {
               onChange={(e) => setForm({ ...form, deductions: e.target.value })}
             />
           </div>
-          <Button type="submit" disabled={creating} className="col-span-2 w-fit">
+          <Button type="submit" disabled={creating} className="sm:col-span-2 w-fit">
             {creating ? "Creating…" : "Create Slip"}
           </Button>
         </form>
