@@ -4,7 +4,7 @@ import { listCourses, getEnrollments, getMaterials } from "../api/courses";
 import { listQuizzesForCourse, getPendingGrades } from "../api/quizzes";
 import { StatCard, Card, CourseCard, Button, EmptyState, LoadingState } from "../components/ui";
 
-export default function TeacherOverview({ onNavigate }) {
+export default function TeacherOverview({ onNavigate, onOpenCourse }) {
   const [stats, setStats] = useState(null);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +77,7 @@ export default function TeacherOverview({ onNavigate }) {
               code={c.code}
               name={c.title}
               subtitle={c.description}
-              onClick={() => onNavigate?.("My Courses")}
+              onClick={() => onOpenCourse?.(c._id)}
               stats={[
                 { label: "Students", value: c.studentCount },
                 { label: "Materials", value: c.materialCount },
@@ -89,7 +89,7 @@ export default function TeacherOverview({ onNavigate }) {
                   className="w-full justify-center"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onNavigate?.("My Courses");
+                    onOpenCourse?.(c._id);
                   }}
                 >
                   <IconFolderOpen size={15} />

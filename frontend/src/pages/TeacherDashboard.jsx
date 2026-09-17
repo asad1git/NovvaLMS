@@ -9,17 +9,23 @@ const NAV_ITEMS = ["Dashboard", "My Courses", "Grade Approvals", "Account Settin
 
 export default function TeacherDashboard() {
   const [activeNav, setActiveNav] = useState("Dashboard");
+  const [openCourseId, setOpenCourseId] = useState(null);
+
+  function handleOpenCourse(courseId) {
+    setOpenCourseId(courseId);
+    setActiveNav("My Courses");
+  }
 
   return (
     <DashboardShell role="Teacher" navItems={NAV_ITEMS} activeNav={activeNav} onNavClick={setActiveNav}>
       {activeNav === "My Courses" ? (
-        <TeacherCourses />
+        <TeacherCourses initialCourseId={openCourseId} onCourseOpened={() => setOpenCourseId(null)} />
       ) : activeNav === "Grade Approvals" ? (
         <GradeApprovals />
       ) : activeNav === "Account Settings" ? (
         <AccountSettings />
       ) : (
-        <TeacherOverview onNavigate={setActiveNav} />
+        <TeacherOverview onNavigate={setActiveNav} onOpenCourse={handleOpenCourse} />
       )}
     </DashboardShell>
   );

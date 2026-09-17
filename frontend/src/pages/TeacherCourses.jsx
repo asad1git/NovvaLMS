@@ -81,7 +81,7 @@ const FILE_CHIP = {
   zip: { icon: IconFileTypeZip, bg: "bg-[#eef2f5]", color: "text-[#5a6b7a]" },
 };
 
-export default function TeacherCourses() {
+export default function TeacherCourses({ initialCourseId, onCourseOpened } = {}) {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -179,6 +179,17 @@ export default function TeacherCourses() {
     setAttendanceOverall(attendance.overall);
     setAssignments(await listAssignments(course._id));
   }
+
+  // Auto-open a course specified from outside this page (e.g. clicking a course
+  // card on the Dashboard Overview) — without this, "My Courses" always mounted
+  // fresh on the grid regardless of which course was clicked, requiring a second click.
+  useEffect(() => {
+    if (!initialCourseId || courses.length === 0) return;
+    const match = courses.find((c) => c._id === initialCourseId);
+    if (match) openCourse(match);
+    onCourseOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCourseId, courses]);
 
   async function loadResults(quizId) {
     setResultsQuizId(quizId);

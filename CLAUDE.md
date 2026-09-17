@@ -608,6 +608,28 @@ has a moderate DoS advisory with no patched version published yet as of this wri
 confirmed present before any work in this session touched dependencies; `npm audit fix`
 has nothing to apply. Not introduced by `pdf-parse`.
 
+**Fixed a real bug, live-reported by the user: clicking a course card on the Teacher
+Dashboard's Overview took two clicks to actually open that course, not one.** Root cause —
+`TeacherOverview.jsx`'s `CourseCard` `onClick` and its "Open" button both only called
+`onNavigate?.("My Courses")`, which just switches the Dashboard's active tab; it carries no
+information about *which* course was clicked, so `TeacherCourses.jsx` always remounted fresh
+on the all-courses grid regardless, requiring a second click on the grid to open the intended
+course. Fixed by threading a course id through, not by changing what "My Courses" itself
+shows: `TeacherDashboard.jsx` now holds `openCourseId` state and passes
+`onOpenCourse={(courseId) => { setOpenCourseId(courseId); setActiveNav("My Courses"); }}`
+to `TeacherOverview`, and `initialCourseId`/`onCourseOpened` to `TeacherCourses`.
+`TeacherOverview.jsx`'s card `onClick` and "Open" button now call `onOpenCourse?.(c._id)`
+instead of the bare tab switch. `TeacherCourses.jsx` gained a `useEffect` keyed on
+`[initialCourseId, courses]` that, once both are available, finds the matching course and
+calls the existing `openCourse(course)` function (the same one the grid's own click handler
+already used), then clears the parent's pending state via `onCourseOpened?.()` so a later
+plain "My Courses" nav click still correctly lands on the grid. `StudentOverview.jsx` was
+checked for the same pattern and confirmed clean — its course rows aren't clickable at all,
+only its "View All" button switches tabs, which is correct since that button really does mean
+"show me everything." Verified live via Playwright as a teacher: both clicking a course
+card directly and clicking its "Open" button now land on that exact course's Materials tab
+in one click, with zero console errors.
+
 ---
 
 ## Design System (already in `frontend/tailwind.config.js` — reuse, don't reinvent)
