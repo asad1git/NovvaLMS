@@ -108,9 +108,9 @@ export default function ChatBot() {
   const selectedCourse = courses.find((c) => c._id === courseId);
 
   return (
-    <div className="flex -m-6" style={{ height: "calc(100vh - 58px)" }}>
+    <div className="flex flex-col lg:flex-row -m-3 sm:-m-6 lg:h-[calc(100vh-58px)]">
       {/* Course switcher */}
-      <div className="w-[220px] min-w-[220px] bg-white border-r border-line flex flex-col flex-shrink-0">
+      <div className="w-full lg:w-[220px] lg:min-w-[220px] bg-white border-r border-line flex flex-col flex-shrink-0 max-h-[280px] lg:max-h-none overflow-y-auto lg:overflow-visible">
         <div className="px-[18px] pt-4 pb-3.5 border-b border-line flex-shrink-0">
           <div className="text-[13px] font-bold text-navy mb-0.5">My Courses</div>
           <div className="text-[11px] text-text-muted">Select a course to chat</div>

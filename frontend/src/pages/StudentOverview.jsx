@@ -32,7 +32,7 @@ export default function StudentOverview({ onNavigate }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Enrolled Courses" value={courses.length} icon={IconBooks} tone="blue" />
         <StatCard label="Quizzes Taken" value={overall.totalAttempts} icon={IconFileCheck} tone="success" />
         <StatCard
@@ -67,7 +67,7 @@ export default function StudentOverview({ onNavigate }) {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <div className="flex items-center justify-between mb-3.5">
             <h2 className="text-[13px] font-semibold text-text-main">My Courses</h2>

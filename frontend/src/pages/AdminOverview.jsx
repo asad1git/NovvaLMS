@@ -49,7 +49,7 @@ export default function AdminOverview({ onNavigate }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Students" value={stats.students} icon={IconCertificate} tone="amber" />
         <StatCard label="Teachers" value={stats.teachers} icon={IconSchool} tone="navy" />
         <StatCard label="Courses" value={stats.courses} icon={IconBooks} tone="success" />
@@ -61,7 +61,7 @@ export default function AdminOverview({ onNavigate }) {
         />
       </div>
 
-      <div className="grid grid-cols-[1.6fr_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
         <Card>
           <div className="flex items-center justify-between mb-3.5">
             <h2 className="text-[13px] font-semibold text-text-main">Recent Courses</h2>

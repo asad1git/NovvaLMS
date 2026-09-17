@@ -86,7 +86,7 @@ export default function AdminParentLinks() {
             No parent accounts yet — create one under "Manage Users" (role: Parent) first.
           </p>
         )}
-        <form onSubmit={handleLink} className="grid grid-cols-3 gap-3 items-end">
+        <form onSubmit={handleLink} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
           <div>
             <label className="block text-[11px] text-text-muted mb-1">Parent</label>
             <select

@@ -1,7 +1,7 @@
 // Exact spec from design-system/*.html's .tabs / .tab.
 export default function Tabs({ tabs, active, onChange }) {
   return (
-    <div className="flex border-b-2 border-line mb-5">
+    <div className="flex border-b-2 border-line mb-5 overflow-x-auto">
       {tabs.map((t) => (
         <button
           key={t}

@@ -70,7 +70,7 @@ export default function Attendance() {
         <LoadingState />
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard label="Sessions Recorded" value={data.overall.totalSessions} icon={IconCalendarStats} tone="blue" />
             <StatCard label="Sessions Attended" value={data.overall.presentCount} icon={IconCheckbox} tone="success" />
             <StatCard

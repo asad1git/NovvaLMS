@@ -65,7 +65,7 @@ export default function AdminSalarySlips() {
 
       <Card>
         <h2 className="text-[13px] font-bold text-navy mb-3">Create Salary Slip</h2>
-        <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] text-text-muted mb-1">Teacher</label>
             <select

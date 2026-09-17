@@ -909,6 +909,51 @@ uploads with no extraction warning (unlike an image), a real Gemini chat questio
 correctly grounded in that file's actual content, and a binary file renamed to `.txt` was
 correctly rejected by the new null-byte check.
 
+**The whole frontend is now genuinely mobile-responsive, post-backlog.** Before this pass there
+were zero media-query breakpoints anywhere in the app — confirmed by screenshotting at a 390px
+phone width: `DashboardShell`'s fixed 200px sidebar alone ate over half the screen, and every
+multi-column form/grid inside squeezed into unreadable slivers (e.g. Manage Users' 3-column
+Create User form, or a 4-across `StatCard` row clipping both the numbers and labels).
+
+`DashboardShell.jsx` is the one fix that mattered most, since it wraps every single page: the
+sidebar is now an off-canvas drawer below Tailwind's `lg` breakpoint (fixed position,
+`-translate-x-full` when closed, a semi-transparent backdrop that closes it on tap, picking a
+nav item auto-closes it) with a hamburger button in the header, and is completely unchanged —
+same fixed 200px column, no drawer logic at all — at `lg` and up (confirmed pixel-identical to
+the pre-change desktop screenshot). The header's user-name/role text hides below `sm` to leave
+room for the page title, keeping just the avatar.
+
+Every fixed `grid-cols-N` layout across the page files (stat-card rows, "Create X" forms, the
+Admin/Teacher/Student Overview two-panel sections, the quiz-builder's option grid) got a
+responsive variant — 4-item stat rows become `grid-cols-2 sm:grid-cols-4` (a clean 2×2 on a
+phone), most forms and side-by-side content panels become `grid-cols-1 sm:grid-cols-N` or
+`grid-cols-1 lg:grid-cols-N` (fully stacked until there's room), chosen per case by what the grid
+actually holds rather than one blanket rule.
+
+The fixed-width split-view pages needed individual treatment, not just a grid tweak:
+`Analytics.jsx`'s 220px course-filter sidebar and `ChatBot.jsx`'s 220px course-switcher both
+go full-width and stack above the main content below `lg` (capped at a 280px scrollable height on
+mobile so a long course list doesn't push the actual content/chat far down the page).
+`GradeApprovals.jsx`'s `grid-cols-[300px_1fr]` split view stacks the same way, with the
+submission list capped at 300px on mobile. `QuizAttempt.jsx`'s 240px question-navigator sidebar
+is simply hidden below `lg` rather than given new drawer-toggle logic — a timed, high-stakes quiz
+screen is exactly the wrong place to introduce a new interactive element that could misbehave
+under time pressure, and the existing "Question X of Y" label plus Previous/Next buttons already
+cover linear navigation on a phone.
+
+Caught one more real gap via an actual mobile screenshot, not by inspection: the shared `Tabs`
+component (`Materials`/`Assignments`/`Quizzes`/`Attendance`/`Results` on `TeacherCourses.jsx`,
+also used by `StudentCourses.jsx`) had no overflow handling at all — on a narrow screen the tab
+bar just clipped mid-word ("Attendanc[e]") with the remaining tabs pushed fully off-screen and
+unreachable. Fixed with a single `overflow-x-auto` on the tab row (the buttons already had
+`whitespace-nowrap`), so a too-wide tab bar now scrolls horizontally instead of clipping —
+confirmed the previously-unreachable "Results" tab is now reachable by scrolling.
+
+Verified via Playwright at a 390px phone width across all three roles and every touched page
+(including a real Gemini chatbot exchange grounded in uploaded material, and the quiz-taking
+flow) — zero horizontal page overflow anywhere, zero console errors — and re-verified at the
+original 1280px desktop width to confirm pixel-identical behavior to before this pass.
+
 ---
 
 ## Sprint Plan (2 weeks each)

@@ -89,7 +89,7 @@ export default function AdminCourses() {
 
       <Card>
         <h2 className="text-[13px] font-bold text-navy mb-3">Create Course</h2>
-        <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] text-text-muted mb-1">Course Title</label>
             <input
@@ -181,7 +181,7 @@ export default function AdminCourses() {
           </p>
 
           {enrollResult && (
-            <div className="grid grid-cols-3 gap-2 mb-4 text-[11px] animate-[fadeIn_0.15s_ease-in]">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4 text-[11px] animate-[fadeIn_0.15s_ease-in]">
               <div className="bg-badge-green-bg text-badge-green-text rounded px-2 py-1">
                 Enrolled: {enrollResult.enrolled.length}
               </div>

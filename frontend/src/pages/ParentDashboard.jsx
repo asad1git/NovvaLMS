@@ -59,7 +59,7 @@ function ChildAnalytics({ child, analytics }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Quizzes Taken" value={overall.totalAttempts} icon={IconFileCheck} tone="success" />
         <StatCard
           label="Average Score"

@@ -119,9 +119,9 @@ export default function Analytics() {
   const activeCourseLabel = courseId ? courses.find((c) => c._id === courseId)?.title : "all your courses";
 
   return (
-    <div className="flex -m-6" style={{ height: "calc(100vh - 58px)" }}>
+    <div className="flex flex-col lg:flex-row -m-3 sm:-m-6 lg:h-[calc(100vh-58px)]">
       {/* Course filter sidebar */}
-      <div className="w-[220px] min-w-[220px] bg-white border-r border-line flex flex-col overflow-hidden flex-shrink-0">
+      <div className="w-full lg:w-[220px] lg:min-w-[220px] bg-white border-r border-line flex flex-col overflow-hidden lg:overflow-hidden flex-shrink-0 max-h-[280px] lg:max-h-none">
         <div className="px-[18px] pt-4 pb-3.5 border-b border-line flex-shrink-0">
           <div className="text-[13px] font-bold text-navy mb-0.5">Course Filter</div>
           <div className="text-[11px] text-text-muted">Filter analytics by course</div>
@@ -169,7 +169,7 @@ export default function Analytics() {
           <LoadingState />
         ) : (
           <div className="space-y-5">
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <StatCard
                 icon={IconChecklist}
                 tone="blue"
@@ -206,7 +206,7 @@ export default function Analytics() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card>
                 <div className="flex items-center gap-1.5 mb-1">
                   <IconChartBar size={15} className="text-navy-light" />

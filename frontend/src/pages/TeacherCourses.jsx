@@ -725,7 +725,7 @@ export default function TeacherCourses() {
 
             {showAssignmentForm && (
               <form onSubmit={handleCreateAssignment} className="border border-line rounded-card p-3.5 mb-4 space-y-3 animate-[fadeIn_0.15s_ease-in]">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] text-text-muted mb-1">Title</label>
                     <input
@@ -756,7 +756,7 @@ export default function TeacherCourses() {
                     onChange={(e) => setAssignmentDescription(e.target.value)}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] text-text-muted mb-1">Due Date</label>
                     <input
@@ -831,7 +831,7 @@ export default function TeacherCourses() {
               <IconSparkles size={16} className="text-navy-light" />
               AI Quiz Generation
             </div>
-            <div className="grid grid-cols-3 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-wide text-text-main mb-1.5">
                   Source Material
@@ -967,7 +967,7 @@ export default function TeacherCourses() {
                       </div>
                     ) : (
                       <>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {q.options.map((opt, oi) => (
                             <label key={oi} className="flex items-center gap-2 text-xs">
                               <input

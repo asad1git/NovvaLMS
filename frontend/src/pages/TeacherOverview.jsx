@@ -46,7 +46,7 @@ export default function TeacherOverview({ onNavigate }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="My Courses" value={stats.courses} icon={IconBooks} tone="blue" />
         <StatCard label="Enrolled Students" value={stats.students} icon={IconUsers} tone="navy" />
         <StatCard label="Quizzes Created" value={stats.quizzes} icon={IconFileCheck} tone="success" />

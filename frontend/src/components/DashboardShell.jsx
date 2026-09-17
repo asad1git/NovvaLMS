@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,6 +16,8 @@ import {
   IconCash,
   IconLogout,
   IconSchool,
+  IconMenu2,
+  IconX,
 } from "@tabler/icons-react";
 import NotificationBell from "./NotificationBell";
 
@@ -41,10 +44,16 @@ const NAV_ICONS = {
 export default function DashboardShell({ role, navItems, activeNav, onNavClick, children }) {
   const { auth, logout } = useAuth();
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   function handleLogout() {
     logout();
     navigate("/login");
+  }
+
+  function handleNavClick(item) {
+    onNavClick?.(item);
+    setSidebarOpen(false); // a nav pick always closes the mobile drawer
   }
 
   const initials = (auth?.name || "?")
@@ -55,17 +64,36 @@ export default function DashboardShell({ role, navItems, activeNav, onNavClick, 
     .toUpperCase();
 
   return (
-    <div className="flex h-screen bg-bg-page text-sm text-text-main">
-      {/* Sidebar */}
-      <aside className="w-[200px] min-w-[200px] bg-navy flex flex-col flex-shrink-0 overflow-y-auto">
+    <div className="flex h-screen bg-bg-page text-sm text-text-main overflow-hidden">
+      {/* Backdrop — mobile only, closes the drawer on tap outside it */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — an off-canvas drawer below lg, a normal fixed-width column at lg and up */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-[200px] min-w-[200px] bg-navy flex flex-col flex-shrink-0 overflow-y-auto transition-transform duration-200 lg:static lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="flex items-center gap-2.5 px-4 pt-[18px] pb-4 border-b border-white/[0.08]">
           <div className="w-9 h-9 bg-navy-light rounded-lg flex items-center justify-center flex-shrink-0">
             <IconSchool size={19} stroke={2} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="text-sm font-bold text-white leading-tight">Novva LMS</div>
             <div className="text-[11px] text-white/[0.42]">{role}</div>
           </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="ml-auto p-1 text-white/65 hover:text-white lg:hidden"
+            aria-label="Close menu"
+          >
+            <IconX size={20} />
+          </button>
         </div>
 
         <nav className="flex-1 py-2.5">
@@ -75,7 +103,7 @@ export default function DashboardShell({ role, navItems, activeNav, onNavClick, 
             return (
               <div
                 key={item}
-                onClick={() => onNavClick?.(item)}
+                onClick={() => handleNavClick(item)}
                 className={`flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium cursor-pointer select-none border-l-[3px] transition-colors duration-150 ${
                   isActive
                     ? "bg-white/10 text-white border-l-navy-light"
@@ -101,12 +129,21 @@ export default function DashboardShell({ role, navItems, activeNav, onNavClick, 
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-[58px] flex-shrink-0 bg-white border-b border-line flex items-center justify-between px-6 shadow-card z-10">
-          <span className="text-lg font-bold text-navy">{activeNav || "Dashboard"}</span>
-          <div className="flex items-center gap-2.5">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <header className="h-[58px] flex-shrink-0 bg-white border-b border-line flex items-center justify-between px-3 sm:px-6 shadow-card z-10">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-1.5 -ml-1.5 text-navy lg:hidden flex-shrink-0"
+              aria-label="Open menu"
+            >
+              <IconMenu2 size={22} />
+            </button>
+            <span className="text-base sm:text-lg font-bold text-navy truncate">{activeNav || "Dashboard"}</span>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
             <NotificationBell />
-            <div className="text-right">
+            <div className="text-right hidden sm:block">
               <div className="text-[13px] font-semibold text-text-main leading-tight">{auth?.name}</div>
               <div className="text-[11px] text-text-muted leading-tight">{role}</div>
             </div>
@@ -116,7 +153,7 @@ export default function DashboardShell({ role, navItems, activeNav, onNavClick, 
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6">{children}</main>
       </div>
     </div>
   );

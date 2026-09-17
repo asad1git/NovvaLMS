@@ -232,7 +232,7 @@ export default function QuizAttempt() {
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
             <div className="bg-bg-page rounded-[8px] py-3.5 px-3">
               <div className="text-xl font-bold text-navy mb-0.5">{pct}%</div>
               <div className="text-[11px] text-text-muted uppercase tracking-wide">Percentage</div>
@@ -312,7 +312,10 @@ export default function QuizAttempt() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Navigator */}
-        <div className="w-[240px] min-w-[240px] bg-white border-r border-line flex flex-col p-5 overflow-y-auto flex-shrink-0">
+        {/* Hidden below lg — a timed quiz shouldn't gain new drawer-toggle logic to fumble under
+            time pressure; the existing "Question X of Y" label plus Previous/Next below already
+            cover linear navigation on a phone. */}
+        <div className="hidden lg:flex lg:w-[240px] lg:min-w-[240px] bg-white border-r border-line flex-col p-5 overflow-y-auto flex-shrink-0">
           <div className="text-[11px] font-bold uppercase tracking-wide text-text-muted mb-3.5">Question Navigator</div>
           <div className="flex flex-col gap-1.5 mb-4.5 p-3 bg-bg-page rounded-[6px]">
             <LegendItem className="bg-navy text-white" label="Answered" />

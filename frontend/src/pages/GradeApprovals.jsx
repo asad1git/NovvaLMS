@@ -69,7 +69,7 @@ export default function GradeApprovals() {
   const feedbackValue = selected ? resolveField(draft, "feedback", selected, "aiDraftJustification") : "";
 
   return (
-    <div className="space-y-4 h-[calc(100vh-130px)] flex flex-col">
+    <div className="space-y-4 lg:h-[calc(100vh-130px)] flex flex-col">
       {error && (
         <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-input px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
           {error}
@@ -80,8 +80,8 @@ export default function GradeApprovals() {
         Pending Submissions ({pending.length})
       </div>
 
-      <div className="grid grid-cols-[300px_1fr] gap-4 flex-1 min-h-0">
-        <div className="overflow-y-auto flex flex-col gap-2 pr-1">
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 flex-1 min-h-0">
+        <div className="max-h-[300px] lg:max-h-none overflow-y-auto flex flex-col gap-2 pr-1">
           {pending.length === 0 && (
             <Card>
               <EmptyState icon={<IconClipboardCheck size={32} className="text-success" />} title="Nothing pending" subtitle="All subjective answers are graded." />
