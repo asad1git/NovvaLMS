@@ -65,6 +65,33 @@ const questionSchema = new mongoose.Schema({
     maxlength: [60, "Topic cannot exceed 60 characters"],
     default: "",
   },
+  // select:false — mirrors correctOptionIndex's own pattern exactly, so a
+  // student taking the quiz can never read the answer explanation early
+  // out of the API response. Shown to a student ONLY after they submit
+  // their own attempt (attemptController.getAttemptReview, which
+  // explicitly `.select("+explanation")`), and to the owning teacher/admin
+  // when building/reviewing a quiz (quizController.getQuizById does the
+  // same). For an mcq question, why the correct option is right; for a
+  // subjective one, what a strong answer should cover. Optional — blank on
+  // questions created before this field existed, exactly like `topic`.
+  explanation: {
+    type: String,
+    trim: true,
+    maxlength: [800, "Explanation cannot exceed 800 characters"],
+    default: "",
+    select: false,
+  },
+  // Subjective questions only — a sample answer the AI drafts (or a
+  // teacher writes/edits) to guide review before grading. Same select:false
+  // treatment and reveal points as `explanation` above — never visible to
+  // a student attempting the quiz.
+  modelAnswer: {
+    type: String,
+    trim: true,
+    maxlength: [3000, "Model answer cannot exceed 3000 characters"],
+    default: "",
+    select: false,
+  },
 });
 
 module.exports = mongoose.model("Question", questionSchema);

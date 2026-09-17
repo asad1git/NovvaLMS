@@ -62,6 +62,8 @@ const createQuiz = asyncHandler(async (req, res) => {
         maxScore: q.type === "subjective" ? q.maxScore || 5 : 1,
         order: i,
         topic: q.topic || "",
+        explanation: q.explanation || "",
+        modelAnswer: q.type === "subjective" ? q.modelAnswer || "" : "",
       })),
       { ordered: true }
     );
@@ -130,7 +132,7 @@ const getQuizById = asyncHandler(async (req, res) => {
   }
 
   const questions = await Question.find({ quiz: quiz._id })
-    .select(isManager ? "+correctOptionIndex" : "")
+    .select(isManager ? "+correctOptionIndex +explanation +modelAnswer" : "")
     .sort({ order: 1 });
 
   res.status(200).json({ success: true, data: { quiz, questions } });
@@ -223,13 +225,18 @@ const getAttemptsForQuiz = asyncHandler(async (req, res) => {
 
 /**
  * US-05 — POST /api/courses/:id/quizzes/generate (Admin or the course's Teacher)
- * :id is a CourseOffering id. Drafts MCQ questions from an uploaded PDF via
- * the configured AI provider (AI_PROVIDER env var) and returns them
- * WITHOUT saving anything — the teacher reviews/edits the draft in the same
+ * :id is a CourseOffering id. Drafts questions from an uploaded PDF via the
+ * configured AI provider (AI_PROVIDER env var) and returns them WITHOUT
+ * saving anything — the teacher reviews/edits the draft in the same
  * question-builder UI used for manual creation, and nothing exists until
  * they call the existing `createQuiz` endpoint. This keeps the teacher in
  * control of quiz content, in the same spirit as CLAUDE.md's HITL rule for
- * grades.
+ * grades. `includeSubjective` (optional, default false — preserves the
+ * original MCQ-only behavior) lets the AI also draft subjective questions
+ * alongside MCQs, each with a `modelAnswer` for the teacher to review before
+ * it's ever used to grade anything. Every question, mcq or subjective, now
+ * also gets an `explanation` — surfaced to a student only after they submit
+ * their own attempt (see attemptController.getAttemptReview), never before.
  */
 const generateQuizQuestions = asyncHandler(async (req, res) => {
   const offering = await CourseOffering.findById(req.params.id);
@@ -239,7 +246,7 @@ const generateQuizQuestions = asyncHandler(async (req, res) => {
   }
   assertCourseManager(req.user, res, offering);
 
-  const { materialId, numQuestions } = req.body;
+  const { materialId, numQuestions, includeSubjective } = req.body;
   if (!materialId || !numQuestions || Number(numQuestions) < 1) {
     res.status(400);
     throw new Error("materialId and a positive numQuestions are required");
@@ -267,7 +274,11 @@ const generateQuizQuestions = asyncHandler(async (req, res) => {
   const provider = getAIProvider();
   let result;
   try {
-    result = await provider.generateQuiz({ text: truncated, numQuestions: Number(numQuestions) });
+    result = await provider.generateQuiz({
+      text: truncated,
+      numQuestions: Number(numQuestions),
+      includeSubjective: !!includeSubjective,
+    });
   } catch (err) {
     res.status(502);
     throw new Error(`AI quiz generation failed: ${err.message}`);
@@ -275,25 +286,33 @@ const generateQuizQuestions = asyncHandler(async (req, res) => {
 
   // Never trust external AI output blindly, even with JSON-schema
   // enforcement upstream — validate shape before it ever reaches the
-  // question-builder UI or (later) the DB.
+  // question-builder UI or (later) the DB. A subjective question only
+  // needs real text + a modelAnswer; an mcq question still needs the full
+  // 4-option/correctOptionIndex shape exactly as before.
   const questions = (result.questions || [])
-    .filter(
-      (q) =>
-        q &&
-        typeof q.text === "string" &&
+    .filter((q) => {
+      if (!q || typeof q.text !== "string" || !q.text.trim()) return false;
+      if (q.type === "subjective") {
+        return typeof q.modelAnswer === "string" && q.modelAnswer.trim().length > 0;
+      }
+      return (
         Array.isArray(q.options) &&
         q.options.length === 4 &&
         q.options.every((o) => typeof o === "string" && o.trim().length > 0) &&
         Number.isInteger(q.correctOptionIndex) &&
         q.correctOptionIndex >= 0 &&
         q.correctOptionIndex <= 3
-    )
+      );
+    })
     .map((q) => ({
-      type: "mcq",
+      type: q.type === "subjective" ? "subjective" : "mcq",
       text: q.text,
-      options: q.options,
-      correctOptionIndex: q.correctOptionIndex,
+      options: q.type === "subjective" ? undefined : q.options,
+      correctOptionIndex: q.type === "subjective" ? undefined : q.correctOptionIndex,
+      maxScore: q.type === "subjective" ? 5 : 1,
       topic: typeof q.topic === "string" ? q.topic.trim().slice(0, 60) : "",
+      explanation: typeof q.explanation === "string" ? q.explanation.trim().slice(0, 800) : "",
+      modelAnswer: q.type === "subjective" && typeof q.modelAnswer === "string" ? q.modelAnswer.trim().slice(0, 3000) : "",
     }));
 
   if (questions.length === 0) {

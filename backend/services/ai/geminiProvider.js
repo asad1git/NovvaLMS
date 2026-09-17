@@ -3,7 +3,13 @@ const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODE
 
 // Structured-output schema — this is what CLAUDE.md's Sprint 5 goal calls
 // "JSON enforcement": Gemini is constrained to return exactly this shape,
-// so there's no free-text response to parse/guess at.
+// so there's no free-text response to parse/guess at. Every question
+// object always carries every field regardless of type (an mcq question's
+// "modelAnswer" is just an empty string, a subjective question's
+// "correctOptionIndex" is -1) — this keeps the exact same schema shape
+// working across all three providers, including OpenAI/NVIDIA's strict
+// JSON-schema mode, which requires every "required" field present on
+// every object, not conditionally.
 const QUIZ_SCHEMA = {
   type: "OBJECT",
   properties: {
@@ -12,35 +18,52 @@ const QUIZ_SCHEMA = {
       items: {
         type: "OBJECT",
         properties: {
+          type: { type: "STRING" },
           text: { type: "STRING" },
           options: { type: "ARRAY", items: { type: "STRING" } },
           correctOptionIndex: { type: "INTEGER" },
           topic: { type: "STRING" },
+          explanation: { type: "STRING" },
+          modelAnswer: { type: "STRING" },
         },
-        required: ["text", "options", "correctOptionIndex", "topic"],
+        required: ["type", "text", "options", "correctOptionIndex", "topic", "explanation", "modelAnswer"],
       },
     },
   },
   required: ["questions"],
 };
 
-function buildPrompt(text, numQuestions) {
+function buildPrompt(text, numQuestions, includeSubjective) {
+  const typeInstruction = includeSubjective
+    ? `Generate a MIX of question types: roughly 70% "mcq" (multiple-choice) and 30% "subjective" ` +
+      `(short-answer, requiring the student to explain a concept in their own words — deeper ` +
+      `understanding than a multiple-choice question can test).`
+    : `Generate ONLY "mcq" (multiple-choice) questions.`;
+
   return (
-    `You are helping a university teacher create a multiple-choice quiz from their lecture material.\n` +
-    `Generate exactly ${numQuestions} multiple-choice questions that test understanding of the material below.\n` +
-    `Each question must have exactly 4 options and exactly one correct answer (correctOptionIndex, 0-3).\n` +
-    `For each question, also include a short "topic" tag (1-3 words, e.g. "Arrays", "Recursion") ` +
-    `naming the specific concept it tests — this powers weak-topic analytics for students.\n` +
+    `You are helping a university teacher create a quiz from their lecture material.\n` +
+    `Generate exactly ${numQuestions} questions that test understanding of the material below. ${typeInstruction}\n\n` +
+    `For an "mcq" question: set "options" to exactly 4 non-empty strings and "correctOptionIndex" ` +
+    `to the 0-3 index of the correct one. Set "modelAnswer" to an empty string.\n` +
+    `For a "subjective" question: set "options" to an empty array and "correctOptionIndex" to -1. ` +
+    `Set "modelAnswer" to a strong sample answer a student could give — the teacher reviews this ` +
+    `before it's ever used to grade anything.\n\n` +
+    `For EVERY question, also include:\n` +
+    `- "topic": a short tag (1-3 words, e.g. "Arrays", "Recursion") naming the specific concept it ` +
+    `tests — this powers weak-topic analytics for students.\n` +
+    `- "explanation" (1-2 sentences): for an mcq question, why the correct option is right; for a ` +
+    `subjective question, what a strong answer should cover. This is shown to the student only ` +
+    `after they submit the quiz, so they can learn from what they got wrong.\n\n` +
     `Base every question strictly on the material — do not invent facts not present in it.\n\n` +
     `LECTURE MATERIAL:\n${text}`
   );
 }
 
 /**
- * generateQuiz({ text, numQuestions }) -> { questions: [...] }
+ * generateQuiz({ text, numQuestions, includeSubjective }) -> { questions: [...] }
  * `text` is lecture content only — never student PII, per CLAUDE.md's rule.
  */
-async function generateQuiz({ text, numQuestions }) {
+async function generateQuiz({ text, numQuestions, includeSubjective = false }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("AI generation is not configured — set GEMINI_API_KEY in .env");
@@ -50,7 +73,7 @@ async function generateQuiz({ text, numQuestions }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(text, numQuestions) }] }],
+      contents: [{ parts: [{ text: buildPrompt(text, numQuestions, includeSubjective) }] }],
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: QUIZ_SCHEMA,

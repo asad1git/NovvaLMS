@@ -123,4 +123,58 @@ const submitAttempt = asyncHandler(async (req, res) => {
   Promise.all(subjectiveQuestions.map((q) => draftGradeInBackground(attempt._id, q))).catch(() => {});
 });
 
-module.exports = { autosaveAnswer, submitAttempt };
+/**
+ * GET /api/attempts/:id/review (Student, own SUBMITTED attempt only)
+ * Reveals correctOptionIndex/explanation/modelAnswer — never available
+ * before this point (see Question.js's select:false on all three) — so a
+ * student can learn from what they got right or wrong. Deliberately
+ * gated on `attempt.submittedAt` existing: revealing the answer key to a
+ * student still mid-attempt would let them just look it up and finish
+ * the quiz with it, defeating the whole assessment.
+ */
+const getAttemptReview = asyncHandler(async (req, res) => {
+  const attempt = await QuizAttempt.findById(req.params.id);
+  if (!attempt) {
+    res.status(404);
+    throw new Error("Attempt not found");
+  }
+  if (String(attempt.student) !== String(req.user._id)) {
+    res.status(403);
+    throw new Error("This is not your attempt");
+  }
+  if (!attempt.submittedAt) {
+    res.status(400);
+    throw new Error("This attempt has not been submitted yet");
+  }
+
+  const [questions, answers] = await Promise.all([
+    Question.find({ quiz: attempt.quiz }).select("+correctOptionIndex +explanation +modelAnswer").sort({ order: 1 }),
+    Answer.find({ attempt: attempt._id }),
+  ]);
+  const answerByQuestion = new Map(answers.map((a) => [String(a.question), a]));
+
+  const review = questions.map((q) => {
+    const answer = answerByQuestion.get(String(q._id));
+    const isMcq = q.type !== "subjective";
+    return {
+      _id: q._id,
+      type: q.type,
+      text: q.text,
+      topic: q.topic,
+      explanation: q.explanation,
+      options: isMcq ? q.options : undefined,
+      correctOptionIndex: isMcq ? q.correctOptionIndex : undefined,
+      modelAnswer: isMcq ? undefined : q.modelAnswer,
+      studentSelectedOptionIndex: answer?.selectedOptionIndex ?? null,
+      studentTextAnswer: answer?.textAnswer ?? "",
+      isCorrect: isMcq ? answer?.selectedOptionIndex === q.correctOptionIndex : undefined,
+      gradeStatus: answer?.gradeStatus,
+      score: answer?.score ?? null,
+      feedback: answer?.feedback ?? "",
+    };
+  });
+
+  res.status(200).json({ success: true, data: review });
+});
+
+module.exports = { autosaveAnswer, submitAttempt, getAttemptReview };

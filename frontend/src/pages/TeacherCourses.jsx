@@ -65,6 +65,8 @@ const BLANK_QUESTION = () => ({
   correctOptionIndex: 0,
   maxScore: 5,
   topic: "",
+  explanation: "",
+  modelAnswer: "",
 });
 
 const FILE_CHIP = {
@@ -105,6 +107,7 @@ export default function TeacherCourses() {
 
   const [generateMaterialId, setGenerateMaterialId] = useState("");
   const [generateNumQuestions, setGenerateNumQuestions] = useState(5);
+  const [generateIncludeSubjective, setGenerateIncludeSubjective] = useState(false);
   const [generating, setGenerating] = useState(false);
 
   const [attendanceSessions, setAttendanceSessions] = useState([]);
@@ -381,7 +384,12 @@ export default function TeacherCourses() {
     setError("");
     setGenerating(true);
     try {
-      const drafted = await generateQuizQuestions(selectedCourse._id, generateMaterialId, Number(generateNumQuestions));
+      const drafted = await generateQuizQuestions(
+        selectedCourse._id,
+        generateMaterialId,
+        Number(generateNumQuestions),
+        generateIncludeSubjective
+      );
       setQuestions(drafted.map((q) => ({ ...q, maxScore: q.maxScore || 1 })));
     } catch (err) {
       setError(err.response?.data?.message || "AI quiz generation failed");
@@ -911,6 +919,14 @@ export default function TeacherCourses() {
                 </Button>
               </div>
             </div>
+            <label className="flex items-center gap-1.5 text-[11px] text-text-main mb-1">
+              <input
+                type="checkbox"
+                checked={generateIncludeSubjective}
+                onChange={(e) => setGenerateIncludeSubjective(e.target.checked)}
+              />
+              Include subjective (short-answer) questions, not just multiple-choice
+            </label>
             {materials.length === 0 && (
               <p className="text-[11px] text-text-muted">Upload a material first to enable AI generation.</p>
             )}
@@ -1026,6 +1042,24 @@ export default function TeacherCourses() {
                         <p className="text-[10px] text-text-muted">Select the radio button next to the correct option.</p>
                       </>
                     )}
+
+                    {q.type === "subjective" && (
+                      <textarea
+                        className={`w-full ${inputClass} px-2 py-1.5 text-xs min-h-[60px]`}
+                        placeholder="Model answer (optional) — a sample answer to guide grading. Never shown to the student before submission."
+                        value={q.modelAnswer || ""}
+                        onChange={(e) => updateQuestion(qi, { modelAnswer: e.target.value })}
+                        maxLength={3000}
+                      />
+                    )}
+
+                    <textarea
+                      className={`w-full ${inputClass} px-2 py-1.5 text-xs min-h-[44px]`}
+                      placeholder="Explanation (optional) — shown to the student after they submit, so they can learn from what they got wrong."
+                      value={q.explanation || ""}
+                      onChange={(e) => updateQuestion(qi, { explanation: e.target.value })}
+                      maxLength={800}
+                    />
                   </div>
                 ))}
 

@@ -1466,6 +1466,54 @@ question (capital of France) in the same conversation thread still correctly tri
 refusal, confirming the upgrade didn't loosen the "never invent an answer" guarantee. Confirmed in
 the real browser via Playwright too — zero console errors, correct citation pill rendered.
 
+**AI-quality initiative, part 3 — AI quiz generation gains explanations and subjective questions.**
+Two real gaps in `services/ai/*Provider.js#generateQuiz`: it was MCQ-only (a teacher's manual path
+already supported subjective questions, but AI generation never did), and no question — mcq or
+subjective — carried any explanation of the right answer, so a student who got something wrong
+learned nothing from it beyond the raw score.
+
+`Question` gained `explanation` and `modelAnswer`, both `select: false` — the exact same "don't
+leak the answer key early" treatment `correctOptionIndex` already has, since an explanation of the
+correct answer is just as much an answer-key leak as the index itself would be if shown to a
+student mid-attempt. `quizController.getQuizById` extends its existing manager-only
+`.select("+correctOptionIndex")` to also select these two for the owning teacher/admin (needed to
+review/edit an AI draft or a saved quiz); a student's view never includes them, before or during
+an attempt — confirmed live.
+
+All three AI providers' `generateQuiz` gained an `includeSubjective` param (default `false`,
+preserving the exact original MCQ-only behavior for anyone not opting in) and a `type` field per
+question. Every question, regardless of type, always carries every schema field with a sentinel
+for whichever doesn't apply — an mcq question's `modelAnswer` is `""`, a subjective question's
+`correctOptionIndex` is `-1` — because OpenAI/NVIDIA's `strict: true` JSON-schema mode requires
+every `required` field present on every object; Gemini's schema was kept identical on purpose so
+the exact same shape works regardless of which provider in the failover chain actually serves the
+call. A subjective question's `modelAnswer` is a real sample answer the AI drafts for the teacher
+to review — never used to grade anything automatically, matching this project's every other AI
+draft (HITL: the teacher's own saved question data is the only thing that's ever real).
+
+**Revealing the answer key required a genuinely new capability, not just a data change**: a new
+`GET /api/attempts/:id/review` (Student, own SUBMITTED attempt only — gated on `submittedAt`
+existing, so a student mid-attempt can never look up the answer key and finish with it) returns
+every question with `correctOptionIndex`/`explanation`/`modelAnswer` now selected, alongside that
+student's own answer and correctness. `QuizAttempt.jsx`'s result screen gained a "Review My
+Answers" toggle — expands into a per-question breakdown (correct option highlighted green, the
+student's wrong pick highlighted red if applicable, the explanation below, and for a subjective
+question the model answer plus the teacher's actual score/feedback once graded, or "Awaiting
+teacher review" until then).
+
+Verified end-to-end via the real API, not just a schema check: generated 3 questions from a real
+material with `includeSubjective: true` and got back a genuine mix (2 mcq + 1 subjective), every
+question carrying a real explanation, the subjective one carrying a real model answer. Saved and
+published the quiz, then confirmed the student's pre-submission view of it does NOT leak
+`explanation`/`modelAnswer`/`correctOptionIndex` (all three came back `undefined`). Submitted real
+answers (a mix of correct/incorrect), then confirmed the post-submission review correctly reveals
+all three fields, computes `isCorrect` accurately per mcq, and correctly shows the subjective
+answer as still `pending` (not yet graded). Confirmed an unrelated student gets 403 on someone
+else's attempt review. Followed by a Playwright pass on both surfaces — the teacher's question
+builder showing the generated mcq/subjective mix with editable explanation/model-answer fields,
+and the student's expanded "Review My Answers" section with correct green/red highlighting — zero
+console errors.
+
 ---
 
 ## Sprint Plan (2 weeks each)

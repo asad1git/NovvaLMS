@@ -12,9 +12,13 @@ import {
   IconCircleCheckFilled,
   IconCircleXFilled,
   IconLayoutDashboard,
+  IconChevronDown,
+  IconChevronUp,
+  IconCircleCheck,
+  IconCircleX,
 } from "@tabler/icons-react";
 import { useAuth } from "../context/AuthContext";
-import { getQuiz, startOrResumeAttempt, autosaveAnswer, submitAttempt } from "../api/quizzes";
+import { getQuiz, startOrResumeAttempt, autosaveAnswer, submitAttempt, getAttemptReview } from "../api/quizzes";
 import { LoadingState } from "../components/ui";
 
 function formatTime(ms) {
@@ -50,6 +54,9 @@ export default function QuizAttempt() {
   const [showModal, setShowModal] = useState(false);
   const [saveState, setSaveState] = useState("saved"); // "saving" | "saved"
   const [ringOffset, setRingOffset] = useState(377);
+  const [review, setReview] = useState(null);
+  const [showReview, setShowReview] = useState(false);
+  const [loadingReview, setLoadingReview] = useState(false);
 
   const selectionsRef = useRef(selections);
   selectionsRef.current = selections;
@@ -122,6 +129,20 @@ export default function QuizAttempt() {
     }
   }
 
+  async function handleToggleReview() {
+    if (!showReview && !review) {
+      setLoadingReview(true);
+      try {
+        setReview(await getAttemptReview(attempt._id));
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to load answer review");
+      } finally {
+        setLoadingReview(false);
+      }
+    }
+    setShowReview((v) => !v);
+  }
+
   // Countdown + auto-submit at zero.
   useEffect(() => {
     if (!attempt || attempt.submittedAt || result) return;
@@ -188,7 +209,11 @@ export default function QuizAttempt() {
     const mcqCount = questions.filter((q) => q.type !== "subjective").length;
     return (
       <div className="min-h-screen flex items-center justify-center bg-bg-page p-6">
-        <div className="bg-white rounded-xl border border-line shadow-[0_4px_24px_rgba(0,0,0,0.08)] text-center max-w-[480px] w-full px-12 py-11 animate-[fadeIn_0.3s_ease-in]">
+        <div
+          className={`bg-white rounded-xl border border-line shadow-[0_4px_24px_rgba(0,0,0,0.08)] text-center w-full px-12 py-11 animate-[fadeIn_0.3s_ease-in] transition-[max-width] duration-200 ${
+            showReview ? "max-w-[640px]" : "max-w-[480px]"
+          }`}
+        >
           <div className="text-[13px] font-semibold text-text-muted uppercase tracking-wide mb-5">Quiz Complete</div>
 
           <div className="relative w-[140px] h-[140px] mx-auto mb-6">
@@ -246,6 +271,87 @@ export default function QuizAttempt() {
               <div className="text-[11px] text-text-muted uppercase tracking-wide">MCQ</div>
             </div>
           </div>
+
+          <button
+            onClick={handleToggleReview}
+            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-navy-light hover:underline mb-5"
+          >
+            {loadingReview ? "Loading…" : showReview ? "Hide My Answers" : "Review My Answers"}
+            {!loadingReview && (showReview ? <IconChevronUp size={15} /> : <IconChevronDown size={15} />)}
+          </button>
+
+          {showReview && review && (
+            <div className="text-left mb-8 max-h-[420px] overflow-y-auto space-y-3 pr-1">
+              {review.map((q, qi) => (
+                <div key={q._id} className="border border-line rounded-[8px] p-3.5 bg-bg-page">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="text-[13px] font-semibold text-text-main">
+                      Q{qi + 1}. {q.text}
+                    </div>
+                    {q.type === "mcq" &&
+                      (q.isCorrect ? (
+                        <IconCircleCheck size={18} className="text-success flex-shrink-0" />
+                      ) : (
+                        <IconCircleX size={18} className="text-badge-red-text flex-shrink-0" />
+                      ))}
+                  </div>
+
+                  {q.type === "mcq" ? (
+                    <div className="space-y-1 mb-2">
+                      {q.options.map((opt, oi) => {
+                        const isCorrectOpt = oi === q.correctOptionIndex;
+                        const isStudentPick = oi === q.studentSelectedOptionIndex;
+                        return (
+                          <div
+                            key={oi}
+                            className={`text-xs px-2.5 py-1.5 rounded-[6px] border ${
+                              isCorrectOpt
+                                ? "border-success bg-badge-green-bg text-badge-green-text font-medium"
+                                : isStudentPick
+                                ? "border-badge-red-text bg-badge-red-bg text-badge-red-text"
+                                : "border-line bg-white text-text-muted"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + oi)}. {opt}
+                            {isCorrectOpt && " (Correct)"}
+                            {isStudentPick && !isCorrectOpt && " (Your answer)"}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 mb-2 text-xs">
+                      <div className="bg-white border border-line rounded-[6px] px-2.5 py-1.5">
+                        <span className="text-text-muted">Your answer: </span>
+                        {q.studentTextAnswer || <span className="italic text-text-muted">No answer given</span>}
+                      </div>
+                      {q.gradeStatus === "graded" ? (
+                        <div className="bg-badge-blue-bg border border-navy-light/20 rounded-[6px] px-2.5 py-1.5">
+                          <span className="font-medium text-navy">Score: {q.score}</span>
+                          {q.feedback && <span className="text-text-main"> — {q.feedback}</span>}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-badge-amber-text">Awaiting teacher review</div>
+                      )}
+                      {q.modelAnswer && (
+                        <div className="bg-white border border-line rounded-[6px] px-2.5 py-1.5">
+                          <span className="text-text-muted">Model answer: </span>
+                          {q.modelAnswer}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {q.explanation && (
+                    <div className="text-[11px] text-text-muted leading-[1.5] pt-1.5 border-t border-line">
+                      <span className="font-semibold text-text-main">Explanation: </span>
+                      {q.explanation}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex gap-3 justify-center">
             <button

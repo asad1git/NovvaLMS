@@ -8,9 +8,9 @@ export function createQuiz(courseId, payload) {
   return api.post(`/courses/${courseId}/quizzes`, payload).then((r) => r.data.data);
 }
 
-export function generateQuizQuestions(courseId, materialId, numQuestions) {
+export function generateQuizQuestions(courseId, materialId, numQuestions, includeSubjective = false) {
   return api
-    .post(`/courses/${courseId}/quizzes/generate`, { materialId, numQuestions })
+    .post(`/courses/${courseId}/quizzes/generate`, { materialId, numQuestions, includeSubjective })
     .then((r) => r.data.data.questions);
 }
 
@@ -40,6 +40,10 @@ export function autosaveAnswer(attemptId, questionId, value) {
 
 export function submitAttempt(attemptId) {
   return api.post(`/attempts/${attemptId}/submit`).then((r) => r.data.data);
+}
+
+export function getAttemptReview(attemptId) {
+  return api.get(`/attempts/${attemptId}/review`).then((r) => r.data.data);
 }
 
 export function getPendingGrades() {
