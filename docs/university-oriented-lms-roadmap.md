@@ -152,10 +152,11 @@ honest that full generality on items 6 and 8 isn't worth chasing.
 
 ## Where this was left
 
-**Update:** the user decided to proceed. **Items 1, 2, and 4 are done** — the Course/
-CourseOffering split, Term, and GPA/transcripts — see CLAUDE.md's "University-oriented Phase 1"
-and "Phase 2" entries for the full writeups, including the deliberate choice to wipe and reseed
-existing data fresh rather than migrate it, the RBAC boundary tests that specifically verified
-the highest-risk item on this list, and the actual GPA math confirmed correct end-to-end (not
-just that the page renders). Items 3, 5, 6, 7, and 8 (self-service registration, narrower roles,
+**Update:** the user decided to proceed. **Items 1, 2, 3, and 4 are done** — the Course/
+CourseOffering split, Term, self-service registration, and GPA/transcripts — see CLAUDE.md's
+"University-oriented Phase 1/2/3" entries for the full writeups. Notably, item 3's flagged
+technical blocker (seat-capacity races) turned out to be solvable *without* the multi-document
+transactions this doc originally assumed were necessary — a single atomic conditional update on
+one document's own two fields (`enrolledCount` vs `capacity`) is simpler and more portable,
+working even on standalone MongoDB, not just Atlas. Items 5, 6, 7, and 8 (narrower roles,
 scheduling, fee automation, degree audit) are still just this planning discussion.

@@ -8,9 +8,11 @@ import StudentOverview from "./StudentOverview";
 import AccountSettings from "./AccountSettings";
 import Attendance from "./Attendance";
 import Transcript from "./Transcript";
+import Register from "./Register";
 
 const NAV_ITEMS = [
   "Dashboard",
+  "Register",
   "My Courses",
   "My Results",
   "Analytics",
@@ -25,7 +27,9 @@ export default function StudentDashboard() {
 
   return (
     <DashboardShell role="Student" navItems={NAV_ITEMS} activeNav={activeNav} onNavClick={setActiveNav}>
-      {activeNav === "My Courses" ? (
+      {activeNav === "Register" ? (
+        <Register />
+      ) : activeNav === "My Courses" ? (
         <StudentCourses />
       ) : activeNav === "Novva Assistant" ? (
         <ChatBot />

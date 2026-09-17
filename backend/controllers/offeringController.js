@@ -25,6 +25,9 @@ function flattenOffering(offering) {
     teacher: offering.teacher,
     term: offering.term,
     sectionLabel: offering.sectionLabel,
+    capacity: offering.capacity,
+    enrolledCount: offering.enrolledCount,
+    seatsRemaining: offering.capacity - offering.enrolledCount,
     isActive: offering.isActive,
     createdAt: offering.createdAt,
   };
@@ -36,7 +39,7 @@ function flattenOffering(offering) {
  * "who teaches what, when" fact a real timetable/roster hangs off.
  */
 const createOffering = asyncHandler(async (req, res) => {
-  const { courseId, termId, teacherId, sectionLabel } = req.body;
+  const { courseId, termId, teacherId, sectionLabel, capacity } = req.body;
 
   if (!courseId || !termId || !teacherId) {
     res.status(400);
@@ -68,6 +71,7 @@ const createOffering = asyncHandler(async (req, res) => {
       term: term._id,
       teacher: teacher._id,
       sectionLabel: sectionLabel || "A",
+      capacity: capacity ? Number(capacity) : undefined,
     });
   } catch (err) {
     if (err.code === 11000) {

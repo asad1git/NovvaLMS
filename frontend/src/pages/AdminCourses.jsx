@@ -25,13 +25,31 @@ export default function AdminCourses() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [termForm, setTermForm] = useState({ name: "", startDate: "", endDate: "" });
+  const [termForm, setTermForm] = useState({
+    name: "",
+    startDate: "",
+    endDate: "",
+    registrationOpensAt: "",
+    registrationClosesAt: "",
+  });
   const [creatingTerm, setCreatingTerm] = useState(false);
 
-  const [catalogForm, setCatalogForm] = useState({ title: "", code: "", description: "", creditHours: 3 });
+  const [catalogForm, setCatalogForm] = useState({
+    title: "",
+    code: "",
+    description: "",
+    creditHours: 3,
+    prerequisites: [],
+  });
   const [creatingCatalog, setCreatingCatalog] = useState(false);
 
-  const [offeringForm, setOfferingForm] = useState({ courseId: "", termId: "", teacherId: "", sectionLabel: "A" });
+  const [offeringForm, setOfferingForm] = useState({
+    courseId: "",
+    termId: "",
+    teacherId: "",
+    sectionLabel: "A",
+    capacity: 30,
+  });
   const [creatingOffering, setCreatingOffering] = useState(false);
 
   const [selectedOffering, setSelectedOffering] = useState(null);
@@ -66,7 +84,7 @@ export default function AdminCourses() {
     setError("");
     try {
       await createTerm(termForm);
-      setTermForm({ name: "", startDate: "", endDate: "" });
+      setTermForm({ name: "", startDate: "", endDate: "", registrationOpensAt: "", registrationClosesAt: "" });
       setTerms(await listTerms());
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create term");
@@ -81,7 +99,7 @@ export default function AdminCourses() {
     setError("");
     try {
       await createCourse(catalogForm);
-      setCatalogForm({ title: "", code: "", description: "", creditHours: 3 });
+      setCatalogForm({ title: "", code: "", description: "", creditHours: 3, prerequisites: [] });
       setCatalog(await listCatalogCourses());
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create catalog course");
@@ -96,7 +114,7 @@ export default function AdminCourses() {
     setError("");
     try {
       await createOffering(offeringForm);
-      setOfferingForm({ courseId: "", termId: "", teacherId: "", sectionLabel: "A" });
+      setOfferingForm({ courseId: "", termId: "", teacherId: "", sectionLabel: "A", capacity: 30 });
       setOfferings(await listCourses());
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create offering");
@@ -177,10 +195,32 @@ export default function AdminCourses() {
               required
             />
           </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Registration Opens (optional)</label>
+            <input
+              type="datetime-local"
+              className={inputClass}
+              value={termForm.registrationOpensAt}
+              onChange={(e) => setTermForm({ ...termForm, registrationOpensAt: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Registration Closes (optional)</label>
+            <input
+              type="datetime-local"
+              className={inputClass}
+              value={termForm.registrationClosesAt}
+              onChange={(e) => setTermForm({ ...termForm, registrationClosesAt: e.target.value })}
+            />
+          </div>
           <Button type="submit" disabled={creatingTerm} className="sm:col-span-3 w-fit">
             {creatingTerm ? "Creating…" : "Create Term"}
           </Button>
         </form>
+        <p className="text-[11px] text-text-muted mb-3">
+          Leave the registration window blank if students shouldn't self-register into this term
+          yet — a missing window is always treated as closed, never as "always open."
+        </p>
         <div className="flex flex-wrap gap-1.5">
           {terms.length === 0 && <p className="text-[11px] text-text-muted">No terms created yet.</p>}
           {terms.map((t) => (
@@ -237,6 +277,28 @@ export default function AdminCourses() {
               onChange={(e) => setCatalogForm({ ...catalogForm, creditHours: e.target.value })}
               required
             />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-[11px] text-text-muted mb-1">
+              Prerequisites (optional — Ctrl/Cmd-click to select multiple)
+            </label>
+            <select
+              multiple
+              className={`w-full bg-white ${inputClass} h-[72px]`}
+              value={catalogForm.prerequisites}
+              onChange={(e) =>
+                setCatalogForm({
+                  ...catalogForm,
+                  prerequisites: Array.from(e.target.selectedOptions, (o) => o.value),
+                })
+              }
+            >
+              {catalog.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.code} — {c.title}
+                </option>
+              ))}
+            </select>
           </div>
           <Button type="submit" disabled={creatingCatalog} className="sm:col-span-3 w-fit">
             {creatingCatalog ? "Creating…" : "Add to Catalog"}
@@ -316,6 +378,17 @@ export default function AdminCourses() {
               onChange={(e) => setOfferingForm({ ...offeringForm, sectionLabel: e.target.value })}
             />
           </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Capacity</label>
+            <input
+              type="number"
+              min="1"
+              className={inputClass}
+              value={offeringForm.capacity}
+              onChange={(e) => setOfferingForm({ ...offeringForm, capacity: e.target.value })}
+              required
+            />
+          </div>
           <Button type="submit" disabled={creatingOffering} className="sm:col-span-4 w-fit">
             {creatingOffering ? "Creating…" : "Create Offering"}
           </Button>
@@ -346,6 +419,11 @@ export default function AdminCourses() {
                   {o.term?.name && (
                     <span className="inline-flex items-center gap-0.5">
                       <IconCalendarStats size={12} /> {o.term.name}
+                    </span>
+                  )}
+                  {o.capacity !== undefined && (
+                    <span>
+                      · {o.seatsRemaining}/{o.capacity} seats left
                     </span>
                   )}
                 </div>

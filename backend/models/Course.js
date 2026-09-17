@@ -37,6 +37,17 @@ const courseSchema = new mongoose.Schema(
       min: [1, "Credit hours must be at least 1"],
       default: 3,
     },
+    // Courses (not offerings) a student must have a passing finalized
+    // Grade in, in ANY term/offering, before self-registering into an
+    // offering of THIS course. Lives on the catalog entry, not the
+    // offering, since a prerequisite requirement is a property of the
+    // course itself, independent of which term/section is being taken.
+    prerequisites: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Course",
+      },
+    ],
     isActive: {
       type: Boolean,
       default: true,

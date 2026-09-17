@@ -14,14 +14,20 @@ const { flattenOffering } = require("./offeringController");
  * teacher+term is the separate POST /api/offerings step.
  */
 const createCourse = asyncHandler(async (req, res) => {
-  const { title, code, description } = req.body;
+  const { title, code, description, creditHours, prerequisites } = req.body;
 
   if (!title || !code) {
     res.status(400);
     throw new Error("Title and code are required");
   }
 
-  const course = await Course.create({ title, code: code.toUpperCase(), description });
+  const course = await Course.create({
+    title,
+    code: code.toUpperCase(),
+    description,
+    creditHours: creditHours ? Number(creditHours) : undefined,
+    prerequisites: prerequisites || [],
+  });
   res.status(201).json({ success: true, data: course });
 });
 
@@ -127,6 +133,11 @@ const bulkEnrollFromCSV = asyncHandler(async (req, res) => {
 
     try {
       await Enrollment.create({ student: student._id, courseOffering: offering._id });
+      // Admin enrollment is an override — never capacity-checked, unlike
+      // registrationController's self-service path — but enrolledCount
+      // still needs to reflect it, so "seats remaining" stays accurate
+      // regardless of which path put a student in the seat.
+      await CourseOffering.updateOne({ _id: offering._id }, { $inc: { enrolledCount: 1 } });
       enrolled.push(email);
     } catch (err) {
       if (err.code === 11000) {

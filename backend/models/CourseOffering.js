@@ -37,6 +37,23 @@ const courseOfferingSchema = new mongoose.Schema(
       default: "A",
       maxlength: [10, "Section label cannot exceed 10 characters"],
     },
+    // Seat limit + a running count, checked and incremented together in one
+    // atomic findOneAndUpdate (see registrationController.js) — not via a
+    // multi-document transaction. A single document's own atomicity is
+    // actually the simpler, more portable fix for the classic "two students
+    // grab the last seat at once" race: it works even on a standalone
+    // (non-replica-set) MongoDB, unlike a transaction.
+    capacity: {
+      type: Number,
+      required: [true, "Capacity is required"],
+      min: [1, "Capacity must be at least 1"],
+      default: 30,
+    },
+    enrolledCount: {
+      type: Number,
+      default: 0,
+      min: [0, "Enrolled count cannot go negative"],
+    },
     isActive: {
       type: Boolean,
       default: true,

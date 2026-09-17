@@ -1075,6 +1075,61 @@ correctly shows `B (85%)`; that same student's `Transcript` page correctly shows
 matching cumulative GPA — the actual GPA math confirmed correct, not just that the page renders.
 Zero console errors throughout.
 
+**University-oriented Phase 3 — self-service registration, post-backlog.** Item 3 from
+`docs/university-oriented-lms-roadmap.md`, the item flagged in that doc as having a real
+technical blocker: seat-capacity races under concurrent requests. **Solved without needing
+Atlas's transaction support after all** — a single atomic `findOneAndUpdate` with
+`$expr: { $lt: ["$enrolledCount", "$capacity"] }` (comparing two fields of the *same* document)
+reserves a seat, since MongoDB guarantees a single document's own update is atomic regardless of
+topology. Simpler and more portable than a multi-document transaction would have been — works
+even on standalone (non-replica-set) MongoDB, so the local dev DB and Atlas behave identically
+here. `CourseOffering` gained `capacity`/`enrolledCount`; if the post-`Enrollment.create()` step
+fails for any reason (most commonly: already enrolled, via the unique index), the reserved seat
+is explicitly released again — the increment must never outlive a failed enrollment.
+
+`Term` gained a registration window (`registrationOpensAt`/`registrationClosesAt`), deliberately
+separate from its own academic date range — real registration windows open well before a term
+starts, not for its whole duration — and treated as **closed** whenever either bound is unset,
+never as "always open," so missing data can't accidentally grant access. `Course` gained
+`prerequisites` (other Course refs) — `registrationController.getUnmetPrerequisites` checks for
+a passing (`finalLetter !== "F"`) *finalized* `Grade` in each prerequisite, in any term/offering,
+directly reusing Phase 2's `Grade` model — a concrete example of Phase 2 paying forward into
+Phase 3, not just Phase 1 into Phase 2.
+
+New `GET /api/registration/offerings` (Student — offerings in the active/given term the student
+isn't already in, each with seats remaining and which prerequisites, if any, are still unmet),
+`POST /api/registration/offerings/:id` (register, enforcing window + prerequisites + the atomic
+capacity reservation, in that order), `DELETE /api/registration/offerings/:id` (drop — not gated
+on the registration window, matching how most real registrars separate a drop deadline from
+registration itself, which this pass doesn't model separately). New student-facing **Register**
+page (currently-enrolled list with a Drop action, available-offerings list with seats/
+prerequisite status and a Register action) and matching admin UI additions to
+`AdminCourses.jsx`: registration-window fields on Term, a prerequisites multi-select on the
+catalog form, a capacity field on the offering form. `bulkEnrollFromCSV` (admin's existing
+enrollment path) now also increments `enrolledCount` — never capacity-checked, since admin
+enrollment is a deliberate override, but the seats-remaining display needs to stay accurate
+regardless of which path actually filled a seat.
+
+**Caught and fixed two real bugs during verification, both the same shape**: `createCourse`
+never actually read `prerequisites` OR `creditHours` off `req.body` — both new fields silently
+fell back to their schema defaults (`[]` and `3`) no matter what an admin typed into the form.
+Caught the `prerequisites` miss immediately (a student who should have been blocked from a
+course wasn't); the `creditHours` miss had been silently live since Phase 2 and was only caught
+now with a dedicated non-default-value test — Phase 2's own verification had only confirmed the
+*existing*, backfilled courses computed GPA correctly, never that a *newly created* course
+actually persisted a submitted credit-hours value. Fixed by destructuring both fields into the
+`Course.create()` call; the one catalog course already created through the buggy path during
+this session's own verification was corrected with a direct one-off update rather than deleting
+and recreating it.
+
+Verified end-to-end: a student without a passing `CS201` grade is correctly shown "Missing
+prerequisite(s)" with Register disabled for a course requiring it; a student who does have one
+registers successfully; a capacity-1 offering correctly shows "Full" to a second student once the
+first has taken the seat, and correctly frees back up the moment the first student drops it — the
+actual race-condition-safe seat accounting confirmed working, not just the happy path. Zero
+console errors throughout, plus a final full-app regression pass across all three roles' existing
+nav items to confirm nothing else in the app regressed from these model changes.
+
 ---
 
 ## Sprint Plan (2 weeks each)

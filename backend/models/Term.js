@@ -22,6 +22,21 @@ const termSchema = new mongoose.Schema(
       type: Date,
       required: [true, "End date is required"],
     },
+    // Self-registration is only allowed inside this window — deliberately
+    // separate from startDate/endDate above (a term's own academic dates)
+    // since registration typically opens well before a term starts and
+    // closes shortly after it begins, not for its whole duration. Optional:
+    // a term with either unset is treated as registration-closed (see
+    // registrationController.isRegistrationOpen), never as "always open" —
+    // missing data should never accidentally grant access.
+    registrationOpensAt: {
+      type: Date,
+      default: null,
+    },
+    registrationClosesAt: {
+      type: Date,
+      default: null,
+    },
     // Exactly one Term is expected to be "current" at a time in normal use
     // (enforced by convention/UI, not a DB constraint — a second admin
     // marking a different term current is a real scenario, not a bug),
