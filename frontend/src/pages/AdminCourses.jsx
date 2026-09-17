@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconBooks, IconCertificate, IconCalendarStats } from "@tabler/icons-react";
+import { IconBooks, IconCertificate, IconCalendarStats, IconTrash, IconPlus } from "@tabler/icons-react";
 import {
   listCourses,
   createCourse,
@@ -17,6 +17,12 @@ import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui"
 const inputClass =
   "border border-line rounded px-3 py-2 text-xs transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function describeSlot(slot) {
+  return `${DAY_NAMES[slot.dayOfWeek]} ${slot.startTime}–${slot.endTime}${slot.room ? ` · ${slot.room}` : ""}`;
+}
 
 export default function AdminCourses() {
   const [offerings, setOfferings] = useState([]);
@@ -52,6 +58,7 @@ export default function AdminCourses() {
     teacherId: "",
     sectionLabel: "A",
     capacity: 30,
+    schedule: [],
   });
   const [creatingOffering, setCreatingOffering] = useState(false);
 
@@ -124,13 +131,29 @@ export default function AdminCourses() {
     setError("");
     try {
       await createOffering(offeringForm);
-      setOfferingForm({ courseId: "", termId: "", teacherId: "", sectionLabel: "A", capacity: 30 });
+      setOfferingForm({ courseId: "", termId: "", teacherId: "", sectionLabel: "A", capacity: 30, schedule: [] });
       setOfferings(await listCourses());
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create offering");
     } finally {
       setCreatingOffering(false);
     }
+  }
+
+  function addScheduleSlot() {
+    setOfferingForm({
+      ...offeringForm,
+      schedule: [...offeringForm.schedule, { dayOfWeek: 1, startTime: "09:00", endTime: "10:00", room: "" }],
+    });
+  }
+
+  function updateScheduleSlot(index, field, value) {
+    const schedule = offeringForm.schedule.map((s, i) => (i === index ? { ...s, [field]: value } : s));
+    setOfferingForm({ ...offeringForm, schedule });
+  }
+
+  function removeScheduleSlot(index) {
+    setOfferingForm({ ...offeringForm, schedule: offeringForm.schedule.filter((_, i) => i !== index) });
   }
 
   async function openOffering(offering) {
@@ -414,6 +437,61 @@ export default function AdminCourses() {
               required
             />
           </div>
+          <div className="sm:col-span-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] text-text-muted">
+                Weekly Schedule (optional — enables conflict detection for teacher double-booking
+                and student overlapping sections)
+              </label>
+              <button
+                type="button"
+                onClick={addScheduleSlot}
+                className="text-[11px] text-navy-light hover:underline flex items-center gap-1"
+              >
+                <IconPlus size={12} /> Add meeting time
+              </button>
+            </div>
+            {offeringForm.schedule.length > 0 && (
+              <div className="space-y-2 mb-2">
+                {offeringForm.schedule.map((slot, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-center">
+                    <select
+                      className={`w-full bg-white ${inputClass}`}
+                      value={slot.dayOfWeek}
+                      onChange={(e) => updateScheduleSlot(i, "dayOfWeek", Number(e.target.value))}
+                    >
+                      {DAY_NAMES.map((d, idx) => (
+                        <option key={idx} value={idx}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="time"
+                      className={inputClass}
+                      value={slot.startTime}
+                      onChange={(e) => updateScheduleSlot(i, "startTime", e.target.value)}
+                    />
+                    <input
+                      type="time"
+                      className={inputClass}
+                      value={slot.endTime}
+                      onChange={(e) => updateScheduleSlot(i, "endTime", e.target.value)}
+                    />
+                    <input
+                      className={inputClass}
+                      placeholder="Room (optional)"
+                      value={slot.room}
+                      onChange={(e) => updateScheduleSlot(i, "room", e.target.value)}
+                    />
+                    <button type="button" onClick={() => removeScheduleSlot(i)} className="text-badge-red-text">
+                      <IconTrash size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <Button type="submit" disabled={creatingOffering} className="sm:col-span-4 w-fit">
             {creatingOffering ? "Creating…" : "Create Offering"}
           </Button>
@@ -452,6 +530,11 @@ export default function AdminCourses() {
                     </span>
                   )}
                 </div>
+                {o.schedule?.length > 0 && (
+                  <div className="text-[11px] text-text-muted mt-0.5">
+                    {o.schedule.map(describeSlot).join(" · ")}
+                  </div>
+                )}
               </div>
               <Badge variant={o.isActive ? "green" : "red"}>{o.isActive ? "Active" : "Inactive"}</Badge>
             </div>

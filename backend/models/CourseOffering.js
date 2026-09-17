@@ -54,6 +54,39 @@ const courseOfferingSchema = new mongoose.Schema(
       default: 0,
       min: [0, "Enrolled count cannot go negative"],
     },
+    // A manually-entered weekly meeting pattern — deliberately NOT an
+    // auto-generated optimal timetable (a genuinely hard constraint-
+    // satisfaction problem real SIS vendors have whole teams for, per the
+    // roadmap doc's own risk assessment; out of scope here). Empty by
+    // default so every pre-existing offering stays valid unchanged and is
+    // simply never conflict-checked (see utils/scheduleConflict.js) — a
+    // missing schedule can never itself cause or block a conflict.
+    schedule: [
+      {
+        dayOfWeek: {
+          type: Number,
+          min: 0,
+          max: 6,
+          required: true,
+        },
+        startTime: {
+          type: String,
+          required: true,
+          match: [/^([01]\d|2[0-3]):[0-5]\d$/, "startTime must be in HH:MM 24-hour format"],
+        },
+        endTime: {
+          type: String,
+          required: true,
+          match: [/^([01]\d|2[0-3]):[0-5]\d$/, "endTime must be in HH:MM 24-hour format"],
+        },
+        room: {
+          type: String,
+          trim: true,
+          maxlength: [40, "Room cannot exceed 40 characters"],
+          default: "",
+        },
+      },
+    ],
     isActive: {
       type: Boolean,
       default: true,

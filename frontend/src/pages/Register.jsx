@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
-import { IconCalendarStats, IconLock, IconUsersGroup } from "@tabler/icons-react";
+import { IconCalendarStats, IconLock, IconUsersGroup, IconClockHour4 } from "@tabler/icons-react";
 import { getRegistrationOfferings, registerForOffering, dropOffering } from "../api/registration";
 import { listCourses } from "../api/courses";
 import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function describeSchedule(schedule) {
+  if (!schedule?.length) return null;
+  return schedule.map((s) => `${DAY_NAMES[s.dayOfWeek]} ${s.startTime}–${s.endTime}${s.room ? ` · ${s.room}` : ""}`).join(" · ");
+}
 
 export default function Register() {
   const [data, setData] = useState(null);
@@ -108,6 +115,9 @@ export default function Register() {
                   {o.code} — {o.title}
                 </div>
                 <div className="text-[11px] text-text-muted">Teacher: {o.teacher?.name || "—"}</div>
+                {describeSchedule(o.schedule) && (
+                  <div className="text-[11px] text-text-muted">{describeSchedule(o.schedule)}</div>
+                )}
               </div>
               <Button
                 size="sm"
@@ -131,7 +141,8 @@ export default function Register() {
           {data.offerings.map((o) => {
             const full = o.seatsRemaining <= 0;
             const blocked = o.unmetPrerequisites.length > 0;
-            const disabled = !data.registrationOpen || full || blocked || actingId === o._id;
+            const conflicted = !!o.scheduleConflictWith;
+            const disabled = !data.registrationOpen || full || blocked || conflicted || actingId === o._id;
             return (
               <div key={o._id} className="border border-line rounded-card p-3.5">
                 <div className="flex items-center justify-between gap-2">
@@ -143,6 +154,9 @@ export default function Register() {
                       Teacher: {o.teacher?.name || "—"} · {o.creditHours} credit hours ·{" "}
                       {o.seatsRemaining}/{o.capacity} seats left
                     </div>
+                    {describeSchedule(o.schedule) && (
+                      <div className="text-[11px] text-text-muted">{describeSchedule(o.schedule)}</div>
+                    )}
                   </div>
                   <Button size="sm" onClick={() => handleRegister(o._id)} disabled={disabled}>
                     {actingId === o._id ? "Registering…" : full ? "Full" : "Register"}
@@ -152,6 +166,12 @@ export default function Register() {
                   <div className="mt-2 flex items-start gap-1.5 text-[11px] text-badge-red-text">
                     <IconLock size={13} className="flex-shrink-0 mt-px" />
                     Missing prerequisite(s): {o.unmetPrerequisites.join(", ")}
+                  </div>
+                )}
+                {conflicted && (
+                  <div className="mt-2 flex items-start gap-1.5 text-[11px] text-badge-red-text">
+                    <IconClockHour4 size={13} className="flex-shrink-0 mt-px" />
+                    Schedule conflict with {o.scheduleConflictWith}
                   </div>
                 )}
               </div>

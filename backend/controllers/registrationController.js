@@ -4,6 +4,23 @@ const Course = require("../models/Course");
 const Term = require("../models/Term");
 const Enrollment = require("../models/Enrollment");
 const Grade = require("../models/Grade");
+const { findScheduleConflict, describeSlot } = require("../utils/scheduleConflict");
+
+/**
+ * Every schedule-bearing CourseOffering this student is currently enrolled
+ * in for the given term — the comparison set for both
+ * getRegistrationOfferings' surfaced hint and registerForOffering's actual
+ * enforcement, computed once rather than duplicated in each.
+ */
+async function getStudentScheduleInTerm(studentId, termId) {
+  const enrollments = await Enrollment.find({ student: studentId }).populate({
+    path: "courseOffering",
+    match: { term: termId },
+    select: "schedule term course",
+    populate: { path: "course", select: "code" },
+  });
+  return enrollments.filter((e) => e.courseOffering).map((e) => e.courseOffering);
+}
 
 /**
  * A term's registration window is separate from its own academic dates
@@ -67,10 +84,19 @@ const getRegistrationOfferings = asyncHandler(async (req, res) => {
     .sort({ createdAt: 1 });
 
   const open = isRegistrationOpen(term);
+  const myScheduleThisTerm = await getStudentScheduleInTerm(req.user._id, term._id);
 
   const data = await Promise.all(
     offerings.map(async (o) => {
       const unmet = await getUnmetPrerequisites(req.user._id, o.course);
+      let scheduleConflictWith = null;
+      for (const enrolled of myScheduleThisTerm) {
+        const conflict = findScheduleConflict(o.schedule, enrolled.schedule);
+        if (conflict) {
+          scheduleConflictWith = `${enrolled.course.code} (${describeSlot(conflict.b)})`;
+          break;
+        }
+      }
       return {
         _id: o._id,
         title: o.course.title,
@@ -78,9 +104,11 @@ const getRegistrationOfferings = asyncHandler(async (req, res) => {
         creditHours: o.course.creditHours,
         teacher: o.teacher,
         sectionLabel: o.sectionLabel,
+        schedule: o.schedule,
         seatsRemaining: o.capacity - o.enrolledCount,
         capacity: o.capacity,
         unmetPrerequisites: unmet.map((p) => `${p.code} — ${p.title}`),
+        scheduleConflictWith,
       };
     })
   );
@@ -121,6 +149,21 @@ const registerForOffering = asyncHandler(async (req, res) => {
   if (unmet.length > 0) {
     res.status(400);
     throw new Error(`Missing prerequisite(s): ${unmet.map((p) => `${p.code} — ${p.title}`).join(", ")}`);
+  }
+
+  // Enforced here too, not just surfaced as a hint by getRegistrationOfferings
+  // — same "server is the real boundary" principle as the seat-capacity
+  // check right below (a determined student could otherwise just POST
+  // straight past a disabled button).
+  const myScheduleThisTerm = await getStudentScheduleInTerm(req.user._id, offering.term);
+  for (const enrolled of myScheduleThisTerm) {
+    const conflict = findScheduleConflict(offering.schedule, enrolled.schedule);
+    if (conflict) {
+      res.status(400);
+      throw new Error(
+        `Schedule conflict with ${enrolled.course.code} — you're already enrolled in a section meeting ${describeSlot(conflict.b)}`
+      );
+    }
   }
 
   const reserved = await CourseOffering.findOneAndUpdate(

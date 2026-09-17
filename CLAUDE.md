@@ -90,6 +90,9 @@ to OpenAI/Gemini. Only academic content goes in the prompt.
 
 ## Database — 26 MongoDB Collections
 
+`CourseOffering` also gained an embedded `schedule` array (see "University-oriented item 6"
+further down) — not a new collection, so the count below is unchanged by it.
+
 `Users, Courses, Terms, CourseOfferings, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
 Answers, ChatSessions, Messages, FeeChallans, FeeStructures, SalarySlips, ParentLinks,
 ParentChatSessions, ParentMessages, Notifications, AttendanceSessions, AttendanceRecords,
@@ -1234,6 +1237,57 @@ a correct 5-offering registration list, a 403 for an unlinked student, and a 403
 full link listing. Followed by a Playwright pass logging into all three new dashboards plus the
 two new Admin nav items ("Departments," "Advisor Links") and the conditional HOD department-picker
 on the Create User form — all rendering real data, zero console errors.
+
+**University-oriented item 6 (scheduling and conflict detection) is now built** — scoped exactly
+as the roadmap doc split it: *checking* a manually-built schedule for conflicts is what got built;
+*auto-generating* an optimal timetable from scratch stayed explicitly out of scope, flagged there
+as a genuinely hard constraint-satisfaction problem real SIS vendors have whole teams for.
+
+`CourseOffering` gained an embedded `schedule` array — `{dayOfWeek (0–6), startTime, endTime
+("HH:MM" 24-hour strings), room}` per weekly meeting slot, entered manually on the offering-
+creation form, not generated. Empty by default so every pre-existing offering stays valid
+unchanged and is simply never conflict-checked — `utils/scheduleConflict.js#findScheduleConflict`
+treats a missing schedule on either side as "nothing to conflict," never as an automatic match.
+Times are compared as plain strings (`"09:00" < "10:30"`) rather than parsed into `Date` objects
+— correct and dependency-free for zero-padded 24-hour `HH:MM`, which the schema's own regex
+enforces.
+
+**Teacher double-booking** is checked in `offeringController.createOffering`: before creating a
+new offering with a non-empty schedule, every other offering the same teacher already has *in the
+same Term* is checked for an overlapping slot, and a conflict is a flat 400 naming the colliding
+course and the exact overlapping time — deliberately scoped to "same term" only (this project's
+`Term` model doesn't enforce non-overlapping date ranges across terms, and guarding against a
+teacher double-booked across two terms that happen to overlap in real dates wasn't asked for).
+
+**Student double-booking** is checked in `registrationController.registerForOffering` — a new
+`getStudentScheduleInTerm(studentId, termId)` helper (shared with `getRegistrationOfferings`, so
+the exact same comparison logic backs both) computes what the student is already enrolled in for
+that term, and a conflict is rejected the same way the seat-capacity check right below it already
+is: enforced server-side, not just surfaced as a disabled button, so a determined student can't
+just POST straight past the UI (the exact same principle already established for the quiz time
+limit). `getRegistrationOfferings` ALSO surfaces this as a `scheduleConflictWith` field per
+offering — the same "tell the frontend *why* a button is disabled instead of just failing on
+click" pattern `unmetPrerequisites` already established — so `Register.jsx` can show a real reason
+("Schedule conflict with SCHA101 (Monday 09:00–10:30)") next to a disabled Register button, not
+just a generic rejection after the fact.
+
+`AdminCourses.jsx`'s offering-creation form (reused as-is by `RegistrarDashboard.jsx`, so a
+Registrar gets this for free) gained an "Add meeting time" row builder — day dropdown, two time
+inputs, an optional room field, one row per weekly slot — and every offering listing everywhere
+(`AdminCourses.jsx`'s own list, `Register.jsx`'s "Currently Enrolled" and "Available Offerings")
+now shows the schedule inline when one exists.
+
+Verified end-to-end via direct API calls with exact assertions, not just happy-path checks: a
+teacher assigned an overlapping second offering was correctly rejected with a message naming the
+real conflicting course and time; a back-to-back slot (one offering ending exactly when another
+starts, `10:00`–`10:30` immediately followed by `10:30`–`11:30`) was correctly accepted as NOT
+overlapping — a real boundary-condition check, not just "any two slots on the same day conflict."
+A student enrolled in one offering was then correctly blocked from registering into a second,
+differently-taught offering with an overlapping time — confirming the conflict check is genuinely
+schedule-based, not a same-teacher-only check — and the exact same conflict was independently
+confirmed to already be visible as a `scheduleConflictWith` hint before the student ever clicked
+Register. Followed by a Playwright pass confirming the schedule builder, the inline schedule
+display, and the disabled-button-with-reason all render correctly with zero console errors.
 
 ---
 

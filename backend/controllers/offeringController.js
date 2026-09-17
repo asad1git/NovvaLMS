@@ -3,6 +3,7 @@ const Course = require("../models/Course");
 const Term = require("../models/Term");
 const CourseOffering = require("../models/CourseOffering");
 const User = require("../models/User");
+const { findScheduleConflict, describeSlot } = require("../utils/scheduleConflict");
 
 /**
  * Flattens a populated CourseOffering into the same shape the old, pre-split
@@ -25,6 +26,7 @@ function flattenOffering(offering) {
     teacher: offering.teacher,
     term: offering.term,
     sectionLabel: offering.sectionLabel,
+    schedule: offering.schedule,
     capacity: offering.capacity,
     enrolledCount: offering.enrolledCount,
     seatsRemaining: offering.capacity - offering.enrolledCount,
@@ -39,7 +41,7 @@ function flattenOffering(offering) {
  * "who teaches what, when" fact a real timetable/roster hangs off.
  */
 const createOffering = asyncHandler(async (req, res) => {
-  const { courseId, termId, teacherId, sectionLabel, capacity } = req.body;
+  const { courseId, termId, teacherId, sectionLabel, capacity, schedule } = req.body;
 
   if (!courseId || !termId || !teacherId) {
     res.status(400);
@@ -64,6 +66,26 @@ const createOffering = asyncHandler(async (req, res) => {
     throw new Error("teacherId must belong to an existing teacher account");
   }
 
+  // Teacher double-booking check — scoped to the same Term only, since
+  // that's the practical case a real registrar hits (this project's Term
+  // model doesn't enforce non-overlapping date ranges across terms, and
+  // guarding against that theoretical edge wasn't asked for). A missing
+  // schedule on either side never conflicts (see findScheduleConflict).
+  if (schedule?.length > 0) {
+    const teacherOfferingsThisTerm = await CourseOffering.find({ term: term._id, teacher: teacher._id })
+      .select("schedule")
+      .populate("course", "code");
+    for (const existing of teacherOfferingsThisTerm) {
+      const conflict = findScheduleConflict(schedule, existing.schedule);
+      if (conflict) {
+        res.status(400);
+        throw new Error(
+          `${teacher.name} is already teaching ${existing.course.code} at ${describeSlot(conflict.b)}, which overlaps ${describeSlot(conflict.a)}`
+        );
+      }
+    }
+  }
+
   let offering;
   try {
     offering = await CourseOffering.create({
@@ -72,6 +94,7 @@ const createOffering = asyncHandler(async (req, res) => {
       teacher: teacher._id,
       sectionLabel: sectionLabel || "A",
       capacity: capacity ? Number(capacity) : undefined,
+      schedule: schedule || [],
     });
   } catch (err) {
     if (err.code === 11000) {
