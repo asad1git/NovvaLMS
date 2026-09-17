@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const asyncHandler = require("express-async-handler");
-const Course = require("../models/Course");
+const CourseOffering = require("../models/CourseOffering");
 const Enrollment = require("../models/Enrollment");
 const Assignment = require("../models/Assignment");
 const AssignmentSubmission = require("../models/AssignmentSubmission");
@@ -96,16 +96,17 @@ async function draftAssignmentGradeInBackground(assignment, submissionId) {
 
 /**
  * POST /api/courses/:id/assignments (Admin or the course's Teacher)
- * The question document + a due date the teacher picks now — the deadline
- * that later decides on-time vs. late for every submission.
+ * :id is a CourseOffering id. The question document + a due date the
+ * teacher picks now — the deadline that later decides on-time vs. late for
+ * every submission.
  */
 const createAssignment = asyncHandler(async (req, res) => {
-  const course = await Course.findById(req.params.id);
-  if (!course) {
+  const offering = await CourseOffering.findById(req.params.id).populate("course", "title");
+  if (!offering) {
     res.status(404);
     throw new Error("Course not found");
   }
-  assertCourseManager(req.user, res, course);
+  assertCourseManager(req.user, res, offering);
 
   const { title, description, dueDate, maxScore } = req.body;
   if (!title || !dueDate || !maxScore) {
@@ -116,7 +117,7 @@ const createAssignment = asyncHandler(async (req, res) => {
   const { fileType, textExtractionWarning } = await verifyAndCheckUpload(req, res, ASSIGNMENT_QUESTIONS_DIR);
 
   const assignment = await Assignment.create({
-    course: course._id,
+    courseOffering: offering._id,
     createdBy: req.user._id,
     title,
     description: description || "",
@@ -129,13 +130,13 @@ const createAssignment = asyncHandler(async (req, res) => {
     textExtractionWarning,
   });
 
-  const enrollments = await Enrollment.find({ course: course._id }).select("student");
+  const enrollments = await Enrollment.find({ courseOffering: offering._id }).select("student");
   await notifyUsers(
     enrollments.map((e) => e.student),
     {
       type: "assignment_posted",
       title: `New assignment: "${assignment.title}"`,
-      message: `A new assignment has been posted in ${course.title}, due ${new Date(assignment.dueDate).toLocaleString()}.`,
+      message: `A new assignment has been posted in ${offering.course.title}, due ${new Date(assignment.dueDate).toLocaleString()}.`,
     }
   );
 
@@ -143,9 +144,10 @@ const createAssignment = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /api/courses/:id/assignments — same envelope shape regardless of
- * role ({ assignments }), role-appropriate contents per entry, matching
- * attendanceController.listSessions' own pattern:
+ * GET /api/courses/:id/assignments — :id is a CourseOffering id. Same
+ * envelope shape regardless of role ({ assignments }), role-appropriate
+ * contents per entry, matching attendanceController.listSessions' own
+ * pattern:
  *  - Admin/Teacher: submissionStats (submitted/late/graded counts against
  *    the current roster size).
  *  - Student: their own submission status (or null if not yet submitted)
@@ -153,13 +155,13 @@ const createAssignment = asyncHandler(async (req, res) => {
  *    "Submit Late".
  */
 const getAssignmentsForCourse = asyncHandler(async (req, res) => {
-  const course = await assertCourseAccess(req.user, res, req.params.id);
-  const assignments = await Assignment.find({ course: course._id }).sort({ dueDate: -1 });
-  const isManager = req.user.role === "admin" || String(course.teacher) === String(req.user._id);
+  const offering = await assertCourseAccess(req.user, res, req.params.id);
+  const assignments = await Assignment.find({ courseOffering: offering._id }).sort({ dueDate: -1 });
+  const isManager = req.user.role === "admin" || String(offering.teacher) === String(req.user._id);
   const now = new Date();
 
   if (isManager) {
-    const totalEnrolled = await Enrollment.countDocuments({ course: course._id });
+    const totalEnrolled = await Enrollment.countDocuments({ courseOffering: offering._id });
     const data = await Promise.all(
       assignments.map(async (a) => {
         const submissions = await AssignmentSubmission.find({ assignment: a._id });
@@ -203,7 +205,7 @@ const downloadAssignmentFile = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Assignment not found");
   }
-  await assertCourseAccess(req.user, res, assignment.course);
+  await assertCourseAccess(req.user, res, assignment.courseOffering);
 
   const filePath = path.join(ASSIGNMENT_QUESTIONS_DIR, assignment.fileUrl);
   res.download(filePath, assignment.fileName);
@@ -225,8 +227,7 @@ const submitAssignment = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Assignment not found");
   }
-  const course = await Course.findById(assignment.course);
-  const enrolled = await Enrollment.exists({ student: req.user._id, course: course._id });
+  const enrolled = await Enrollment.exists({ student: req.user._id, courseOffering: assignment.courseOffering });
   if (!enrolled) {
     res.status(403);
     throw new Error("You are not enrolled in this course");
@@ -287,12 +288,12 @@ const getSubmissionsForAssignment = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Assignment not found");
   }
-  const course = await Course.findById(assignment.course);
-  assertCourseManager(req.user, res, course);
+  const offering = await CourseOffering.findById(assignment.courseOffering);
+  assertCourseManager(req.user, res, offering);
 
   const [submissions, enrollments] = await Promise.all([
     AssignmentSubmission.find({ assignment: assignment._id }).populate("student", "name email").sort({ submittedAt: 1 }),
-    Enrollment.find({ course: course._id }).populate("student", "name email"),
+    Enrollment.find({ courseOffering: offering._id }).populate("student", "name email"),
   ]);
 
   const submittedIds = new Set(submissions.map((s) => String(s.student._id)));
@@ -317,8 +318,8 @@ const downloadSubmissionFile = asyncHandler(async (req, res) => {
   const isOwner = String(submission.student) === String(req.user._id);
   if (!isOwner) {
     const assignment = await Assignment.findById(submission.assignment);
-    const course = await Course.findById(assignment.course);
-    assertCourseManager(req.user, res, course);
+    const offering = await CourseOffering.findById(assignment.courseOffering);
+    assertCourseManager(req.user, res, offering);
   }
 
   const filePath = path.join(ASSIGNMENT_SUBMISSIONS_DIR, submission.fileUrl);
@@ -340,8 +341,8 @@ const gradeSubmission = asyncHandler(async (req, res) => {
   }
 
   const assignment = await Assignment.findById(submission.assignment);
-  const course = await Course.findById(assignment.course);
-  assertCourseManager(req.user, res, course);
+  const offering = await CourseOffering.findById(assignment.courseOffering).populate("course", "title");
+  assertCourseManager(req.user, res, offering);
 
   const { score, feedback } = req.body;
   if (score === undefined || score === null || score < 0 || score > assignment.maxScore) {
@@ -359,7 +360,7 @@ const gradeSubmission = asyncHandler(async (req, res) => {
   await notifyUsers([submission.student], {
     type: "assignment_graded",
     title: `Your assignment "${assignment.title}" has been graded`,
-    message: `Your grade for "${assignment.title}" in ${course.title} is now final: ${submission.score}/${assignment.maxScore}.`,
+    message: `Your grade for "${assignment.title}" in ${offering.course.title} is now final: ${submission.score}/${assignment.maxScore}.`,
   });
 
   res.status(200).json({ success: true, data: submission });

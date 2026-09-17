@@ -83,12 +83,18 @@ to OpenAI/Gemini. Only academic content goes in the prompt.
 
 ---
 
-## Database — 20 MongoDB Collections
+## Database — 22 MongoDB Collections
 
-`Users, Courses, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
+`Users, Courses, Terms, CourseOfferings, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
 Answers, ChatSessions, Messages, FeeChallans, SalarySlips, ParentLinks,
 ParentChatSessions, ParentMessages, Notifications, AttendanceSessions, AttendanceRecords,
 Assignments, AssignmentSubmissions`
+
+**`Courses` is a pure catalog now** (title/code/description — no `teacher`); **`CourseOfferings`**
+(course + term + teacher + sectionLabel) is the actual taught instance everything else attaches
+to. `Enrollments`/`Materials`/`Quizzes`/`Assignments`/`AttendanceSessions`/`ChatSessions` all point
+at a `CourseOffering` via their `courseOffering` field, not at `Course` directly — see the
+"University-oriented Phase 1" entry further down for why.
 
 `ParentLinks` (added for the parent-portal feature, post-backlog) maps a
 `parent`-role User to a `student`-role User — same join-collection shape as
@@ -953,6 +959,71 @@ Verified via Playwright at a 390px phone width across all three roles and every 
 (including a real Gemini chatbot exchange grounded in uploaded material, and the quiz-taking
 flow) — zero horizontal page overflow anywhere, zero console errors — and re-verified at the
 original 1280px desktop width to confirm pixel-identical behavior to before this pass.
+
+**University-oriented Phase 1 — the Course/CourseOffering split + Term, post-backlog.** The start
+of a second, larger phase beyond the original 47-point backlog (see
+`docs/university-oriented-lms-roadmap.md` for the full planning discussion this executes on).
+Previously `Course` was one flat object — a single `teacher` field, no notion of when it was
+taught — meaning the same course taught by two teachers, or across two different terms, was a
+data-modeling contradiction. This was flagged in that roadmap doc as the **highest-risk** item on
+the list specifically because it required rewriting the RBAC gate (`assertCourseAccess`/
+`assertCourseManager`, used by nearly every route in the app) — not because it was conceptually
+hard.
+
+Two new collections: `Term` (an academic calendar anchor — name, date range, `isActive`) and
+`CourseOffering` (`course` + `term` + `teacher` + `sectionLabel` — the actual taught instance,
+"CS201, Section A, Fall 2026, taught by Dr. Khan"). `Course` itself is now a pure catalog
+entry — title/code/description only, `teacher` removed entirely. Every collection that used to
+point at `Course` (`Enrollment`, `Material`, `Quiz`, `Assignment`, `AttendanceSession`,
+`ChatSession`) now points at `CourseOffering` instead via a renamed `courseOffering` field —
+enrollment, materials, quizzes, assignments, attendance, and chat are all inherently
+offering-level concepts (a real registration is into a specific section/term, not "the course" in
+the abstract).
+
+**Deliberately minimal API/frontend churn**, despite the model-layer rewrite being real and
+thorough: `GET /api/courses` (used everywhere as "my courses," role-scoped exactly as before)
+now returns `CourseOffering`s, but flattened server-side
+(`offeringController.js#flattenOffering`) back into the exact shape a plain `Course` used to
+have — `title`/`code`/`teacher` still directly on the object, `_id` still the id every
+sub-resource (materials/quizzes/assignments/attendance/chat) already expects. Every existing
+frontend page that reads `course.title`/`course.teacher` off that list — `TeacherCourses`,
+`StudentCourses`, `ChatBot`, `Analytics`, `Attendance`, `GradeApprovals`, all three Overview
+pages — needed **zero changes**. Only `AdminCourses.jsx` (which now manages the real
+catalog/term/offering split directly) and `api/courses.js` (new `listCatalogCourses`/
+`listTerms`/`createTerm`/`createOffering` functions) changed on the frontend. New endpoints:
+`POST/GET /api/terms`, `POST /api/offerings`, `GET /api/courses/catalog` — the last one
+registered before the `/:id` wildcard route specifically so `"catalog"` itself is never captured
+as an `:id` value.
+
+Admin's "Create Course" workflow is now genuinely two steps instead of one, and that's a
+deliberate, correct UX change, not an oversight: **Academic Terms** → **Course Catalog** (title/
+code/description, no teacher) → **Course Offerings** (assign a catalog course to a teacher for a
+term) — matching how a real university actually works, where a course exists independent of who
+teaches it or when.
+
+**Existing data was wiped and reseeded fresh** (both local dev Mongo and the Render/Atlas demo
+database) rather than migrated in place — a deliberate choice, since everything in both
+databases was test/seed data from this project's own verification passes, not anything real; a
+careful backward-migration script would have been strictly more risk for data that didn't need
+to survive. Reseeded: one "Fall 2026" `Term`, three catalog courses (CS201/DB101/OOP231), three
+`CourseOffering`s (Dr. Khan teaching CS201+DB101, Prof. Malik teaching OOP231), and enrollments
+for the three main demo student accounts across all three. Caught and fixed a real migration
+gotcha in the process: the OLD unique index on `Enrollment`/`ChatSession` (`student_1_course_1`)
+was still on the collection after the field rename to `courseOffering` — `deleteMany` clears
+documents, not indexes, so every fresh document had `course: undefined`, colliding on that stale
+index for any student enrolled in more than one offering. Fixed by explicitly dropping those
+indexes before reseeding (the real app recreates the correct ones on `courseOffering` via
+Mongoose's `autoIndex`).
+
+Verified end-to-end via Playwright across all three roles (admin creating a term/catalog
+course/offering through the real UI, a teacher's "My Courses" correctly showing only her own two
+offerings — confirmed a cross-teacher colleague's third offering is correctly absent, materials
+upload and quiz creation both working through the new offering-scoped routes, a student seeing
+all three enrolled offerings, the chatbot and analytics pages loading cleanly) with zero console
+errors, **plus the RBAC boundary this migration was riskiest for, tested directly via the API**:
+a teacher who doesn't teach a given offering gets 403 on both its roster (`assertCourseManager`)
+and its materials (`assertCourseAccess`), and an unauthenticated request gets 401 — confirming the
+rewritten gate actually holds, not just that the happy path works.
 
 ---
 

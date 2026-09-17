@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const asyncHandler = require("express-async-handler");
-const Course = require("../models/Course");
+const CourseOffering = require("../models/CourseOffering");
 const Material = require("../models/Material");
 const { assertCourseAccess, assertCourseManager } = require("../utils/courseAccess");
 const { MATERIALS_DIR } = require("../middleware/uploadMiddleware");
@@ -12,12 +12,12 @@ const { checkExtractability } = require("../utils/checkExtractability");
  * US-04 — POST /api/courses/:id/materials (Admin or the course's Teacher)
  */
 const uploadMaterial = asyncHandler(async (req, res) => {
-  const course = await Course.findById(req.params.id);
-  if (!course) {
+  const offering = await CourseOffering.findById(req.params.id);
+  if (!offering) {
     res.status(404);
     throw new Error("Course not found");
   }
-  assertCourseManager(req.user, res, course);
+  assertCourseManager(req.user, res, offering);
 
   if (!req.file) {
     res.status(400);
@@ -41,7 +41,7 @@ const uploadMaterial = asyncHandler(async (req, res) => {
   const textExtractionWarning = await checkExtractability(filePath, fileType);
 
   const material = await Material.create({
-    course: course._id,
+    courseOffering: offering._id,
     uploadedBy: req.user._id,
     title: req.body.title || req.file.originalname,
     fileName: req.file.originalname,
@@ -59,8 +59,8 @@ const uploadMaterial = asyncHandler(async (req, res) => {
  * enrolled Student.
  */
 const getMaterials = asyncHandler(async (req, res) => {
-  const course = await assertCourseAccess(req.user, res, req.params.id);
-  const materials = await Material.find({ course: course._id }).sort({ createdAt: -1 });
+  const offering = await assertCourseAccess(req.user, res, req.params.id);
+  const materials = await Material.find({ courseOffering: offering._id }).sort({ createdAt: -1 });
   res.status(200).json({ success: true, data: materials });
 });
 
@@ -76,7 +76,7 @@ const downloadMaterial = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Material not found");
   }
-  await assertCourseAccess(req.user, res, material.course);
+  await assertCourseAccess(req.user, res, material.courseOffering);
 
   const filePath = path.join(MATERIALS_DIR, material.fileUrl);
   res.download(filePath, material.fileName);
@@ -99,8 +99,8 @@ const replaceMaterial = asyncHandler(async (req, res) => {
     throw new Error("Material not found");
   }
 
-  const course = await Course.findById(material.course);
-  assertCourseManager(req.user, res, course);
+  const offering = await CourseOffering.findById(material.courseOffering);
+  assertCourseManager(req.user, res, offering);
 
   if (!req.file) {
     res.status(400);
@@ -144,8 +144,8 @@ const deleteMaterial = asyncHandler(async (req, res) => {
     throw new Error("Material not found");
   }
 
-  const course = await Course.findById(material.course);
-  assertCourseManager(req.user, res, course);
+  const offering = await CourseOffering.findById(material.courseOffering);
+  assertCourseManager(req.user, res, offering);
 
   fs.unlink(path.join(MATERIALS_DIR, material.fileUrl), () => {}); // best-effort
   await material.deleteOne();

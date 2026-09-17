@@ -1,6 +1,6 @@
 const path = require("path");
 const asyncHandler = require("express-async-handler");
-const Course = require("../models/Course");
+const CourseOffering = require("../models/CourseOffering");
 const Enrollment = require("../models/Enrollment");
 const Material = require("../models/Material");
 const Assignment = require("../models/Assignment");
@@ -16,35 +16,35 @@ const NO_CONTEXT_REPLY = "I do not have enough context from the uploaded materia
 const HISTORY_TURNS = 6; // recent messages kept for conversational continuity
 
 async function assertEnrolled(req, res) {
-  const course = await Course.findById(req.params.id);
-  if (!course) {
+  const offering = await CourseOffering.findById(req.params.id);
+  if (!offering) {
     res.status(404);
     throw new Error("Course not found");
   }
-  const enrolled = await Enrollment.exists({ student: req.user._id, course: course._id });
+  const enrolled = await Enrollment.exists({ student: req.user._id, courseOffering: offering._id });
   if (!enrolled) {
     res.status(403);
     throw new Error("You are not enrolled in this course");
   }
-  return course;
+  return offering;
 }
 
-async function getOrCreateSession(studentId, courseId) {
-  let session = await ChatSession.findOne({ student: studentId, course: courseId });
+async function getOrCreateSession(studentId, offeringId) {
+  let session = await ChatSession.findOne({ student: studentId, courseOffering: offeringId });
   if (!session) {
-    session = await ChatSession.create({ student: studentId, course: courseId });
+    session = await ChatSession.create({ student: studentId, courseOffering: offeringId });
   }
   return session;
 }
 
 /**
- * Builds { chunksWithSource } from every material in the course — PDF,
- * PPTX, and DOCX all supported via `ragEngine.extractText`'s per-fileType
- * dispatch. Kept simple (re-extracted per request, no caching) — reasonable
- * at this project's scale; see CLAUDE.md for the tradeoff note.
+ * Builds { chunksWithSource } from every material in the course offering —
+ * PDF, PPTX, and DOCX all supported via `ragEngine.extractText`'s
+ * per-fileType dispatch. Kept simple (re-extracted per request, no caching)
+ * — reasonable at this project's scale; see CLAUDE.md for the tradeoff note.
  */
-async function buildCourseChunks(courseId) {
-  const materials = await Material.find({ course: courseId });
+async function buildCourseChunks(offeringId) {
+  const materials = await Material.find({ courseOffering: offeringId });
   const chunksWithSource = [];
 
   for (const material of materials) {
@@ -80,8 +80,8 @@ function formatMaterialsList(materials) {
  * an assignment's _id must never be pushed into that array; assignment
  * content grounds answers here without ever becoming a citation pill).
  */
-async function buildAssignmentChunks(courseId) {
-  const assignments = await Assignment.find({ course: courseId });
+async function buildAssignmentChunks(offeringId) {
+  const assignments = await Assignment.find({ courseOffering: offeringId });
   const chunksWithSource = [];
 
   for (const assignment of assignments) {
@@ -163,11 +163,12 @@ function buildRequestedMaterialSection(mentionedMaterials, chunksWithSource) {
 }
 
 /**
- * US-07 — GET /api/courses/:id/chat/messages (Student, enrolled)
+ * US-07 — GET /api/courses/:id/chat/messages (Student, enrolled). :id is a
+ * CourseOffering id.
  */
 const getMessages = asyncHandler(async (req, res) => {
-  const course = await assertEnrolled(req, res);
-  const session = await ChatSession.findOne({ student: req.user._id, course: course._id });
+  const offering = await assertEnrolled(req, res);
+  const session = await ChatSession.findOne({ student: req.user._id, courseOffering: offering._id });
   if (!session) {
     return res.status(200).json({ success: true, data: [] });
   }
@@ -180,22 +181,23 @@ const getMessages = asyncHandler(async (req, res) => {
 });
 
 /**
- * US-07 — POST /api/courses/:id/chat/messages (Student, enrolled)
- * RAG steps 1-5 per CLAUDE.md: extract -> chunk -> select relevant chunks
- * -> inject as context -> strict "context-only" system prompt for lecture
- * content. Also gives the assistant course-scoped weak-area awareness
- * (reusing the same aggregation US-11's Analytics page uses), a list of
- * every uploaded material, and — when the question names a material
- * directly ("summarize Week 1 Slides") — that material's full extracted
- * content, since a title reference rarely shares vocabulary with the
- * file's actual body text and would otherwise miss `selectRelevantChunks`'s
- * keyword scoring entirely. None of "what's been uploaded", "where am I
- * weak", or "summarize <material>" are lecture-content questions, so the
- * RAG chunk gate shouldn't block any of them. Assignments (question docs +
- * due dates) get the exact same treatment via a parallel, separately-tagged
- * chunk pool (`buildAssignmentChunks`) — kept out of `sourceMaterialIds`
- * since `Message.sources` is `ref: "Material"` only, so an Assignment's
- * `_id` would never resolve there.
+ * US-07 — POST /api/courses/:id/chat/messages (Student, enrolled). :id is a
+ * CourseOffering id. RAG steps 1-5 per CLAUDE.md: extract -> chunk ->
+ * select relevant chunks -> inject as context -> strict "context-only"
+ * system prompt for lecture content. Also gives the assistant
+ * offering-scoped weak-area awareness (reusing the same aggregation US-11's
+ * Analytics page uses), a list of every uploaded material, and — when the
+ * question names a material directly ("summarize Week 1 Slides") — that
+ * material's full extracted content, since a title reference rarely shares
+ * vocabulary with the file's actual body text and would otherwise miss
+ * `selectRelevantChunks`'s keyword scoring entirely. None of "what's been
+ * uploaded", "where am I weak", or "summarize <material>" are
+ * lecture-content questions, so the RAG chunk gate shouldn't block any of
+ * them. Assignments (question docs + due dates) get the exact same
+ * treatment via a parallel, separately-tagged chunk pool
+ * (`buildAssignmentChunks`) — kept out of `sourceMaterialIds` since
+ * `Message.sources` is `ref: "Material"` only, so an Assignment's `_id`
+ * would never resolve there.
  *
  * The zero-cost refusal (no AI call at all) is reserved for the genuinely
  * empty case — no matched chunks, no named-material/assignment match, no
@@ -208,7 +210,7 @@ const getMessages = asyncHandler(async (req, res) => {
  * verbatim).
  */
 const sendMessage = asyncHandler(async (req, res) => {
-  const course = await assertEnrolled(req, res);
+  const offering = await assertEnrolled(req, res);
 
   const { content } = req.body;
   if (!content || !content.trim()) {
@@ -216,7 +218,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     throw new Error("Message content is required");
   }
 
-  const session = await getOrCreateSession(req.user._id, course._id);
+  const session = await getOrCreateSession(req.user._id, offering._id);
 
   const userMessage = await Message.create({ session: session._id, role: "user", content: content.trim() });
 
@@ -227,11 +229,11 @@ const sendMessage = asyncHandler(async (req, res) => {
   const history = priorMessages.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
 
   const [chunksWithSource, materials, assignmentChunksWithSource, assignments, analytics] = await Promise.all([
-    buildCourseChunks(course._id),
-    Material.find({ course: course._id }).select("title fileType"),
-    buildAssignmentChunks(course._id),
-    Assignment.find({ course: course._id }).select("title dueDate description"),
-    computeAnalyticsForStudent(req.user._id, { courseId: course._id }),
+    buildCourseChunks(offering._id),
+    Material.find({ courseOffering: offering._id }).select("title fileType"),
+    buildAssignmentChunks(offering._id),
+    Assignment.find({ courseOffering: offering._id }).select("title dueDate description"),
+    computeAnalyticsForStudent(req.user._id, { courseOfferingId: offering._id }),
   ]);
   const relevant = selectRelevantChunks(chunksWithSource, content, 5);
   const mentionedMaterials = findMentionedMaterials(content, materials);

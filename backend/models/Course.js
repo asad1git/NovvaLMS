@@ -1,5 +1,10 @@
 const mongoose = require("mongoose");
 
+// A pure catalog entry — "CS201, Data Structures" exists once, forever,
+// independent of who teaches it or when. `teacher` used to live here;
+// it moved to CourseOffering (see that model's comment) since a course
+// can be taught by different teachers in different terms, or even
+// multiple teachers/sections in the same term.
 const courseSchema = new mongoose.Schema(
   {
     title: {
@@ -21,11 +26,6 @@ const courseSchema = new mongoose.Schema(
       trim: true,
       maxlength: [1000, "Description cannot exceed 1000 characters"],
       default: "",
-    },
-    teacher: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Teacher is required"],
     },
     isActive: {
       type: Boolean,

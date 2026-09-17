@@ -10,17 +10,22 @@ const Answer = require("../models/Answer");
  * place that defines what "a student's analytics" means. See
  * `getMyAnalytics` for the resolution rules this follows.
  *
- * `courseId` (optional) scopes the result to just that course's quizzes —
- * used by the chatbot, which is a per-course conversation and shouldn't
- * cite weak topics that actually came from a different course's quizzes.
+ * `courseOfferingId` (optional) scopes the result to just that offering's
+ * quizzes — used by the chatbot, which is a per-offering conversation and
+ * shouldn't cite weak topics that actually came from a different course's
+ * quizzes.
  */
-async function computeAnalyticsForStudent(studentId, { courseId } = {}) {
+async function computeAnalyticsForStudent(studentId, { courseOfferingId } = {}) {
   let attempts = await QuizAttempt.find({ student: studentId, submittedAt: { $ne: null } })
-    .populate({ path: "quiz", select: "title course", populate: { path: "course", select: "title" } })
+    .populate({
+      path: "quiz",
+      select: "title courseOffering",
+      populate: { path: "courseOffering", select: "course", populate: { path: "course", select: "title" } },
+    })
     .sort({ submittedAt: -1 });
 
-  if (courseId) {
-    attempts = attempts.filter((a) => a.quiz && String(a.quiz.course?._id) === String(courseId));
+  if (courseOfferingId) {
+    attempts = attempts.filter((a) => a.quiz && String(a.quiz.courseOffering?._id) === String(courseOfferingId));
   }
 
   const attemptResults = [];
@@ -57,8 +62,8 @@ async function computeAnalyticsForStudent(studentId, { courseId } = {}) {
       attemptId: attempt._id,
       quizId: attempt.quiz._id,
       quizTitle: attempt.quiz.title,
-      courseId: attempt.quiz.course?._id || null,
-      courseTitle: attempt.quiz.course?.title || "",
+      courseId: attempt.quiz.courseOffering?._id || null,
+      courseTitle: attempt.quiz.courseOffering?.course?.title || "",
       submittedAt: attempt.submittedAt,
       score: attempt.score,
       maxScore: attempt.maxScore,
@@ -106,7 +111,9 @@ async function computeAnalyticsForStudent(studentId, { courseId } = {}) {
  * awaiting HITL review.
  */
 const getMyAnalytics = asyncHandler(async (req, res) => {
-  const data = await computeAnalyticsForStudent(req.user._id, { courseId: req.query.courseId || undefined });
+  const data = await computeAnalyticsForStudent(req.user._id, {
+    courseOfferingId: req.query.courseId || undefined,
+  });
   res.status(200).json({ success: true, data });
 });
 

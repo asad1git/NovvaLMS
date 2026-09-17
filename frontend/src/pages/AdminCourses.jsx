@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
-import { IconBooks, IconCertificate } from "@tabler/icons-react";
-import { listCourses, createCourse, listTeachers, bulkEnrollCSV, getEnrollments } from "../api/courses";
+import { IconBooks, IconCertificate, IconCalendarStats } from "@tabler/icons-react";
+import {
+  listCourses,
+  createCourse,
+  listCatalogCourses,
+  listTerms,
+  createTerm,
+  createOffering,
+  listTeachers,
+  bulkEnrollCSV,
+  getEnrollments,
+} from "../api/courses";
 import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
 
 const inputClass =
@@ -8,26 +18,40 @@ const inputClass =
   "focus:outline-none focus:border-navy-light focus:ring-1 focus:ring-navy-light/30";
 
 export default function AdminCourses() {
-  const [courses, setCourses] = useState([]);
+  const [offerings, setOfferings] = useState([]);
+  const [catalog, setCatalog] = useState([]);
+  const [terms, setTerms] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [form, setForm] = useState({ title: "", code: "", description: "", teacherId: "" });
-  const [creating, setCreating] = useState(false);
+  const [termForm, setTermForm] = useState({ name: "", startDate: "", endDate: "" });
+  const [creatingTerm, setCreatingTerm] = useState(false);
 
-  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [catalogForm, setCatalogForm] = useState({ title: "", code: "", description: "" });
+  const [creatingCatalog, setCreatingCatalog] = useState(false);
+
+  const [offeringForm, setOfferingForm] = useState({ courseId: "", termId: "", teacherId: "", sectionLabel: "A" });
+  const [creatingOffering, setCreatingOffering] = useState(false);
+
+  const [selectedOffering, setSelectedOffering] = useState(null);
   const [roster, setRoster] = useState([]);
   const [csvFile, setCsvFile] = useState(null);
   const [enrollResult, setEnrollResult] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
 
+  async function refreshAll() {
+    const [o, c, t, teach] = await Promise.all([listCourses(), listCatalogCourses(), listTerms(), listTeachers()]);
+    setOfferings(o);
+    setCatalog(c);
+    setTerms(t);
+    setTeachers(teach);
+  }
+
   useEffect(() => {
     (async () => {
       try {
-        const [c, t] = await Promise.all([listCourses(), listTeachers()]);
-        setCourses(c);
-        setTeachers(t);
+        await refreshAll();
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load courses");
       } finally {
@@ -36,38 +60,68 @@ export default function AdminCourses() {
     })();
   }, []);
 
-  async function handleCreate(e) {
+  async function handleCreateTerm(e) {
     e.preventDefault();
-    setCreating(true);
+    setCreatingTerm(true);
     setError("");
     try {
-      await createCourse(form);
-      setForm({ title: "", code: "", description: "", teacherId: "" });
-      setCourses(await listCourses());
+      await createTerm(termForm);
+      setTermForm({ name: "", startDate: "", endDate: "" });
+      setTerms(await listTerms());
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to create course");
+      setError(err.response?.data?.message || "Failed to create term");
     } finally {
-      setCreating(false);
+      setCreatingTerm(false);
     }
   }
 
-  async function openCourse(course) {
-    setSelectedCourse(course);
+  async function handleCreateCatalog(e) {
+    e.preventDefault();
+    setCreatingCatalog(true);
+    setError("");
+    try {
+      await createCourse(catalogForm);
+      setCatalogForm({ title: "", code: "", description: "" });
+      setCatalog(await listCatalogCourses());
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to create catalog course");
+    } finally {
+      setCreatingCatalog(false);
+    }
+  }
+
+  async function handleCreateOffering(e) {
+    e.preventDefault();
+    setCreatingOffering(true);
+    setError("");
+    try {
+      await createOffering(offeringForm);
+      setOfferingForm({ courseId: "", termId: "", teacherId: "", sectionLabel: "A" });
+      setOfferings(await listCourses());
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to create offering");
+    } finally {
+      setCreatingOffering(false);
+    }
+  }
+
+  async function openOffering(offering) {
+    setSelectedOffering(offering);
     setEnrollResult(null);
     setError("");
-    setRoster([]); // clear immediately so a course switch never shows the previous course's roster
-    setRoster(await getEnrollments(course._id));
+    setRoster([]); // clear immediately so switching offerings never shows the previous roster
+    setRoster(await getEnrollments(offering._id));
   }
 
   async function handleEnroll(e) {
     e.preventDefault();
-    if (!csvFile || !selectedCourse) return;
+    if (!csvFile || !selectedOffering) return;
     setEnrolling(true);
     setError("");
     try {
-      const result = await bulkEnrollCSV(selectedCourse._id, csvFile);
+      const result = await bulkEnrollCSV(selectedOffering._id, csvFile);
       setEnrollResult(result);
-      setRoster(await getEnrollments(selectedCourse._id));
+      setRoster(await getEnrollments(selectedOffering._id));
       setCsvFile(null);
       e.target.reset();
     } catch (err) {
@@ -88,15 +142,69 @@ export default function AdminCourses() {
       )}
 
       <Card>
-        <h2 className="text-[13px] font-bold text-navy mb-3">Create Course</h2>
-        <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <h2 className="text-[13px] font-bold text-navy mb-1">Academic Terms</h2>
+        <p className="text-[11px] text-text-muted mb-3">
+          The academic calendar every course offering belongs to (e.g. "Fall 2026").
+        </p>
+        <form onSubmit={handleCreateTerm} className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Term Name</label>
+            <input
+              className={inputClass}
+              placeholder="e.g. Fall 2026"
+              value={termForm.name}
+              onChange={(e) => setTermForm({ ...termForm, name: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Start Date</label>
+            <input
+              type="date"
+              className={inputClass}
+              value={termForm.startDate}
+              onChange={(e) => setTermForm({ ...termForm, startDate: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">End Date</label>
+            <input
+              type="date"
+              className={inputClass}
+              value={termForm.endDate}
+              onChange={(e) => setTermForm({ ...termForm, endDate: e.target.value })}
+              required
+            />
+          </div>
+          <Button type="submit" disabled={creatingTerm} className="sm:col-span-3 w-fit">
+            {creatingTerm ? "Creating…" : "Create Term"}
+          </Button>
+        </form>
+        <div className="flex flex-wrap gap-1.5">
+          {terms.length === 0 && <p className="text-[11px] text-text-muted">No terms created yet.</p>}
+          {terms.map((t) => (
+            <Badge key={t._id} variant={t.isActive ? "blue" : "gray"}>
+              {t.name}
+            </Badge>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="text-[13px] font-bold text-navy mb-1">Course Catalog</h2>
+        <p className="text-[11px] text-text-muted mb-3">
+          A catalog course exists once, independent of who teaches it or when — assign it to a
+          teacher and term below under Course Offerings.
+        </p>
+        <form onSubmit={handleCreateCatalog} className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
           <div>
             <label className="block text-[11px] text-text-muted mb-1">Course Title</label>
             <input
               className={inputClass}
               placeholder="Course title"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              value={catalogForm.title}
+              onChange={(e) => setCatalogForm({ ...catalogForm, title: e.target.value })}
               required
             />
           </div>
@@ -105,17 +213,79 @@ export default function AdminCourses() {
             <input
               className={inputClass}
               placeholder="e.g. CS201"
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value })}
+              value={catalogForm.code}
+              onChange={(e) => setCatalogForm({ ...catalogForm, code: e.target.value })}
               required
             />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Description (optional)</label>
+            <input
+              className={inputClass}
+              placeholder="Description"
+              value={catalogForm.description}
+              onChange={(e) => setCatalogForm({ ...catalogForm, description: e.target.value })}
+            />
+          </div>
+          <Button type="submit" disabled={creatingCatalog} className="sm:col-span-3 w-fit">
+            {creatingCatalog ? "Creating…" : "Add to Catalog"}
+          </Button>
+        </form>
+        <div className="flex flex-wrap gap-1.5">
+          {catalog.length === 0 && <p className="text-[11px] text-text-muted">No catalog courses yet.</p>}
+          {catalog.map((c) => (
+            <Badge key={c._id} variant="gray">
+              {c.code} — {c.title}
+            </Badge>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="text-[13px] font-bold text-navy mb-1">Course Offerings</h2>
+        <p className="text-[11px] text-text-muted mb-3">
+          Assigns a catalog course to a teacher for a specific term — this is what students
+          actually enroll into.
+        </p>
+        <form onSubmit={handleCreateOffering} className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Catalog Course</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={offeringForm.courseId}
+              onChange={(e) => setOfferingForm({ ...offeringForm, courseId: e.target.value })}
+              required
+            >
+              <option value="">Select course…</option>
+              {catalog.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.code} — {c.title}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Term</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={offeringForm.termId}
+              onChange={(e) => setOfferingForm({ ...offeringForm, termId: e.target.value })}
+              required
+            >
+              <option value="">Select term…</option>
+              {terms.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-[11px] text-text-muted mb-1">Teacher</label>
             <select
               className={`w-full bg-white ${inputClass}`}
-              value={form.teacherId}
-              onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
+              value={offeringForm.teacherId}
+              onChange={(e) => setOfferingForm({ ...offeringForm, teacherId: e.target.value })}
               required
             >
               <option value="">Assign teacher…</option>
@@ -127,49 +297,59 @@ export default function AdminCourses() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] text-text-muted mb-1">Description (optional)</label>
+            <label className="block text-[11px] text-text-muted mb-1">Section</label>
             <input
               className={inputClass}
-              placeholder="Description"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="A"
+              value={offeringForm.sectionLabel}
+              onChange={(e) => setOfferingForm({ ...offeringForm, sectionLabel: e.target.value })}
             />
           </div>
-          <Button type="submit" disabled={creating} className="sm:col-span-2 w-fit">
-            {creating ? "Creating…" : "Create Course"}
+          <Button type="submit" disabled={creatingOffering} className="sm:col-span-4 w-fit">
+            {creatingOffering ? "Creating…" : "Create Offering"}
           </Button>
         </form>
-      </Card>
 
-      <Card>
-        <h2 className="text-[13px] font-bold text-navy mb-3">All Courses</h2>
+        <h3 className="text-[13px] font-semibold text-text-main mb-2">All Offerings</h3>
         <div className="space-y-2">
-          {courses.length === 0 && <EmptyState icon={<IconBooks size={32} className="text-text-muted" />} title="No courses yet." />}
-          {courses.map((c) => (
+          {offerings.length === 0 && (
+            <EmptyState icon={<IconBooks size={32} className="text-text-muted" />} title="No offerings yet." />
+          )}
+          {offerings.map((o) => (
             <div
-              key={c._id}
-              onClick={() => openCourse(c)}
+              key={o._id}
+              onClick={() => openOffering(o)}
               className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer border transition-colors duration-150 ${
-                selectedCourse?._id === c._id
+                selectedOffering?._id === o._id
                   ? "border-navy-light bg-badge-blue-bg"
                   : "border-line hover:bg-bg-page"
               }`}
             >
               <div>
                 <div className="text-xs font-medium text-text-main">
-                  {c.code} — {c.title}
+                  {o.code} — {o.title}
+                  {o.sectionLabel && <span className="text-text-muted"> (Sec. {o.sectionLabel})</span>}
                 </div>
-                <div className="text-[11px] text-text-muted">Teacher: {c.teacher?.name || "—"}</div>
+                <div className="text-[11px] text-text-muted flex items-center gap-1.5">
+                  Teacher: {o.teacher?.name || "—"}
+                  {o.term?.name && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <IconCalendarStats size={12} /> {o.term.name}
+                    </span>
+                  )}
+                </div>
               </div>
-              <Badge variant={c.isActive ? "green" : "red"}>{c.isActive ? "Active" : "Inactive"}</Badge>
+              <Badge variant={o.isActive ? "green" : "red"}>{o.isActive ? "Active" : "Inactive"}</Badge>
             </div>
           ))}
         </div>
       </Card>
 
-      {selectedCourse && (
+      {selectedOffering && (
         <Card>
-          <h2 className="text-[13px] font-bold text-navy mb-3">Bulk Enroll — {selectedCourse.code}</h2>
+          <h2 className="text-[13px] font-bold text-navy mb-3">
+            Bulk Enroll — {selectedOffering.code} (Sec. {selectedOffering.sectionLabel})
+          </h2>
           <form onSubmit={handleEnroll} className="flex items-center gap-2 mb-2">
             <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files[0])} className="text-xs" />
             <Button type="submit" disabled={enrolling || !csvFile} variant="secondary" size="sm">

@@ -19,6 +19,8 @@ const parentLinkRoutes = require("./routes/parentLinkRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const assignmentRoutes = require("./routes/assignmentRoutes");
+const termRoutes = require("./routes/termRoutes");
+const offeringRoutes = require("./routes/offeringRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -55,6 +57,8 @@ app.use("/api/parent-links", parentLinkRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/assignments", assignmentRoutes);
+app.use("/api/terms", termRoutes);
+app.use("/api/offerings", offeringRoutes);
 
 // ─── Error handling (must be last) ───
 app.use(notFound);

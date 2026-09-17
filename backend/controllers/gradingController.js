@@ -1,5 +1,5 @@
 const asyncHandler = require("express-async-handler");
-const Course = require("../models/Course");
+const CourseOffering = require("../models/CourseOffering");
 const Quiz = require("../models/Quiz");
 const Question = require("../models/Question");
 const Answer = require("../models/Answer");
@@ -9,18 +9,21 @@ const { recomputeAttemptScore } = require("../utils/scoring");
 const { notifyUsers } = require("../utils/notify");
 
 /**
- * HITL — GET /api/grading/pending (Admin, or Teacher scoped to their own courses)
- * There's no denormalized course/teacher reference on Answer, so this walks
- * courses -> quizzes -> subjective questions -> pending answers. Fine at
- * this project's scale; not worth an aggregation pipeline for it.
+ * HITL — GET /api/grading/pending (Admin, or Teacher scoped to their own
+ * course offerings). There's no denormalized offering/teacher reference on
+ * Answer, so this walks offerings -> quizzes -> subjective questions ->
+ * pending answers. Fine at this project's scale; not worth an aggregation
+ * pipeline for it.
  */
 const getPendingGrades = asyncHandler(async (req, res) => {
-  const courseFilter = req.user.role === "teacher" ? { teacher: req.user._id } : {};
+  const offeringFilter = req.user.role === "teacher" ? { teacher: req.user._id } : {};
 
-  const courses = await Course.find(courseFilter).select("_id title code");
-  const courseById = new Map(courses.map((c) => [String(c._id), c]));
+  const offerings = await CourseOffering.find(offeringFilter).select("_id teacher course").populate("course", "code");
+  const offeringById = new Map(offerings.map((o) => [String(o._id), o]));
 
-  const quizzes = await Quiz.find({ course: { $in: [...courseById.keys()] } }).select("_id title course");
+  const quizzes = await Quiz.find({ courseOffering: { $in: [...offeringById.keys()] } }).select(
+    "_id title courseOffering"
+  );
   const quizById = new Map(quizzes.map((q) => [String(q._id), q]));
 
   const questions = await Question.find({
@@ -39,14 +42,14 @@ const getPendingGrades = asyncHandler(async (req, res) => {
   const data = pendingAnswers.map((a) => {
     const question = questionById.get(String(a.question));
     const quiz = quizById.get(String(question.quiz));
-    const course = courseById.get(String(quiz.course));
+    const offering = offeringById.get(String(quiz.courseOffering));
     return {
       _id: a._id,
       textAnswer: a.textAnswer,
       questionText: question.text,
       maxScore: question.maxScore,
       quizTitle: quiz.title,
-      courseCode: course.code,
+      courseCode: offering.course.code,
       studentName: a.attempt.student.name,
       studentEmail: a.attempt.student.email,
       aiDraftScore: a.aiDraftScore,
@@ -79,8 +82,8 @@ const gradeAnswer = asyncHandler(async (req, res) => {
   }
 
   const quiz = await Quiz.findById(question.quiz);
-  const course = await Course.findById(quiz.course);
-  assertCourseManager(req.user, res, course);
+  const offering = await CourseOffering.findById(quiz.courseOffering).populate("course", "title");
+  assertCourseManager(req.user, res, offering);
 
   const { score, feedback } = req.body;
   if (score === undefined || score === null || score < 0 || score > question.maxScore) {
@@ -105,7 +108,7 @@ const gradeAnswer = asyncHandler(async (req, res) => {
     await notifyUsers([attemptBefore.student], {
       type: "grade_posted",
       title: `Your quiz "${quiz.title}" has been graded`,
-      message: `Your grade for "${quiz.title}" in ${course.title} is now final: ${updatedAttempt.score}/${updatedAttempt.maxScore}.`,
+      message: `Your grade for "${quiz.title}" in ${offering.course.title} is now final: ${updatedAttempt.score}/${updatedAttempt.maxScore}.`,
     });
   }
 

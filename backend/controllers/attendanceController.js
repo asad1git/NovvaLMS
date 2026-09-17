@@ -1,5 +1,5 @@
 const asyncHandler = require("express-async-handler");
-const Course = require("../models/Course");
+const CourseOffering = require("../models/CourseOffering");
 const Enrollment = require("../models/Enrollment");
 const AttendanceSession = require("../models/AttendanceSession");
 const AttendanceRecord = require("../models/AttendanceRecord");
@@ -15,8 +15,8 @@ const PRESENT_STATUSES = ["present", "late"]; // both count toward "attended" fo
  * who showed up, for the common case where most students attend.
  */
 const createSession = asyncHandler(async (req, res) => {
-  const course = await assertCourseAccess(req.user, res, req.params.id);
-  assertCourseManager(req.user, res, course);
+  const offering = await assertCourseAccess(req.user, res, req.params.id);
+  assertCourseManager(req.user, res, offering);
 
   const { date, topic } = req.body;
   if (!date) {
@@ -25,13 +25,13 @@ const createSession = asyncHandler(async (req, res) => {
   }
 
   const session = await AttendanceSession.create({
-    course: course._id,
+    courseOffering: offering._id,
     date,
     topic: topic || "",
     createdBy: req.user._id,
   });
 
-  const enrollments = await Enrollment.find({ course: course._id }).select("student");
+  const enrollments = await Enrollment.find({ courseOffering: offering._id }).select("student");
   if (enrollments.length > 0) {
     await AttendanceRecord.insertMany(
       enrollments.map((e) => ({ session: session._id, student: e.student, status: "present" }))
@@ -52,9 +52,9 @@ const createSession = asyncHandler(async (req, res) => {
  *    time this is requested.
  */
 const listSessions = asyncHandler(async (req, res) => {
-  const course = await assertCourseAccess(req.user, res, req.params.id);
-  const sessions = await AttendanceSession.find({ course: course._id }).sort({ date: -1 });
-  const isManager = req.user.role === "admin" || String(course.teacher) === String(req.user._id);
+  const offering = await assertCourseAccess(req.user, res, req.params.id);
+  const sessions = await AttendanceSession.find({ courseOffering: offering._id }).sort({ date: -1 });
+  const isManager = req.user.role === "admin" || String(offering.teacher) === String(req.user._id);
 
   if (isManager) {
     let totalPresent = 0;
@@ -120,8 +120,8 @@ const getSessionDetail = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Attendance session not found");
   }
-  const course = await Course.findById(session.course);
-  assertCourseManager(req.user, res, course);
+  const offering = await CourseOffering.findById(session.courseOffering);
+  assertCourseManager(req.user, res, offering);
 
   const records = await AttendanceRecord.find({ session: session._id }).populate("student", "name email");
   records.sort((a, b) => a.student.name.localeCompare(b.student.name)); // populate() runs after the DB sort, so sort client-side here
@@ -141,8 +141,8 @@ const updateSessionRecords = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Attendance session not found");
   }
-  const course = await Course.findById(session.course);
-  assertCourseManager(req.user, res, course);
+  const offering = await CourseOffering.findById(session.courseOffering);
+  assertCourseManager(req.user, res, offering);
 
   const { records } = req.body;
   if (!Array.isArray(records) || records.length === 0) {

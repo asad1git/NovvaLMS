@@ -5,10 +5,10 @@ const mongoose = require("mongoose");
 // that's the teacher's call, not something to block.
 const attendanceSessionSchema = new mongoose.Schema(
   {
-    course: {
+    courseOffering: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
-      required: [true, "Course is required"],
+      ref: "CourseOffering",
+      required: [true, "Course offering is required"],
     },
     date: {
       type: Date,

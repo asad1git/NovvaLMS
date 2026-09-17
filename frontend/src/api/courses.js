@@ -1,11 +1,38 @@
 import api from "./axios";
 
+// Role-scoped list of CourseOfferings, flattened server-side into the same
+// shape a plain Course used to have (title/code/teacher directly on the
+// object) — see backend/controllers/offeringController.js#flattenOffering.
+// Every existing caller of this function keeps working unchanged.
 export function listCourses() {
   return api.get("/courses").then((r) => r.data.data);
 }
 
+// Creates a CATALOG course only (title/code/description) — no teacher, no
+// term. Assigning a teacher+term to it is the separate createOffering call.
 export function createCourse(payload) {
   return api.post("/courses", payload).then((r) => r.data.data);
+}
+
+// The plain catalog (admin only) — used by the "which catalog course is
+// this an offering of" dropdown. Not the same as listCourses() above.
+export function listCatalogCourses() {
+  return api.get("/courses/catalog").then((r) => r.data.data);
+}
+
+export function listTerms() {
+  return api.get("/terms").then((r) => r.data.data);
+}
+
+export function createTerm(payload) {
+  return api.post("/terms", payload).then((r) => r.data.data);
+}
+
+// Assigns a catalog course to a term with a teacher — the actual
+// "who teaches what, when" fact. Returns the same flattened shape as
+// listCourses()'s entries.
+export function createOffering(payload) {
+  return api.post("/offerings", payload).then((r) => r.data.data);
 }
 
 export function getEnrollments(courseId) {

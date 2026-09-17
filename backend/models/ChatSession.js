@@ -10,15 +10,15 @@ const chatSessionSchema = new mongoose.Schema(
       ref: "User",
       required: [true, "Student is required"],
     },
-    course: {
+    courseOffering: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
-      required: [true, "Course is required"],
+      ref: "CourseOffering",
+      required: [true, "Course offering is required"],
     },
   },
   { timestamps: { createdAt: "createdAt", updatedAt: false } }
 );
 
-chatSessionSchema.index({ student: 1, course: 1 }, { unique: true });
+chatSessionSchema.index({ student: 1, courseOffering: 1 }, { unique: true });
 
 module.exports = mongoose.model("ChatSession", chatSessionSchema);

@@ -1,6 +1,6 @@
 const path = require("path");
 const asyncHandler = require("express-async-handler");
-const Course = require("../models/Course");
+const CourseOffering = require("../models/CourseOffering");
 const Enrollment = require("../models/Enrollment");
 const Quiz = require("../models/Quiz");
 const Question = require("../models/Question");
@@ -15,22 +15,23 @@ const { notifyUsers } = require("../utils/notify");
 
 const MAX_SOURCE_CHARS = 30000; // keeps the prompt size sane regardless of provider
 
-function isManagerOf(user, course) {
-  return user.role === "admin" || (user.role === "teacher" && String(course.teacher) === String(user._id));
+function isManagerOf(user, offering) {
+  return user.role === "admin" || (user.role === "teacher" && String(offering.teacher) === String(user._id));
 }
 
 /**
  * US-08 substrate — POST /api/courses/:id/quizzes (Admin or the course's Teacher)
- * Quiz generation is manual for now (AI generation is a later, separate
- * story) — the teacher supplies title/duration/questions directly.
+ * :id is a CourseOffering id. Quiz generation is manual for now (AI
+ * generation is a later, separate story) — the teacher supplies
+ * title/duration/questions directly.
  */
 const createQuiz = asyncHandler(async (req, res) => {
-  const course = await Course.findById(req.params.id);
-  if (!course) {
+  const offering = await CourseOffering.findById(req.params.id);
+  if (!offering) {
     res.status(404);
     throw new Error("Course not found");
   }
-  assertCourseManager(req.user, res, course);
+  assertCourseManager(req.user, res, offering);
 
   const { title, durationMinutes, questions } = req.body;
 
@@ -44,7 +45,7 @@ const createQuiz = asyncHandler(async (req, res) => {
   }
 
   const quiz = await Quiz.create({
-    course: course._id,
+    courseOffering: offering._id,
     title,
     durationMinutes,
     createdBy: req.user._id,
@@ -78,18 +79,19 @@ const createQuiz = asyncHandler(async (req, res) => {
 /**
  * GET /api/courses/:id/quizzes — role-scoped: Admin/owning Teacher see every
  * quiz (draft + published); an enrolled Student sees only published ones.
+ * :id is a CourseOffering id.
  */
 const getQuizzesForCourse = asyncHandler(async (req, res) => {
-  const course = await Course.findById(req.params.id);
-  if (!course) {
+  const offering = await CourseOffering.findById(req.params.id);
+  if (!offering) {
     res.status(404);
     throw new Error("Course not found");
   }
 
-  const filter = { course: course._id };
+  const filter = { courseOffering: offering._id };
 
-  if (!isManagerOf(req.user, course)) {
-    const enrolled = await Enrollment.exists({ student: req.user._id, course: course._id });
+  if (!isManagerOf(req.user, offering)) {
+    const enrolled = await Enrollment.exists({ student: req.user._id, courseOffering: offering._id });
     if (!enrolled) {
       res.status(403);
       throw new Error("You are not enrolled in this course");
@@ -112,11 +114,11 @@ const getQuizById = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Quiz not found");
   }
-  const course = await Course.findById(quiz.course);
-  const isManager = isManagerOf(req.user, course);
+  const offering = await CourseOffering.findById(quiz.courseOffering);
+  const isManager = isManagerOf(req.user, offering);
 
   if (!isManager) {
-    const enrolled = await Enrollment.exists({ student: req.user._id, course: course._id });
+    const enrolled = await Enrollment.exists({ student: req.user._id, courseOffering: offering._id });
     if (!enrolled) {
       res.status(403);
       throw new Error("You are not enrolled in this course");
@@ -143,8 +145,8 @@ const publishQuiz = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Quiz not found");
   }
-  const course = await Course.findById(quiz.course);
-  assertCourseManager(req.user, res, course);
+  const offering = await CourseOffering.findById(quiz.courseOffering).populate("course", "title");
+  assertCourseManager(req.user, res, offering);
 
   const wasPublished = quiz.isPublished;
   quiz.isPublished = req.body.isPublished !== undefined ? !!req.body.isPublished : !quiz.isPublished;
@@ -153,13 +155,13 @@ const publishQuiz = asyncHandler(async (req, res) => {
   // Notify on the false -> true transition only — never on unpublish, and
   // never again if it's already published and gets toggled a second time.
   if (!wasPublished && quiz.isPublished) {
-    const enrollments = await Enrollment.find({ course: course._id }).select("student");
+    const enrollments = await Enrollment.find({ courseOffering: offering._id }).select("student");
     await notifyUsers(
       enrollments.map((e) => e.student),
       {
         type: "quiz_published",
         title: `New quiz published: ${quiz.title}`,
-        message: `A new quiz "${quiz.title}" is now available in ${course.title}.`,
+        message: `A new quiz "${quiz.title}" is now available in ${offering.course.title}.`,
       }
     );
   }
@@ -180,8 +182,7 @@ const startOrResumeAttempt = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Quiz not found");
   }
-  const course = await Course.findById(quiz.course);
-  const enrolled = await Enrollment.exists({ student: req.user._id, course: course._id });
+  const enrolled = await Enrollment.exists({ student: req.user._id, courseOffering: quiz.courseOffering });
   if (!enrolled) {
     res.status(403);
     throw new Error("You are not enrolled in this course");
@@ -210,8 +211,8 @@ const getAttemptsForQuiz = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Quiz not found");
   }
-  const course = await Course.findById(quiz.course);
-  assertCourseManager(req.user, res, course);
+  const offering = await CourseOffering.findById(quiz.courseOffering);
+  assertCourseManager(req.user, res, offering);
 
   const attempts = await QuizAttempt.find({ quiz: quiz._id })
     .populate("student", "name email")
@@ -222,20 +223,21 @@ const getAttemptsForQuiz = asyncHandler(async (req, res) => {
 
 /**
  * US-05 — POST /api/courses/:id/quizzes/generate (Admin or the course's Teacher)
- * Drafts MCQ questions from an uploaded PDF via the configured AI provider
- * (AI_PROVIDER env var) and returns them WITHOUT saving anything — the
- * teacher reviews/edits the draft in the same question-builder UI used for
- * manual creation, and nothing exists until they call the existing
- * `createQuiz` endpoint. This keeps the teacher in control of quiz content,
- * in the same spirit as CLAUDE.md's HITL rule for grades.
+ * :id is a CourseOffering id. Drafts MCQ questions from an uploaded PDF via
+ * the configured AI provider (AI_PROVIDER env var) and returns them
+ * WITHOUT saving anything — the teacher reviews/edits the draft in the same
+ * question-builder UI used for manual creation, and nothing exists until
+ * they call the existing `createQuiz` endpoint. This keeps the teacher in
+ * control of quiz content, in the same spirit as CLAUDE.md's HITL rule for
+ * grades.
  */
 const generateQuizQuestions = asyncHandler(async (req, res) => {
-  const course = await Course.findById(req.params.id);
-  if (!course) {
+  const offering = await CourseOffering.findById(req.params.id);
+  if (!offering) {
     res.status(404);
     throw new Error("Course not found");
   }
-  assertCourseManager(req.user, res, course);
+  assertCourseManager(req.user, res, offering);
 
   const { materialId, numQuestions } = req.body;
   if (!materialId || !numQuestions || Number(numQuestions) < 1) {
@@ -243,7 +245,7 @@ const generateQuizQuestions = asyncHandler(async (req, res) => {
     throw new Error("materialId and a positive numQuestions are required");
   }
 
-  const material = await Material.findOne({ _id: materialId, course: course._id });
+  const material = await Material.findOne({ _id: materialId, courseOffering: offering._id });
   if (!material) {
     res.status(404);
     throw new Error("Material not found in this course");

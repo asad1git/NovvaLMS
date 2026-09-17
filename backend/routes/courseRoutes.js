@@ -4,6 +4,7 @@ const { authorize } = require("../middleware/rbacMiddleware");
 const { uploadMaterialFile, uploadCSV, uploadAssignmentQuestionFile } = require("../middleware/uploadMiddleware");
 const {
   createCourse,
+  listCatalogCourses,
   getCourses,
   getCourseById,
   bulkEnrollFromCSV,
@@ -24,6 +25,9 @@ router.use(protect);
 
 router.post("/", authorize("admin"), createCourse);
 router.get("/", getCourses);
+// Must be registered before "/:id" — otherwise "catalog" itself would be
+// captured as an :id value by the wildcard route below.
+router.get("/catalog", authorize("admin"), listCatalogCourses);
 router.get("/:id", getCourseById);
 
 router.post("/:id/enroll/csv", authorize("admin"), uploadCSV.single("file"), bulkEnrollFromCSV);

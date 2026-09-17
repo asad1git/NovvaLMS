@@ -2,10 +2,10 @@ const mongoose = require("mongoose");
 
 const assignmentSchema = new mongoose.Schema(
   {
-    course: {
+    courseOffering: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
-      required: [true, "Course is required"],
+      ref: "CourseOffering",
+      required: [true, "Course offering is required"],
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
