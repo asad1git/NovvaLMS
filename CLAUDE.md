@@ -88,7 +88,7 @@ to OpenAI/Gemini. Only academic content goes in the prompt.
 
 ---
 
-## Database — 26 MongoDB Collections
+## Database — 27 MongoDB Collections
 
 `CourseOffering` also gained an embedded `schedule` array (see "University-oriented item 6"
 further down) — not a new collection, so the count below is unchanged by it.
@@ -96,7 +96,7 @@ further down) — not a new collection, so the count below is unchanged by it.
 `Users, Courses, Terms, CourseOfferings, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
 Answers, ChatSessions, Messages, FeeChallans, FeeStructures, SalarySlips, ParentLinks,
 ParentChatSessions, ParentMessages, Notifications, AttendanceSessions, AttendanceRecords,
-Assignments, AssignmentSubmissions, Grades, Departments, AdvisorLinks`
+Assignments, AssignmentSubmissions, Grades, Departments, AdvisorLinks, Programs`
 
 **`Courses` is a pure catalog now** (title/code/description — no `teacher`); **`CourseOfferings`**
 (course + term + teacher + sectionLabel) is the actual taught instance everything else attaches
@@ -1288,6 +1288,62 @@ schedule-based, not a same-teacher-only check — and the exact same conflict wa
 confirmed to already be visible as a `scheduleConflictWith` hint before the student ever clicked
 Register. Followed by a Playwright pass confirming the schedule builder, the inline schedule
 display, and the disabled-button-with-reason all render correctly with zero console errors.
+
+**University-oriented item 8 (degree audit) is now built — the full roadmap is complete.** Scoped
+exactly as the roadmap doc's own risk assessment split it: "a program requiring a fixed list of
+courses is very buildable" is what got built; elective categories, transfer credit, and a
+minimum-grade-per-course rule stayed explicitly out ("the kind of feature real SIS products spend
+years on — full generality isn't realistically worth chasing here").
+
+New `Program` model — `name`, `code`, a FIXED `requiredCourses` array (catalog `Course` refs),
+`totalCreditHoursRequired`, and `minGpaToGraduate` (default 2.0). `User` gained an optional
+`program` ref, meaningful only for role `student` — assignable at creation (`AdminUsers.jsx`'s
+create form, mirroring the `hod`→`department` picker) OR any time later via
+`PUT /api/users/:id` (a new inline "assign program" `<select>` next to every student row in
+Manage Users) — later assignment is the realistic path, since Programs will typically be defined
+well after students already exist.
+
+`degreeAuditController.computeDegreeAudit(studentId)` is the one place this is computed, reused
+by both the student's own view and the advisor's — same split-function pattern as
+`computeAnalyticsForStudent`/`computeTranscriptForStudent` before it. It calls
+`computeTranscriptForStudent` (Phase 2) for GPA, checks each required course for a passing
+(`finalLetter !== "F"`) finalized `Grade` in any term/offering (the exact same rule
+`registrationController.getUnmetPrerequisites` already uses for prerequisites), and separately
+sums "earned" credit hours from only the PASSING grades — deliberately NOT the same number as
+`transcript.cumulativeCredits`, which correctly also counts a failed course's credit hours toward
+GPA math (an F still lowers your GPA at full weight) but hasn't actually been "earned" toward a
+degree. **Academic standing** (`Good Standing` / `Academic Probation` / `Academic Suspension`) is
+computed from fixed 2.0/1.0 cumulative-GPA bands — the roadmap doc's own "probation/suspension
+thresholds based on GPA" — deliberately fixed constants, not a per-program setting (unlike
+`minGpaToGraduate`, which is). `readyToGraduate` is `true` only when every required course is
+passed AND earned credit hours meet the program's total AND cumulative GPA meets its minimum.
+
+`GET /api/degree-audit/me` (Student) and `GET /api/advisor-links/:studentId/degree-audit`
+(Advisor, `AdvisorLink`-gated same as the transcript/registration endpoints beside it) both return
+the identical shape — a new shared `DegreeAuditView.jsx` component renders it once, used by both
+the student's new "Degree Audit" nav item (`DegreeAudit.jsx`) and `AdvisorDashboard.jsx`'s advisee
+view (appended below the existing transcript section). This is exactly what item 5's own writeup
+flagged as deferred — "'degree progress' is covered by the transcript endpoint, since a full
+degree-audit doesn't exist yet" — now genuinely covered by the real thing. New "Programs" nav item
+(`AdminPrograms.jsx`) lets an admin define programs (required-courses multi-select from the
+catalog, same UI pattern as `AdminCourses.jsx`'s prerequisites picker).
+
+Verified end-to-end via direct API calls with exact assertions: built a test program requiring
+CS201 + DB101 (Ali Raza had a finalized passing grade in the former, none yet in the latter) —
+before assignment, `hasProgram: false`; after assignment, `completedRequired: [CS201]`,
+`remainingRequired: [DB101]`, `creditHoursEarned: 3` (only CS201's, not DB101's, since it isn't
+passed yet), `readyToGraduate: false`. Finalizing Ali's DB101 grade at 90% (as the real teacher,
+through the real HITL grading endpoint) flipped `remainingRequired` to empty,
+`creditHoursEarned` to 6, and `readyToGraduate` to `true` — the actual state-transition confirmed
+working, not just a static snapshot. The advisor's view of the same data came back
+byte-identical to the student's own. Followed by a Playwright pass across all three surfaces
+(student's Degree Audit page showing the real "ready to graduate" trophy banner, admin's Programs
+page, and the advisor's advisee view with the degree audit section appended below the transcript)
+— zero console errors. One unrelated hiccup surfaced mid-verification and was resolved, not a code
+bug: the local Vite dev server was serving a stale cached transform of `StudentDashboard.jsx`
+(missing the new nav item entirely) even after the file was updated on disk — the same class of
+issue this file already documents once before ("Vite stale-cache issue... cache-clear + restart
+resolved it"); killing and restarting the dev server fixed it immediately.
 
 ---
 

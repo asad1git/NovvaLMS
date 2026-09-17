@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const crypto = require("crypto");
 const User = require("../models/User");
 const Department = require("../models/Department");
+const Program = require("../models/Program");
 const generateToken = require("../utils/generateToken");
 const sendEmail = require("../utils/sendEmail");
 
@@ -78,7 +79,7 @@ const getMe = asyncHandler(async (req, res) => {
  * this matches "automated credential delivery via email" from the SDS.
  */
 const createUser = asyncHandler(async (req, res) => {
-  const { name, email, role, departmentId } = req.body;
+  const { name, email, role, departmentId, programId } = req.body;
 
   if (!name || !email || !role) {
     res.status(400);
@@ -107,9 +108,28 @@ const createUser = asyncHandler(async (req, res) => {
     }
   }
 
+  // programId is only meaningful for a Student — the degree program their
+  // audit is computed against. Optional even for a Student, since Programs
+  // may not exist yet when the account is first created (see also
+  // PUT /api/users/:id, which lets an admin assign one later).
+  let program = null;
+  if (role === "student" && programId) {
+    program = await Program.findById(programId);
+    if (!program) {
+      res.status(400);
+      throw new Error("programId must belong to an existing program");
+    }
+  }
+
   const tempPassword = crypto.randomBytes(6).toString("base64url"); // e.g. "Xk9pQr2b"
 
-  const user = new User({ name, email: email.toLowerCase(), role, department: department?._id || null });
+  const user = new User({
+    name,
+    email: email.toLowerCase(),
+    role,
+    department: department?._id || null,
+    program: program?._id || null,
+  });
   await user.setPassword(tempPassword);
   await user.save();
 

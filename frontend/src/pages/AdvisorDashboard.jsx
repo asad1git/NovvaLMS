@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { IconUsers, IconFileCertificate, IconBooks } from "@tabler/icons-react";
 import DashboardShell from "../components/DashboardShell";
 import AccountSettings from "./AccountSettings";
-import { getMyAdvisees, getAdviseeTranscript, getAdviseeRegistration } from "../api/advisorLinks";
+import { getMyAdvisees, getAdviseeTranscript, getAdviseeRegistration, getAdviseeDegreeAudit } from "../api/advisorLinks";
+import DegreeAuditView from "../components/DegreeAuditView";
 import { Card, EmptyState, LoadingState } from "../components/ui";
 
 const NAV_ITEMS = ["My Advisees", "Account Settings"];
@@ -31,16 +32,22 @@ function AdviseePicker({ advisees, selectedId, setSelectedId }) {
 function AdviseeDetail({ advisee }) {
   const [transcript, setTranscript] = useState(null);
   const [registration, setRegistration] = useState(null);
+  const [degreeAudit, setDegreeAudit] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     setError("");
-    Promise.all([getAdviseeTranscript(advisee._id), getAdviseeRegistration(advisee._id)])
-      .then(([t, r]) => {
+    Promise.all([
+      getAdviseeTranscript(advisee._id),
+      getAdviseeRegistration(advisee._id),
+      getAdviseeDegreeAudit(advisee._id),
+    ])
+      .then(([t, r, d]) => {
         setTranscript(t);
         setRegistration(r);
+        setDegreeAudit(d);
       })
       .catch((err) => setError(err.response?.data?.message || "Failed to load advisee data"))
       .finally(() => setLoading(false));
@@ -106,6 +113,8 @@ function AdviseeDetail({ advisee }) {
           </div>
         )}
       </Card>
+
+      <DegreeAuditView audit={degreeAudit} />
     </div>
   );
 }

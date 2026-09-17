@@ -23,6 +23,8 @@ import {
   IconBuildingBank,
   IconUserCheck,
   IconReportAnalytics,
+  IconCertificate,
+  IconAward,
 } from "@tabler/icons-react";
 import NotificationBell from "./NotificationBell";
 
@@ -40,6 +42,8 @@ const NAV_ICONS = {
   Departments: IconBuildingBank,
   "Department Report": IconReportAnalytics,
   "My Advisees": IconUsers,
+  Programs: IconCertificate,
+  "Degree Audit": IconAward,
   "Fee Challans": IconReceipt2,
   "Salary Slips": IconCash,
   "My Results": IconClipboardList,

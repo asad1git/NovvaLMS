@@ -23,3 +23,7 @@ export function getAdviseeTranscript(studentId) {
 export function getAdviseeRegistration(studentId) {
   return api.get(`/advisor-links/${studentId}/registration`).then((r) => r.data.data);
 }
+
+export function getAdviseeDegreeAudit(studentId) {
+  return api.get(`/advisor-links/${studentId}/degree-audit`).then((r) => r.data.data);
+}

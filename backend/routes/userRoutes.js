@@ -1,6 +1,7 @@
 const express = require("express");
 const asyncHandler = require("express-async-handler");
 const User = require("../models/User");
+const Program = require("../models/Program");
 const { createUser } = require("../controllers/authController");
 const { protect } = require("../middleware/authMiddleware");
 const { authorize } = require("../middleware/rbacMiddleware");
@@ -30,12 +31,16 @@ router.get(
   })
 );
 
-// PUT /api/users/:id — update name / active status. Admin only.
+// PUT /api/users/:id — update name / active status / program. Admin only.
+// programId is meaningful only for a student account — lets an admin
+// assign or change a student's degree Program any time after the account
+// already exists (most realistic flow: Programs get defined well after
+// students are already enrolled), not just at creation.
 router.put(
   "/:id",
   authorize("admin"),
   asyncHandler(async (req, res) => {
-    const { name, isActive } = req.body;
+    const { name, isActive, programId } = req.body;
 
     const user = await User.findById(req.params.id);
     if (!user) {
@@ -45,6 +50,16 @@ router.put(
 
     if (name !== undefined) user.name = name;
     if (isActive !== undefined) user.isActive = isActive;
+    if (programId !== undefined) {
+      if (programId) {
+        const program = await Program.findById(programId);
+        if (!program) {
+          res.status(400);
+          throw new Error("programId must belong to an existing program");
+        }
+      }
+      user.program = programId || null;
+    }
     await user.save();
 
     res.status(200).json({ success: true, data: user });

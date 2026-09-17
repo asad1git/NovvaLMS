@@ -4,6 +4,7 @@ const User = require("../models/User");
 const Enrollment = require("../models/Enrollment");
 const CourseOffering = require("../models/CourseOffering");
 const { computeTranscriptForStudent } = require("./transcriptController");
+const { computeDegreeAudit } = require("./degreeAuditController");
 
 /**
  * POST /api/advisor-links (Admin only) — same admin-managed join-collection
@@ -129,6 +130,23 @@ const getAdviseeRegistration = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * GET /api/advisor-links/:studentId/degree-audit (Advisor only)
+ * Completes what item 5's own writeup flagged as deferred — "degree
+ * progress" only had the transcript to point to since no degree audit
+ * existed yet. Now it does, so an advisor gets the real thing.
+ */
+const getAdviseeDegreeAudit = asyncHandler(async (req, res) => {
+  const linked = await AdvisorLink.exists({ advisor: req.user._id, student: req.params.studentId });
+  if (!linked) {
+    res.status(403);
+    throw new Error("You are not linked to this student");
+  }
+
+  const data = await computeDegreeAudit(req.params.studentId);
+  res.status(200).json({ success: true, data });
+});
+
 module.exports = {
   linkAdvisor,
   listAdvisorLinks,
@@ -136,4 +154,5 @@ module.exports = {
   getMyAdvisees,
   getAdviseeTranscript,
   getAdviseeRegistration,
+  getAdviseeDegreeAudit,
 };

@@ -9,6 +9,7 @@ import AccountSettings from "./AccountSettings";
 import Attendance from "./Attendance";
 import Transcript from "./Transcript";
 import Register from "./Register";
+import DegreeAudit from "./DegreeAudit";
 
 const NAV_ITEMS = [
   "Dashboard",
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   "Analytics",
   "Attendance",
   "Transcript",
+  "Degree Audit",
   "Novva Assistant",
   "Account Settings",
 ];
@@ -41,6 +43,8 @@ export default function StudentDashboard() {
         <Attendance />
       ) : activeNav === "Transcript" ? (
         <Transcript />
+      ) : activeNav === "Degree Audit" ? (
+        <DegreeAudit />
       ) : activeNav === "Account Settings" ? (
         <AccountSettings />
       ) : (

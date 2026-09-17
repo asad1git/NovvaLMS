@@ -9,12 +9,14 @@ import AccountSettings from "./AccountSettings";
 import AdminParentLinks from "./AdminParentLinks";
 import AdminAdvisorLinks from "./AdminAdvisorLinks";
 import AdminDepartments from "./AdminDepartments";
+import AdminPrograms from "./AdminPrograms";
 
 const NAV_ITEMS = [
   "Dashboard",
   "Manage Users",
   "Manage Courses",
   "Departments",
+  "Programs",
   "Parent Links",
   "Advisor Links",
   "Fee Challans",
@@ -33,6 +35,8 @@ export default function AdminDashboard() {
         <AdminUsers />
       ) : activeNav === "Departments" ? (
         <AdminDepartments />
+      ) : activeNav === "Programs" ? (
+        <AdminPrograms />
       ) : activeNav === "Parent Links" ? (
         <AdminParentLinks />
       ) : activeNav === "Advisor Links" ? (

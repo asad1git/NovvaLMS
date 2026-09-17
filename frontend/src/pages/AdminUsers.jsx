@@ -3,6 +3,7 @@ import { IconUser } from "@tabler/icons-react";
 import api from "../api/axios";
 import { listUsers, createUser, updateUser } from "../api/users";
 import { listDepartments } from "../api/departments";
+import { listPrograms } from "../api/programs";
 import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
 
 const ROLE_BADGE_VARIANT = {
@@ -27,9 +28,11 @@ export default function AdminUsers() {
   const [notice, setNotice] = useState("");
   const [currentUserId, setCurrentUserId] = useState(null);
 
-  const [form, setForm] = useState({ name: "", email: "", role: "student", departmentId: "" });
+  const [form, setForm] = useState({ name: "", email: "", role: "student", departmentId: "", programId: "" });
   const [creating, setCreating] = useState(false);
   const [departments, setDepartments] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [assigningProgramId, setAssigningProgramId] = useState(null);
 
   async function refresh(role) {
     setLoading(true);
@@ -45,6 +48,7 @@ export default function AdminUsers() {
   useEffect(() => {
     api.get("/auth/me").then((r) => setCurrentUserId(r.data.data._id));
     listDepartments().then(setDepartments);
+    listPrograms().then(setPrograms);
     refresh("");
   }, []);
 
@@ -64,7 +68,7 @@ export default function AdminUsers() {
       setNotice(
         `${user.name} created. A temporary password was emailed to them (or logged to the server console if SMTP isn't configured yet).`
       );
-      setForm({ name: "", email: "", role: "student", departmentId: "" });
+      setForm({ name: "", email: "", role: "student", departmentId: "", programId: "" });
       await refresh(roleFilter);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create user");
@@ -80,6 +84,19 @@ export default function AdminUsers() {
       await refresh(roleFilter);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to update user");
+    }
+  }
+
+  async function handleAssignProgram(user, programId) {
+    setAssigningProgramId(user._id);
+    setError("");
+    try {
+      await updateUser(user._id, { programId });
+      await refresh(roleFilter);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to assign program");
+    } finally {
+      setAssigningProgramId(null);
     }
   }
 
@@ -138,6 +155,23 @@ export default function AdminUsers() {
               <option value="admin">Admin</option>
             </select>
           </div>
+          {form.role === "student" && (
+            <div>
+              <label className="block text-[11px] text-text-muted mb-1">Degree Program (optional)</label>
+              <select
+                className={`w-full bg-white ${inputClass}`}
+                value={form.programId}
+                onChange={(e) => setForm({ ...form, programId: e.target.value })}
+              >
+                <option value="">No program</option>
+                {programs.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.code} — {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {form.role === "hod" && (
             <div>
               <label className="block text-[11px] text-text-muted mb-1">Heads Department</label>
@@ -196,6 +230,21 @@ export default function AdminUsers() {
                 <div className="text-[11px] text-text-muted">{u.email}</div>
               </div>
               <div className="flex items-center gap-2">
+                {u.role === "student" && (
+                  <select
+                    className={`bg-white ${inputClass} py-1`}
+                    value={u.program || ""}
+                    disabled={assigningProgramId === u._id}
+                    onChange={(e) => handleAssignProgram(u, e.target.value)}
+                  >
+                    <option value="">No program</option>
+                    {programs.map((p) => (
+                      <option key={p._id} value={p._id}>
+                        {p.code}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <Badge variant={ROLE_BADGE_VARIANT[u.role] || "gray"} className="capitalize">
                   {u.role}
                 </Badge>

@@ -38,6 +38,16 @@ const userSchema = new mongoose.Schema(
       ref: "Department",
       default: null,
     },
+    // Only meaningful for role "student" — which Program they're pursuing,
+    // powering their degree audit (required-course checklist, credit-hour
+    // progress, graduation readiness). Admin-assignable at creation or
+    // later via PUT /api/users/:id; null means no degree audit is possible
+    // yet, not an error.
+    program: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Program",
+      default: null,
+    },
     isActive: {
       type: Boolean,
       default: true,
