@@ -32,6 +32,18 @@ export function downloadFeeChallanPdf(id, challanNumber) {
   return downloadBlob(`/fee-challans/${id}/pdf`, `${challanNumber}.pdf`);
 }
 
+export function listFeeStructures() {
+  return api.get("/fee-challans/structures").then((r) => r.data.data);
+}
+
+export function setFeeStructure(payload) {
+  return api.post("/fee-challans/structures", payload).then((r) => r.data.data);
+}
+
+export function generateChallans(payload) {
+  return api.post("/fee-challans/generate", payload).then((r) => r.data.data);
+}
+
 export function listSalarySlips() {
   return api.get("/salary-slips").then((r) => r.data.data);
 }

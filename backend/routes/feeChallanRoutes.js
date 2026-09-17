@@ -6,11 +6,18 @@ const {
   getFeeChallans,
   setFeeChallanStatus,
   downloadFeeChallanPdf,
+  setFeeStructure,
+  getFeeStructures,
+  generateChallansForTerm,
 } = require("../controllers/feeChallanController");
 
 const router = express.Router();
 
 router.use(protect);
+
+router.post("/structures", authorize("admin"), setFeeStructure);
+router.get("/structures", authorize("admin"), getFeeStructures);
+router.post("/generate", authorize("admin"), generateChallansForTerm);
 
 router.post("/", authorize("admin"), createFeeChallan);
 router.get("/", getFeeChallans); // role-scoped inside the controller

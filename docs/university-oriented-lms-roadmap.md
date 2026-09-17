@@ -152,11 +152,14 @@ honest that full generality on items 6 and 8 isn't worth chasing.
 
 ## Where this was left
 
-**Update:** the user decided to proceed. **Items 1, 2, 3, and 4 are done** — the Course/
-CourseOffering split, Term, self-service registration, and GPA/transcripts — see CLAUDE.md's
-"University-oriented Phase 1/2/3" entries for the full writeups. Notably, item 3's flagged
-technical blocker (seat-capacity races) turned out to be solvable *without* the multi-document
-transactions this doc originally assumed were necessary — a single atomic conditional update on
-one document's own two fields (`enrolledCount` vs `capacity`) is simpler and more portable,
-working even on standalone MongoDB, not just Atlas. Items 5, 6, 7, and 8 (narrower roles,
-scheduling, fee automation, degree audit) are still just this planning discussion.
+**Update:** the user decided to proceed. **Items 1, 2, 3, 4, and 7 are done** — the Course/
+CourseOffering split, Term, self-service registration, GPA/transcripts, and fee automation — see
+CLAUDE.md's "University-oriented Phase 1/2/3" and "item 7 (fee automation)" entries for the full
+writeups. Notably, item 3's flagged technical blocker (seat-capacity races) turned out to be
+solvable *without* the multi-document transactions this doc originally assumed were necessary —
+a single atomic conditional update on one document's own two fields (`enrolledCount` vs
+`capacity`) is simpler and more portable, working even on standalone MongoDB, not just Atlas.
+Item 7 turned out exactly as low-medium-risk as originally assessed above — the new
+`FeeStructure` model and bulk-generate endpoint reuse the existing `FeeChallan`/PDF pipeline
+unchanged, just with a computed amount instead of a typed one. Items 5, 6, and 8 (narrower roles,
+scheduling, degree audit) are still just this planning discussion.

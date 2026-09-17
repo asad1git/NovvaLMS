@@ -7,6 +7,15 @@ const feeChallanSchema = new mongoose.Schema(
       ref: "User",
       required: [true, "Student is required"],
     },
+    // Set only for challans created by the auto-generate flow
+    // (generateChallansForTerm) — lets a re-run skip a student who's
+    // already been billed for that term without touching manually-created
+    // challans, which have no term and are never auto-skipped.
+    term: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Term",
+      default: null,
+    },
     challanNumber: {
       type: String,
       required: true,

@@ -83,10 +83,10 @@ to OpenAI/Gemini. Only academic content goes in the prompt.
 
 ---
 
-## Database — 23 MongoDB Collections
+## Database — 24 MongoDB Collections
 
 `Users, Courses, Terms, CourseOfferings, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
-Answers, ChatSessions, Messages, FeeChallans, SalarySlips, ParentLinks,
+Answers, ChatSessions, Messages, FeeChallans, FeeStructures, SalarySlips, ParentLinks,
 ParentChatSessions, ParentMessages, Notifications, AttendanceSessions, AttendanceRecords,
 Assignments, AssignmentSubmissions, Grades`
 
@@ -1129,6 +1129,35 @@ first has taken the seat, and correctly frees back up the moment the first stude
 actual race-condition-safe seat accounting confirmed working, not just the happy path. Zero
 console errors throughout, plus a final full-app regression pass across all three roles' existing
 nav items to confirm nothing else in the app regressed from these model changes.
+
+**University-oriented item 7 (fee automation) is now built** — `FeeChallan.amount` no longer has
+to be typed in by hand for the common case. A new `FeeStructure` model (`term` unique ref +
+`perCreditHourRate` + `fixedFees`) is a policy an admin sets once per `Term`, deliberately kept
+separate from `FeeChallan` itself. `FeeChallan` gained an optional `term` field — `null` for every
+manually-created challan (that flow is untouched, still needed for exceptions/corrections), set
+only by the new bulk `POST /api/fee-challans/generate` (Admin, `{termId, dueDate, description}`)
+in `feeChallanController.generateChallansForTerm`: finds every `CourseOffering` in that term, sums
+each enrolled student's total credit-hour load across their `Enrollment`s into those offerings
+(via `Course.creditHours`, added back in Phase 2), computes
+`amount = creditHours × perCreditHourRate + fixedFees`, and creates a `FeeChallan` per student —
+reusing the exact same model, PDF pipeline (`generateFeeChallanPdf`), and notification call
+(`notifyUsers`) the manual flow already had, zero duplication. **Idempotent by design**: a student
+who already has a `FeeChallan` for that `term` is skipped rather than double-billed, so re-running
+the same term after a batch of new registrations only bills the newly-registered students — the
+`term` field on `FeeChallan` is what makes that check possible without maintaining a separate
+"already billed" list. `AdminFeeChallans.jsx` gained two new cards above the existing manual
+create form: "Fee Structure (per Term)" (set/update the rate — an upsert, so resubmitting for the
+same term corrects it rather than creating a duplicate `FeeStructure`) and "Auto-Generate Challans
+from Registration" (pick a term + due date, generate, see a generated/skipped summary inline).
+Verified end-to-end via direct API calls (bypassing the UI to get exact numeric assertions): set
+Fall 2026's rate to Rs. 8,000/credit-hour + Rs. 5,000 fixed, generated challans for all three
+enrolled students, and confirmed Ali Raza's challan came out to exactly Rs. 101,000 —
+12 registered credit hours (`CS401`+`CS201`+`DB101`+`OOP231`) × 8,000 + 5,000, matching hand
+computation exactly; re-ran generation for the same term and confirmed all three were skipped
+("Already billed for this term") with zero new challans created; confirmed a student token gets
+403 on both `POST /fee-challans/structures` and `POST /fee-challans/generate`. Followed by a
+Playwright pass on the real UI (admin login → Fee Challans) confirming both new cards render with
+the saved structure and generated challans visible, zero console errors.
 
 ---
 

@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
 import { IconReceipt2 } from "@tabler/icons-react";
-import { listStudents, listFeeChallans, createFeeChallan, setFeeChallanStatus, downloadFeeChallanPdf } from "../api/finance";
+import {
+  listStudents,
+  listFeeChallans,
+  createFeeChallan,
+  setFeeChallanStatus,
+  downloadFeeChallanPdf,
+  listFeeStructures,
+  setFeeStructure,
+  generateChallans,
+} from "../api/finance";
+import { listTerms } from "../api/courses";
 import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
 
 const inputClass =
@@ -10,20 +20,33 @@ const inputClass =
 export default function AdminFeeChallans() {
   const [students, setStudents] = useState([]);
   const [challans, setChallans] = useState([]);
+  const [terms, setTerms] = useState([]);
+  const [structures, setStructures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ studentId: "", amount: "", dueDate: "", description: "" });
 
+  const [structureForm, setStructureForm] = useState({ termId: "", perCreditHourRate: "", fixedFees: "" });
+  const [savingStructure, setSavingStructure] = useState(false);
+  const [generateForm, setGenerateForm] = useState({ termId: "", dueDate: "", description: "" });
+  const [generating, setGenerating] = useState(false);
+  const [generateResult, setGenerateResult] = useState(null);
+
   async function refresh() {
     setChallans(await listFeeChallans());
+  }
+
+  async function refreshStructures() {
+    setStructures(await listFeeStructures());
   }
 
   useEffect(() => {
     (async () => {
       try {
-        const [s] = await Promise.all([listStudents(), refresh()]);
+        const [s, t] = await Promise.all([listStudents(), listTerms(), refresh(), refreshStructures()]);
         setStudents(s);
+        setTerms(t);
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load fee challans");
       } finally {
@@ -31,6 +54,41 @@ export default function AdminFeeChallans() {
       }
     })();
   }, []);
+
+  async function handleSetStructure(e) {
+    e.preventDefault();
+    setSavingStructure(true);
+    setError("");
+    try {
+      await setFeeStructure({
+        termId: structureForm.termId,
+        perCreditHourRate: Number(structureForm.perCreditHourRate),
+        fixedFees: structureForm.fixedFees ? Number(structureForm.fixedFees) : 0,
+      });
+      setStructureForm({ termId: "", perCreditHourRate: "", fixedFees: "" });
+      await refreshStructures();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to save fee structure");
+    } finally {
+      setSavingStructure(false);
+    }
+  }
+
+  async function handleGenerate(e) {
+    e.preventDefault();
+    setGenerating(true);
+    setError("");
+    setGenerateResult(null);
+    try {
+      const result = await generateChallans(generateForm);
+      setGenerateResult(result);
+      await refresh();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to generate fee challans");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -121,6 +179,133 @@ export default function AdminFeeChallans() {
             {creating ? "Creating…" : "Create Challan"}
           </Button>
         </form>
+      </Card>
+
+      <Card>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Fee Structure (per Term)</h2>
+        <form onSubmit={handleSetStructure} className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Term</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={structureForm.termId}
+              onChange={(e) => setStructureForm({ ...structureForm, termId: e.target.value })}
+              required
+            >
+              <option value="">Select term…</option>
+              {terms.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Rate per Credit Hour (Rs.)</label>
+            <input
+              type="number"
+              min="0"
+              className={inputClass}
+              placeholder="e.g. 8000"
+              value={structureForm.perCreditHourRate}
+              onChange={(e) => setStructureForm({ ...structureForm, perCreditHourRate: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Fixed Fees (Rs., optional)</label>
+            <input
+              type="number"
+              min="0"
+              className={inputClass}
+              placeholder="e.g. 5000"
+              value={structureForm.fixedFees}
+              onChange={(e) => setStructureForm({ ...structureForm, fixedFees: e.target.value })}
+            />
+          </div>
+          <Button type="submit" disabled={savingStructure} className="sm:col-span-3 w-fit">
+            {savingStructure ? "Saving…" : "Save Fee Structure"}
+          </Button>
+        </form>
+        {structures.length > 0 && (
+          <div className="space-y-1 border-t border-line pt-3">
+            {structures.map((s) => (
+              <div key={s._id} className="flex items-center justify-between text-xs py-1">
+                <span className="text-text-main">{s.term?.name}</span>
+                <span className="text-text-muted">
+                  Rs. {s.perCreditHourRate.toLocaleString()}/credit hour
+                  {s.fixedFees > 0 && ` + Rs. ${s.fixedFees.toLocaleString()} fixed`}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <h2 className="text-[13px] font-bold text-navy mb-3">Auto-Generate Challans from Registration</h2>
+        <p className="text-[11px] text-text-muted mb-3">
+          Bills every student enrolled in that term based on their total registered credit hours ×
+          the term's rate above. Students already billed for the term are skipped, so this is safe
+          to re-run after new registrations.
+        </p>
+        <form onSubmit={handleGenerate} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Term</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={generateForm.termId}
+              onChange={(e) => setGenerateForm({ ...generateForm, termId: e.target.value })}
+              required
+            >
+              <option value="">Select term…</option>
+              {terms.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Due Date</label>
+            <input
+              type="date"
+              className={inputClass}
+              value={generateForm.dueDate}
+              onChange={(e) => setGenerateForm({ ...generateForm, dueDate: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Description (optional)</label>
+            <input
+              className={inputClass}
+              placeholder="e.g. Fall 2026 Tuition"
+              value={generateForm.description}
+              onChange={(e) => setGenerateForm({ ...generateForm, description: e.target.value })}
+            />
+          </div>
+          <Button type="submit" disabled={generating} className="sm:col-span-3 w-fit">
+            {generating ? "Generating…" : "Generate Challans"}
+          </Button>
+        </form>
+        {generateResult && (
+          <div className="mt-3 border-t border-line pt-3 text-xs space-y-1">
+            <div className="text-badge-green-text font-medium">
+              Generated {generateResult.generated.length} challan(s)
+            </div>
+            {generateResult.generated.map((g) => (
+              <div key={g.challanNumber} className="text-text-muted">
+                {g.challanNumber} — {g.name}: Rs. {g.amount.toLocaleString()}
+              </div>
+            ))}
+            {generateResult.skipped.length > 0 && (
+              <div className="text-text-muted mt-2">
+                Skipped {generateResult.skipped.length}: {generateResult.skipped.map((s) => s.name).join(", ")}
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       <Card>
