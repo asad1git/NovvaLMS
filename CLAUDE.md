@@ -1615,6 +1615,37 @@ would just be noise.
 Both fixes verified end-to-end via the real streaming chat endpoint (not shortcuts) and a
 Playwright pass across all scenarios above — zero console errors throughout.
 
+**AI-quality initiative, part 6 — the parent chatbot catches up: streaming + its own tutoring-
+style prompt.** Everything above landed on the student chatbot first; this brings the parent
+portal's AI Assistant to the same baseline for the two items that actually apply to it. Embedding-
+based retrieval and the citation fix do NOT apply here — the parent chatbot has never used RAG
+chunks (it's grounded in an analytics summary, not lecture documents) and `ParentMessage` has no
+`sources` field at all, so there was nothing to retrieve or misattribute in the first place.
+
+`parentChatStream` was added to `geminiProvider.js` only (mirroring `chatStream`'s exact
+`runChatStream(PARENT_CHAT_SYSTEM_PROMPT, ...)` pattern) — `openaiProvider.js`/`nvidiaProvider.js`
+don't implement it, same as `chatStream` before them, so `services/ai/index.js`'s existing
+`streamWithFailover` transparently falls back to their plain `parentChat()` if the chain ever
+fails over past Gemini. `parentChatController.sendMessage` converts to the same NDJSON streaming
+contract as the student chatbot's `sendMessage` — genuinely simpler here, since there's no
+`sources` classification step to run after the stream completes. `ParentDashboard.jsx`'s
+`ParentChat` component picked up the identical dots-then-growing-text pattern `ChatBot.jsx`
+established, rendering the streamed text as plain text (no `formatMessage` needed — the parent
+chat's system prompt has always forbidden all markdown, unlike the student chat's permitted
+`**bold**`).
+
+The tutoring-style addition to `PARENT_CHAT_SYSTEM_PROMPT` (kept byte-identical across all three
+providers, same as the student one) is a genuine adaptation, not a copy-paste of the student
+version — a parent needs an actionable suggestion, not a worked example testing their own
+understanding: "when discussing a weak topic, briefly suggest ONE concrete way the parent could
+support their child at home... skip it entirely for a simple factual lookup." Confirmed live: "how
+can I help at home" got a real, specific suggestion grounded in the actual weak quiz ("ask your
+child to walk you through the two questions they got right on that quiz — teaching the concept
+back to you reinforces their understanding"), while "how many quizzes has my child taken?" stayed
+a single plain sentence with zero padding. Verified through the real streaming endpoint (headers
+arrive immediately, persisted content matches the streamed text exactly) and a Playwright pass on
+the actual Parent Dashboard — zero console errors.
+
 ---
 
 ## Sprint Plan (2 weeks each)

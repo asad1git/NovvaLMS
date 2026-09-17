@@ -3,7 +3,7 @@ import { IconFileCheck, IconChartLine, IconAlertTriangle, IconUsers, IconNotes, 
 import DashboardShell from "../components/DashboardShell";
 import AccountSettings from "./AccountSettings";
 import { getMyChildren, getChildAnalytics } from "../api/parentLinks";
-import { getMessages, sendMessage } from "../api/parentChat";
+import { getMessages, sendMessageStream } from "../api/parentChat";
 import { StatCard, Card, Button, EmptyState, LoadingState } from "../components/ui";
 
 const NAV_ITEMS = ["Dashboard", "AI Assistant", "Account Settings"];
@@ -183,6 +183,7 @@ function ParentChat({ children, selectedId, setSelectedId }) {
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const bottomRef = useRef(null);
 
   const selectedChild = children.find((c) => c._id === selectedId);
@@ -198,7 +199,7 @@ function ParentChat({ children, selectedId, setSelectedId }) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, sending, streamingText]);
 
   async function handleSend(e) {
     e.preventDefault();
@@ -207,13 +208,30 @@ function ParentChat({ children, selectedId, setSelectedId }) {
     setDraft("");
     setSending(true);
     setError("");
-    setMessages((prev) => [...prev, { _id: `pending-${Date.now()}`, role: "user", content: question }]);
+    setStreamingText("");
+    const pendingUserId = `pending-${Date.now()}`;
+    setMessages((prev) => [...prev, { _id: pendingUserId, role: "user", content: question }]);
+
     try {
-      const { userMessage, assistantMessage } = await sendMessage(selectedId, question);
-      setMessages((prev) => [...prev.filter((m) => !String(m._id).startsWith("pending-")), userMessage, assistantMessage]);
+      await sendMessageStream(selectedId, question, {
+        onStart: (userMessage) => {
+          setMessages((prev) => [...prev.filter((m) => m._id !== pendingUserId), userMessage]);
+        },
+        onDelta: (text) => {
+          setStreamingText((prev) => prev + text);
+        },
+        onDone: (assistantMessage) => {
+          setMessages((prev) => [...prev, assistantMessage]);
+          setStreamingText("");
+        },
+        onError: (message) => {
+          throw new Error(message);
+        },
+      });
     } catch (err) {
-      setError(err.response?.data?.message || "The chatbot failed to respond");
-      setMessages((prev) => prev.filter((m) => !String(m._id).startsWith("pending-")));
+      setError(err.message || "The chatbot failed to respond");
+      setMessages((prev) => prev.filter((m) => m._id !== pendingUserId));
+      setStreamingText("");
       setDraft(question);
     } finally {
       setSending(false);
@@ -255,7 +273,13 @@ function ParentChat({ children, selectedId, setSelectedId }) {
         ))}
         {sending && (
           <div className="flex justify-start">
-            <div className="bg-badge-blue-bg text-text-muted rounded-card px-3 py-2 text-xs italic">Thinking…</div>
+            {streamingText ? (
+              <div className="max-w-[80%] rounded-card px-3 py-2 text-xs shadow-sm bg-badge-blue-bg text-text-main">
+                <p className="whitespace-pre-wrap">{streamingText}</p>
+              </div>
+            ) : (
+              <div className="bg-badge-blue-bg text-text-muted rounded-card px-3 py-2 text-xs italic">Thinking…</div>
+            )}
           </div>
         )}
         <div ref={bottomRef} />

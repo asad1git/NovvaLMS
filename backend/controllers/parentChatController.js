@@ -41,8 +41,13 @@ const getMessages = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/parent-links/:studentId/chat/messages (Parent only)
- * Same shape as the student chatbot's sendMessage, but grounded in the
- * child's analytics summary instead of RAG-selected lecture chunks.
+ * Same shape as the student chatbot's sendMessage (streamed NDJSON, same
+ * "everything before the stream starts can still be a normal JSON error
+ * response, everything after has to become an 'error' event on the stream
+ * itself" split), but grounded in the child's analytics summary instead of
+ * RAG-selected lecture chunks — no sources to classify here at all, since
+ * ParentMessage has no `sources` field (there's nothing to cite, per
+ * CLAUDE.md — the context is analytics data, not documents).
  */
 const sendMessage = asyncHandler(async (req, res) => {
   await assertLinked(req, res);
@@ -65,19 +70,30 @@ const sendMessage = asyncHandler(async (req, res) => {
   const analytics = await computeAnalyticsForStudent(req.params.studentId);
   const context = formatAnalyticsSummary(analytics);
 
-  let answer;
+  res.setHeader("Content-Type", "application/x-ndjson");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.write(JSON.stringify({ type: "start", userMessage }) + "\n");
+
+  let answer = "";
   try {
     const provider = getAIProvider();
-    const result = await provider.parentChat({ context, question: content.trim(), history });
-    answer = result.answer;
+    for await (const delta of provider.parentChatStream({ context, question: content.trim(), history })) {
+      answer += delta;
+      res.write(JSON.stringify({ type: "delta", text: delta }) + "\n");
+    }
+    if (!answer) {
+      throw new Error("AI provider returned no content");
+    }
   } catch (err) {
-    res.status(502);
-    throw new Error(`Chatbot failed to respond: ${err.message}`);
+    res.write(JSON.stringify({ type: "error", message: `Chatbot failed to respond: ${err.message}` }) + "\n");
+    return res.end();
   }
 
   const assistantMessage = await ParentMessage.create({ session: session._id, role: "assistant", content: answer });
 
-  res.status(201).json({ success: true, data: { userMessage, assistantMessage } });
+  res.write(JSON.stringify({ type: "done", assistantMessage }) + "\n");
+  res.end();
 });
 
 module.exports = { getMessages, sendMessage };

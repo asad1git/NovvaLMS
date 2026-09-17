@@ -124,6 +124,7 @@ function getAIProvider() {
     chatStream: (args) => streamWithFailover("chatStream", args),
     gradeSubjective: (args) => callWithFailover("gradeSubjective", args),
     parentChat: (args) => callWithFailover("parentChat", args),
+    parentChatStream: (args) => streamWithFailover("parentChatStream", args),
   };
 }
 

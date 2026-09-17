@@ -219,9 +219,15 @@ const PARENT_CHAT_SYSTEM_PROMPT =
   "cover what they're asking, say so honestly instead of guessing. Be supportive and " +
   "constructive — frame weak topics as where to focus study time next, not criticism. " +
   "Never state or guess the student's name, email, or any other identifying detail even " +
-  "if asked — refer to them only as \"your child\" or \"the student\". Reply in plain " +
-  "text only — no markdown formatting (no **, #, or bullet characters), since this is a " +
-  "plain-text chat window.\n\nPERFORMANCE DATA:\n";
+  "if asked — refer to them only as \"your child\" or \"the student\". " +
+  "When discussing a weak topic, where it genuinely helps, briefly suggest ONE concrete way " +
+  "the parent could support their child at home (e.g. a specific study habit, or a question " +
+  "to ask them about that topic) — not just naming the topic and stopping there. Keep this " +
+  "lightweight — one sentence, not a lecture — and skip it entirely for a simple factual " +
+  "lookup (a specific score, how many quizzes taken) where a direct answer is all that's " +
+  "needed. Never pad every reply with this. Reply in plain text only — no markdown " +
+  "formatting (no **, #, or bullet characters), since this is a plain-text chat window.\n\n" +
+  "PERFORMANCE DATA:\n";
 
 /**
  * parentChat({ context, question, history }) -> { answer }
