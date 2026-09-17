@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { IconRobot, IconSend, IconShieldCheck, IconInfoCircle, IconBook, IconMessageCircle } from "@tabler/icons-react";
 import { listCourses } from "../api/courses";
-import { getMessages, sendMessage } from "../api/chat";
+import { getMessages, sendMessageStream } from "../api/chat";
 import { useAuth } from "../context/AuthContext";
 
 const SUGGESTED_QUESTIONS = [
@@ -50,6 +50,7 @@ export default function ChatBot() {
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
 
   const bottomRef = useRef(null);
 
@@ -78,20 +79,37 @@ export default function ChatBot() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, sending]);
+  }, [messages, sending, streamingText]);
 
   async function doSend(question) {
     if (!question.trim() || !courseId) return;
     setDraft("");
     setSending(true);
     setError("");
-    setMessages((prev) => [...prev, { _id: `pending-${Date.now()}`, role: "user", content: question }]);
+    setStreamingText("");
+    const pendingUserId = `pending-${Date.now()}`;
+    setMessages((prev) => [...prev, { _id: pendingUserId, role: "user", content: question }]);
+
     try {
-      const { userMessage, assistantMessage } = await sendMessage(courseId, question);
-      setMessages((prev) => [...prev.filter((m) => !String(m._id).startsWith("pending-")), userMessage, assistantMessage]);
+      await sendMessageStream(courseId, question, {
+        onStart: (userMessage) => {
+          setMessages((prev) => [...prev.filter((m) => m._id !== pendingUserId), userMessage]);
+        },
+        onDelta: (text) => {
+          setStreamingText((prev) => prev + text);
+        },
+        onDone: (assistantMessage) => {
+          setMessages((prev) => [...prev, assistantMessage]);
+          setStreamingText("");
+        },
+        onError: (message) => {
+          throw new Error(message);
+        },
+      });
     } catch (err) {
-      setError(err.response?.data?.message || "The chatbot failed to respond");
-      setMessages((prev) => prev.filter((m) => !String(m._id).startsWith("pending-")));
+      setError(err.message || "The chatbot failed to respond");
+      setMessages((prev) => prev.filter((m) => m._id !== pendingUserId));
+      setStreamingText("");
       setDraft(question);
     } finally {
       setSending(false);
@@ -229,15 +247,21 @@ export default function ChatBot() {
             </div>
           ))}
           {sending && (
-            <div className="flex gap-2.5 self-start animate-[fadeIn_0.2s_ease-out]">
+            <div className="flex gap-2.5 self-start max-w-[72%] animate-[fadeIn_0.2s_ease-out]">
               <div className="w-8 h-8 rounded-full bg-navy text-white flex items-center justify-center flex-shrink-0 mt-0.5">
                 <IconRobot size={16} />
               </div>
-              <div className="bg-white border border-line rounded-2xl rounded-bl-[4px] shadow-sm px-4.5 py-3.5 flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-[#94a3b8] rounded-full animate-bounce [animation-delay:-0.3s]" />
-                <span className="w-2 h-2 bg-[#94a3b8] rounded-full animate-bounce [animation-delay:-0.15s]" />
-                <span className="w-2 h-2 bg-[#94a3b8] rounded-full animate-bounce" />
-              </div>
+              {streamingText ? (
+                <div className="bg-white border border-line rounded-2xl rounded-bl-[4px] shadow-sm px-4 py-3 text-[13.5px] leading-[1.65] text-text-main break-words">
+                  {formatMessage(streamingText)}
+                </div>
+              ) : (
+                <div className="bg-white border border-line rounded-2xl rounded-bl-[4px] shadow-sm px-4.5 py-3.5 flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-[#94a3b8] rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-2 h-2 bg-[#94a3b8] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-2 h-2 bg-[#94a3b8] rounded-full animate-bounce" />
+                </div>
+              )}
             </div>
           )}
           <div ref={bottomRef} />

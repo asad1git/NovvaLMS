@@ -175,6 +175,87 @@ async function chat({ context, question, history = [] }) {
   return runChat(CHAT_SYSTEM_PROMPT, context, question, history);
 }
 
+/**
+ * Streaming counterpart to runChat — same contract, but an async generator
+ * yielding incremental text deltas as Gemini produces them, via
+ * `:streamGenerateContent?alt=sse` instead of `:generateContent`. This is
+ * what makes the chatbot's real ~20s Gemini free-tier latency FEEL fast —
+ * tokens start appearing almost immediately instead of a static "Thinking…"
+ * indicator sitting inert for the whole wait. Each SSE frame's JSON payload
+ * carries only that frame's incremental text (not the whole answer so far),
+ * so yielding it directly is correct — no de-duplication needed.
+ */
+async function* runChatStream(systemPrompt, context, question, history) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("AI generation is not configured — set GEMINI_API_KEY in .env");
+  }
+
+  const contents = [
+    ...history.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    })),
+    { role: "user", parts: [{ text: question }] },
+  ];
+
+  const streamEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
+  const response = await fetch(streamEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents,
+      systemInstruction: { parts: [{ text: systemPrompt + context }] },
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Gemini API error (${response.status}): ${detail.slice(0, 300)}`);
+  }
+
+  // Read the SSE stream via the raw reader (not `for await` on the Web
+  // ReadableStream directly) — more portable across Node/undici versions
+  // than relying on async-iterator support landing on the stream itself.
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop(); // keep a possibly-incomplete last line for the next read
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const jsonStr = trimmed.slice(5).trim();
+      if (!jsonStr) continue;
+
+      let payload;
+      try {
+        payload = JSON.parse(jsonStr);
+      } catch {
+        continue; // an incomplete/malformed SSE frame — skip rather than crash the stream
+      }
+      const delta = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (delta) yield delta;
+    }
+  }
+}
+
+/**
+ * chatStream({ context, question, history }) -> async generator of text
+ * deltas. Same RAG contract and PII posture as chat() above — just
+ * streamed instead of awaited whole.
+ */
+function chatStream({ context, question, history = [] }) {
+  return runChatStream(CHAT_SYSTEM_PROMPT, context, question, history);
+}
+
 const PARENT_CHAT_SYSTEM_PROMPT =
   "You are an academic performance assistant helping a parent understand their child's " +
   "progress at university. Answer the parent's question using ONLY the performance data " +
@@ -265,4 +346,4 @@ async function gradeSubjective({ question, maxScore, answer }) {
   return { score, justification: parsed.justification || "" };
 }
 
-module.exports = { generateQuiz, chat, gradeSubjective, parentChat };
+module.exports = { generateQuiz, chat, chatStream, gradeSubjective, parentChat };

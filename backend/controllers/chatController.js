@@ -251,7 +251,6 @@ const sendMessage = asyncHandler(async (req, res) => {
   const hasAssignments = assignments.length > 0;
   const hasPerformanceData = analytics.overall.totalAttempts > 0;
 
-  let answer;
   let sourceMaterialIds = [];
 
   const hasAnyContext =
@@ -263,36 +262,55 @@ const sendMessage = asyncHandler(async (req, res) => {
     hasAssignments ||
     hasPerformanceData;
 
-  if (!hasAnyContext) {
-    answer = NO_CONTEXT_REPLY;
-  } else {
-    sourceMaterialIds = [
-      ...new Set([
-        ...(hasLectureExcerpts ? relevant.map((c) => String(c.materialId)) : []),
-        ...requestedMaterial.materialIds,
-      ]),
-    ];
+  // Everything above is a normal await chain — a failure there (bad course
+  // id, not enrolled, etc.) still produces a normal JSON error response via
+  // asyncHandler, since no response headers have been sent yet. Once we
+  // start writing the NDJSON stream below, we're committed: an error from
+  // here on has to become an "error" event on the stream itself, never a
+  // res.status()/throw, since Express can't set headers a second time on an
+  // already-started response.
+  res.setHeader("Content-Type", "application/x-ndjson");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no"); // disable proxy response buffering so deltas flush immediately
+  res.write(JSON.stringify({ type: "start", userMessage }) + "\n");
 
-    const context = [
-      `LECTURE EXCERPTS:\n${hasLectureExcerpts ? relevant.map((c) => c.text).join("\n---\n") : "(none matched this question)"}`,
-      hasRequestedMaterial ? `REQUESTED MATERIAL(S):\n${requestedMaterial.text}` : "",
-      `COURSE MATERIALS:\n${formatMaterialsList(materials)}`,
-      `ASSIGNMENT EXCERPTS:\n${hasAssignmentExcerpts ? relevantAssignmentExcerpts.map((c) => c.text).join("\n---\n") : "(none matched this question)"}`,
-      hasRequestedAssignment ? `REQUESTED ASSIGNMENT(S):\n${requestedAssignmentText}` : "",
-      `ASSIGNMENTS:\n${formatAssignmentsList(assignments)}`,
-      `YOUR PERFORMANCE:\n${formatAnalyticsSummary(analytics)}`,
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+  let answer = "";
+  try {
+    if (!hasAnyContext) {
+      answer = NO_CONTEXT_REPLY;
+      res.write(JSON.stringify({ type: "delta", text: answer }) + "\n");
+    } else {
+      sourceMaterialIds = [
+        ...new Set([
+          ...(hasLectureExcerpts ? relevant.map((c) => String(c.materialId)) : []),
+          ...requestedMaterial.materialIds,
+        ]),
+      ];
 
-    try {
+      const context = [
+        `LECTURE EXCERPTS:\n${hasLectureExcerpts ? relevant.map((c) => c.text).join("\n---\n") : "(none matched this question)"}`,
+        hasRequestedMaterial ? `REQUESTED MATERIAL(S):\n${requestedMaterial.text}` : "",
+        `COURSE MATERIALS:\n${formatMaterialsList(materials)}`,
+        `ASSIGNMENT EXCERPTS:\n${hasAssignmentExcerpts ? relevantAssignmentExcerpts.map((c) => c.text).join("\n---\n") : "(none matched this question)"}`,
+        hasRequestedAssignment ? `REQUESTED ASSIGNMENT(S):\n${requestedAssignmentText}` : "",
+        `ASSIGNMENTS:\n${formatAssignmentsList(assignments)}`,
+        `YOUR PERFORMANCE:\n${formatAnalyticsSummary(analytics)}`,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
       const provider = getAIProvider();
-      const result = await provider.chat({ context, question: content.trim(), history });
-      answer = result.answer;
-    } catch (err) {
-      res.status(502);
-      throw new Error(`Chatbot failed to respond: ${err.message}`);
+      for await (const delta of provider.chatStream({ context, question: content.trim(), history })) {
+        answer += delta;
+        res.write(JSON.stringify({ type: "delta", text: delta }) + "\n");
+      }
+      if (!answer) {
+        throw new Error("AI provider returned no content");
+      }
     }
+  } catch (err) {
+    res.write(JSON.stringify({ type: "error", message: `Chatbot failed to respond: ${err.message}` }) + "\n");
+    return res.end();
   }
 
   const assistantMessage = await Message.create({
@@ -303,7 +321,8 @@ const sendMessage = asyncHandler(async (req, res) => {
   });
   await assistantMessage.populate("sources", "title");
 
-  res.status(201).json({ success: true, data: { userMessage, assistantMessage } });
+  res.write(JSON.stringify({ type: "done", assistantMessage }) + "\n");
+  res.end();
 });
 
 module.exports = { getMessages, sendMessage };

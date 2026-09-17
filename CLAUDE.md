@@ -1345,6 +1345,61 @@ bug: the local Vite dev server was serving a stale cached transform of `StudentD
 issue this file already documents once before ("Vite stale-cache issue... cache-clear + restart
 resolved it"); killing and restarting the dev server fixed it immediately.
 
+**AI-quality initiative, post-backlog — Novva Assistant now streams its replies.** With the
+university-oriented roadmap complete, focus shifted to AI quality itself, since AI is this
+project's core differentiator. First improvement: the chatbot no longer makes a student wait
+silently for Gemini's full ~20s free-tier response before anything appears — it now streams the
+answer token-by-token, the same way a real chat product does, with zero change to retrieval
+quality or grounding (that's a separate, larger upgrade — real embedding-based retrieval instead
+of keyword overlap — still on the list, not done here).
+
+`geminiProvider.js` gained `chatStream({context, question, history})`, an async generator hitting
+Gemini's `:streamGenerateContent?alt=sse` endpoint instead of `:generateContent` — each SSE frame's
+JSON payload carries only that frame's incremental text, so yielding it directly (no
+de-duplication) is correct. Read via the raw `response.body.getReader()` rather than relying on
+`for await` support landing directly on a Web `ReadableStream`, for portability across Node/undici
+versions. `services/ai/index.js`'s failover chain gained a streaming-aware counterpart,
+`streamWithFailover` — the key subtlety: once a provider has yielded even one delta, the caller
+(an already-open HTTP response) may already be showing that partial text, so failing over to a
+different provider mid-stream would corrupt what's on screen. Failover therefore only ever
+triggers BEFORE the first delta (e.g. a bad API key rejected immediately); once a provider starts
+yielding, the chain commits to it, matching `callWithFailover`'s same "try the next provider on
+failure" philosophy, just gated on whether anything has been sent yet. A provider with no
+`chatStream` (openai/nvidia — not converted to streaming in this pass, since Gemini is the default
+and this was scoped to ship the primary path first) transparently falls back to its plain `chat()`
+and yields the whole answer as one delta, so the failover chain still produces a complete response
+even without incremental UX for a fallback provider.
+
+`chatController.sendMessage`'s response contract changed from a single JSON object to a chunked
+`application/x-ndjson` stream of `{type: "start"|"delta"|"done"|"error", ...}` lines — the one
+real design constraint this created: everything that can still fail with a normal HTTP error
+(bad course id, not enrolled, empty message) happens BEFORE any streaming header is written, so
+those keep working exactly as before via `asyncHandler`; anything that fails AFTER streaming has
+started (a mid-answer Gemini error) has to become an `{"type":"error"}` line on the stream itself
+and `res.end()`, never a `res.status()`/`throw`, since Express can't set response headers a second
+time once they've been sent. The zero-cost refusal path (no context at all) is unchanged in
+spirit — it's just now a single `"delta"` event with the fixed string instead of the old single
+JSON field. `Message` persistence (both `userMessage` and the final `assistantMessage`, sources
+included) is completely unchanged — only how the answer gets to the browser changed, not what gets
+stored.
+
+Frontend: `api/chat.js` gained `sendMessageStream()`, using raw `fetch` (not the shared axios
+instance, which doesn't expose an incremental `ReadableStream` reader for browser requests) to read
+the NDJSON stream and invoke `onStart`/`onDelta`/`onDone`/`onError` callbacks as lines arrive.
+`ChatBot.jsx`'s old "Thinking…" bouncing-dots indicator now only shows before the first token
+lands — the instant text starts streaming in, the same bubble slot renders the growing answer via
+the existing `formatMessage()` (bold-markdown-to-React-node) renderer, unchanged, so a student
+watches the reply build up in real time instead of staring at static dots for the whole ~20s.
+
+Verified end-to-end via a raw stream-reading script (bypassing the UI to inspect exact timing):
+confirmed genuine multi-chunk delivery (3 separate `delta` events for one real answer, not the
+whole thing in one frame), confirmed the final persisted `Message.content` is byte-identical to
+the concatenation of every streamed delta, and confirmed the first token reliably arrives in
+~4 seconds — much sooner than the ~20s it used to take for anything to appear at all. Followed by
+a Playwright pass capturing the actual visual transition: bouncing dots visible before the first
+token, then the real streamed answer rendering correctly with its bold-markdown formatting intact
+— zero console errors throughout.
+
 ---
 
 ## Sprint Plan (2 weeks each)
