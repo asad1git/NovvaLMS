@@ -421,11 +421,12 @@ cover, verbatim — confirmed live with an off-topic astronomy question). Improv
 are explicitly hedged ("likely covers", "worth checking") rather than presented as guaranteed
 citations, since there's no stored link between a `Question.topic` and a specific `Material` —
 confirmed live that the model actually uses this hedged phrasing rather than overclaiming.
-**Known minor imprecision:** `Message.sources` is set whenever any chunk scored non-zero
-relevance, even if the AI's actual answer drew from COURSE MATERIALS or YOUR PERFORMANCE instead
-of that chunk — the material named is always real, just occasionally attributed to the wrong
-answer. Not fixed, since doing so reliably would need classifying which section the model
-actually drew from, which isn't cheaply knowable from response text alone.
+**Formerly a known minor imprecision, now fixed — see "AI-quality initiative, part 5" further
+down.** `Message.sources` used to be set whenever any chunk scored non-zero relevance, even if the
+AI's actual answer drew from COURSE MATERIALS or YOUR PERFORMANCE instead of that chunk. At the
+time this was left unfixed because classifying which section the model actually drew from wasn't
+cheaply knowable from response text alone — that stopped being true once real embeddings existed
+for this project to lean on.
 
 **Fixed a real gap caught by live user testing, post-backlog:** "what's inside Week 1 Slides?"
 and "summarize Week 1 Slides" both hit the refusal, even though that material genuinely exists.
@@ -1560,6 +1561,59 @@ assignment list (`GET /courses/:id/assignments`, the endpoint that spreads every
 includes it either. Followed by a Playwright pass confirming both the quiz question builder's and
 the assignment form's rubric checkboxes render correctly (disabled until a model answer is
 actually typed) with zero console errors.
+
+**AI-quality initiative, part 5 — fixed the citation-misattribution bug, and Novva Assistant
+tutors instead of just answering.** Two smaller, final items closing out this initiative.
+
+**Citation fix.** `Message.sources` used to be computed from what merely matched the QUESTION
+(any chunk `selectRelevantChunksSemantic` returned) — but the AI might have actually answered from
+a completely different context section, so the citation pill sometimes named a real material that
+had nothing to do with the actual answer. New `ragEngine.classifyGenuineSources(answerText,
+relevantChunks)` fixes this by embedding the ANSWER itself (once, after streaming completes — this
+runs after the full text is already assembled, so it adds zero perceived latency to what the
+student sees) and keeping only chunks the answer is actually semantically close to, instead of
+every chunk that happened to match the question. `chatController.sendMessage` now computes
+`sourceMaterialIds` after the streaming loop, not before it — REQUESTED MATERIAL(S) stays
+unconditionally attributed, since that path injects a specific named material's FULL text with no
+real ambiguity about whether the answer could be from it; only the top-5 LECTURE EXCERPTS pool
+needed this reclassification.
+
+Getting the actual matching criteria right took two real iterations, both caught by deliberately
+adversarial testing rather than a favorable case:
+1. A flat cosine-similarity floor alone doesn't work — confirmed live that an answer entirely
+   about recursion scored 0.88 against the real chunk it came from, but STILL scored 0.59 against
+   a completely unrelated hashing chunk (same-domain technical prose shares an elevated baseline
+   similarity regardless of genuine topical overlap). Fixed with `SOURCE_ATTRIBUTION_MARGIN`
+   (0.15) — a chunk only counts if it's within that margin of the single best-matching chunk, not
+   just above some absolute cutoff. Confirmed this margin doesn't wrongly exclude a genuine second
+   topic either: an answer that actually covered two topics scored 0.768/0.781 — a ~0.01 gap,
+   comfortably inside the margin, so both correctly stay cited.
+2. Live UI testing (not the isolated test) caught a second, subtler collision the first fix
+   missed: a materials-listing answer ("...uploaded: 1. real_test.txt 2. Recursion Semantic Test")
+   that only ever MENTIONS a material's title — never discussing its actual content — still
+   scored 0.62 against that material's content chunk, just from the word "Recursion" appearing in
+   both, comfortably clearing the original 0.5 floor reused from `selectRelevantChunksSemantic`.
+   Fixed with a dedicated, stricter `SOURCE_ATTRIBUTION_FLOOR` (0.65) specific to answer-to-chunk
+   classification — deliberately not the same constant as query-to-chunk retrieval, since they're
+   different comparisons with different score distributions. Re-verified after the fix that the
+   materials-listing case now correctly gets zero sources while the genuine content-summary case
+   (0.88) and both-topic case (0.77/0.78) still correctly do.
+
+**Tutoring-style prompt.** All three providers' `CHAT_SYSTEM_PROMPT` (kept byte-identical across
+providers, confirmed by comparing the actual runtime string values, not just the source text —
+the files themselves have different line-ending styles from being touched at different points in
+this project's history) gained rule 6: for a conceptual "how/why does this work" question, briefly
+reinforce the answer with a short worked example or analogy, or one focused follow-up question —
+explicitly scoped to skip this entirely for simple factual lookups (what's due, what's uploaded, a
+specific score), so it doesn't pad every reply. Confirmed live with a real A/B: asking "why does a
+recursive function need a base case?" got a genuine, freshly-generated analogy each time (a ladder
+with a floor; a line of people passing a message back) plus a numbered conceptual breakdown, while
+"what materials have been uploaded to this course?" stayed a plain two-item list with no padding —
+confirming the AI correctly discriminates between when the extra reinforcement helps and when it
+would just be noise.
+
+Both fixes verified end-to-end via the real streaming chat endpoint (not shortcuts) and a
+Playwright pass across all scenarios above — zero console errors throughout.
 
 ---
 

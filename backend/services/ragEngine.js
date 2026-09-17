@@ -266,6 +266,73 @@ function findMentionedMaterials(question, materials) {
   });
 }
 
+// A dedicated, stricter floor for answer-to-chunk similarity — deliberately
+// NOT the same SEMANTIC_SIMILARITY_THRESHOLD selectRelevantChunksSemantic
+// uses for query-to-chunk retrieval, since these are two different
+// comparisons with different score distributions. Confirmed live: a
+// materials-listing answer that only ever MENTIONS a material's title
+// ("...uploaded: 1. real_test.txt 2. Recursion Semantic Test") — never
+// discussing that material's actual content — still scored 0.62 against
+// the recursion chunk, comfortably past 0.5, just from the word
+// "Recursion" appearing in both. 0.65 clears that specific collision
+// while still comfortably passing every genuine case measured (0.88 for
+// an answer actually built from that chunk's content; 0.77/0.78 for an
+// answer that genuinely covered two topics at once).
+const SOURCE_ATTRIBUTION_FLOOR = 0.65;
+
+// How far below the single best-matching chunk's score another candidate
+// is still allowed to be and count as a genuine, independent source (not
+// just "same general subject as the one the answer actually came from").
+// A flat floor alone doesn't fully separate this either — confirmed live:
+// an answer entirely about recursion scored 0.88 against the real
+// recursion chunk it came from, but still scored 0.59 against a
+// completely unrelated hashing chunk. Same-domain technical prose (two CS
+// topics explained in a similar textbook register) shares an elevated
+// baseline similarity regardless of genuine topical overlap; the gap to
+// the actual source (0.3 in that case) is what's actually discriminative.
+// A second live case where the answer genuinely covered two topics scored
+// 0.768/0.781 — a ~0.01 gap — confirming this margin doesn't wrongly
+// exclude a second topic the answer truly did draw from.
+const SOURCE_ATTRIBUTION_MARGIN = 0.15;
+
+/**
+ * Fixes the citation-misattribution imprecision CLAUDE.md previously
+ * documented as unfixed ("Message.sources is set whenever any chunk
+ * scored non-zero relevance... isn't cheaply knowable from response text
+ * alone"). It IS cheaply knowable now, with embeddings: instead of citing
+ * every chunk that merely matched the QUESTION (the old, buggy signal —
+ * the AI might have actually answered from COURSE MATERIALS or YOUR
+ * PERFORMANCE instead), this embeds the ANSWER itself and keeps only
+ * chunks that are (a) above SOURCE_ATTRIBUTION_FLOOR, AND (b) within
+ * SOURCE_ATTRIBUTION_MARGIN of the single best-matching chunk — see both
+ * constants' own comments for why a flat floor alone isn't discriminative
+ * enough. Chunks without a precomputed
+ * vector are kept as-is (can't classify them without one) — same
+ * graceful-degradation posture as selectRelevantChunksSemantic. On any
+ * embedding failure, returns every candidate unchanged rather than
+ * silently dropping real citations — a false attribution is a cosmetic
+ * imprecision; losing a true one is worse.
+ */
+async function classifyGenuineSources(answerText, relevantChunks) {
+  const withVectors = relevantChunks.filter((c) => c.vector);
+  if (withVectors.length === 0) return relevantChunks;
+
+  try {
+    const answerVector = await embedQuery(answerText);
+    const scored = withVectors.map((c) => ({ ...c, _answerScore: cosineSimilarity(answerVector, c.vector) }));
+    const bestScore = Math.max(...scored.map((c) => c._answerScore));
+
+    const genuine = scored.filter(
+      (c) => c._answerScore >= SOURCE_ATTRIBUTION_FLOOR && c._answerScore >= bestScore - SOURCE_ATTRIBUTION_MARGIN
+    );
+    const withoutVectors = relevantChunks.filter((c) => !c.vector);
+    return [...genuine, ...withoutVectors];
+  } catch (err) {
+    console.warn(`[Embeddings] Failed to classify genuine sources, keeping all candidates: ${err.message}`);
+    return relevantChunks;
+  }
+}
+
 module.exports = {
   extractTextFromPdf,
   extractTextFromDocx,
@@ -275,6 +342,7 @@ module.exports = {
   chunkText,
   selectRelevantChunks,
   selectRelevantChunksSemantic,
+  classifyGenuineSources,
   computeChunkEmbeddings,
   findMentionedMaterials,
 };

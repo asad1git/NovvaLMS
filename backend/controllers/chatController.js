@@ -11,6 +11,7 @@ const {
   extractText,
   chunkText,
   selectRelevantChunksSemantic,
+  classifyGenuineSources,
   findMentionedMaterials,
 } = require("../services/ragEngine");
 const { getAIProvider } = require("../services/ai");
@@ -283,8 +284,6 @@ const sendMessage = asyncHandler(async (req, res) => {
   const hasAssignments = assignments.length > 0;
   const hasPerformanceData = analytics.overall.totalAttempts > 0;
 
-  let sourceMaterialIds = [];
-
   const hasAnyContext =
     hasLectureExcerpts ||
     hasRequestedMaterial ||
@@ -312,13 +311,6 @@ const sendMessage = asyncHandler(async (req, res) => {
       answer = NO_CONTEXT_REPLY;
       res.write(JSON.stringify({ type: "delta", text: answer }) + "\n");
     } else {
-      sourceMaterialIds = [
-        ...new Set([
-          ...(hasLectureExcerpts ? relevant.map((c) => String(c.materialId)) : []),
-          ...requestedMaterial.materialIds,
-        ]),
-      ];
-
       const context = [
         `LECTURE EXCERPTS:\n${hasLectureExcerpts ? relevant.map((c) => c.text).join("\n---\n") : "(none matched this question)"}`,
         hasRequestedMaterial ? `REQUESTED MATERIAL(S):\n${requestedMaterial.text}` : "",
@@ -344,6 +336,18 @@ const sendMessage = asyncHandler(async (req, res) => {
     res.write(JSON.stringify({ type: "error", message: `Chatbot failed to respond: ${err.message}` }) + "\n");
     return res.end();
   }
+
+  // Classified from the ANSWER itself, not from what merely matched the
+  // QUESTION — see ragEngine.classifyGenuineSources's own comment for why
+  // this fixes the "citation attributed to the wrong context section"
+  // imprecision CLAUDE.md previously documented as unfixed. REQUESTED
+  // MATERIAL(S) stays unconditionally attributed — that path injects a
+  // specific named material's FULL text, so there's no real ambiguity
+  // about whether the answer could have come from it.
+  const genuineRelevant = hasLectureExcerpts ? await classifyGenuineSources(answer, relevant) : [];
+  const sourceMaterialIds = [
+    ...new Set([...genuineRelevant.map((c) => String(c.materialId)), ...requestedMaterial.materialIds]),
+  ];
 
   const assistantMessage = await Message.create({
     session: session._id,
