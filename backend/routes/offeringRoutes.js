@@ -7,6 +7,6 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", authorize("admin"), createOffering);
+router.post("/", authorize("admin", "registrar"), createOffering);
 
 module.exports = router;

@@ -51,11 +51,16 @@ Never let a controller run without both middlewares if the route needs auth.
 
 ## Roles & RBAC
 
-Four roles: `admin`, `teacher`, `student`, `parent`. A student token must NEVER
-be able to reach a teacher or admin route, even if otherwise valid. Enforce
-this at the middleware level (`authorize("admin")`, etc.), not inside controllers.
-A `parent` account only ever sees data for the student(s) it's explicitly linked
-to via `ParentLink` — never course/teacher/admin data.
+Seven roles: `admin`, `teacher`, `student`, `parent`, `registrar`, `hod` (Department Head),
+`advisor`. A student token must NEVER be able to reach a teacher or admin route, even if
+otherwise valid. Enforce this at the middleware level (`authorize("admin")`, etc.), not inside
+controllers. A `parent` account only ever sees data for the student(s) it's explicitly linked to
+via `ParentLink` — never course/teacher/admin data. The three narrower roles (added post-backlog,
+see "University-oriented item 5" further down) are deliberately NOT full-admin: `registrar` owns
+terms/offerings/registration but never user management or fee/salary data; `hod` sees a
+department-scoped report only for the one `Department` its `User.department` field names, never
+another; `advisor` sees registration/transcript data only for the specific students linked to it
+via `AdvisorLink`, the same admin-managed join-collection shape as `ParentLink`.
 
 ---
 
@@ -83,12 +88,12 @@ to OpenAI/Gemini. Only academic content goes in the prompt.
 
 ---
 
-## Database — 24 MongoDB Collections
+## Database — 26 MongoDB Collections
 
 `Users, Courses, Terms, CourseOfferings, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
 Answers, ChatSessions, Messages, FeeChallans, FeeStructures, SalarySlips, ParentLinks,
 ParentChatSessions, ParentMessages, Notifications, AttendanceSessions, AttendanceRecords,
-Assignments, AssignmentSubmissions, Grades`
+Assignments, AssignmentSubmissions, Grades, Departments, AdvisorLinks`
 
 **`Courses` is a pure catalog now** (title/code/description — no `teacher`); **`CourseOfferings`**
 (course + term + teacher + sectionLabel) is the actual taught instance everything else attaches
@@ -1158,6 +1163,77 @@ computation exactly; re-ran generation for the same term and confirmed all three
 403 on both `POST /fee-challans/structures` and `POST /fee-challans/generate`. Followed by a
 Playwright pass on the real UI (admin login → Fee Challans) confirming both new cards render with
 the saved structure and generated challans visible, zero console errors.
+
+**University-oriented item 5 (roles narrower than admin) is now built** — `registrar`, `hod`
+(Department Head), and `advisor` join the four existing roles, each scoped to a slice of what
+Admin can do rather than granted full admin power, per the roadmap doc's own framing. This item
+was flagged there as the **lowest-risk** of the remaining roadmap items specifically because
+`authorize()` is already role-array-based and role-agnostic (proven when `parent` was added
+earlier), and both new scoping patterns — "a set of linked students" and "one department" — reuse
+shapes that already exist and work.
+
+A new `Department` model (`name`, `code` — deliberately minimal, same spirit as `Term`) gives
+`hod` scoping something concrete to scope to; `Course` gained an optional, nullable `department`
+ref (every pre-existing catalog course stays valid, untagged) settable at creation time via
+`AdminCourses.jsx`'s catalog form. `User` gained an optional `department` ref, meaningful only for
+role `hod` — set at account-creation time (`AdminUsers.jsx` shows a "Heads Department" picker only
+when role is Department Head) via a new optional `departmentId` on `POST /api/users`.
+
+**Registrar** — "owns terms, offerings, registration rules," never user/fee/salary management.
+Given `authorize("admin", "registrar")` on `createTerm`, `createOffering`, `createCourse` (catalog
+creation is bundled in too — splitting it out would have meant a registrar seeing a form they
+can't submit), `bulkEnrollFromCSV`, and `getEnrollments`; `getCourses` treats `registrar` the same
+as `admin` (sees every offering, not just one teacher's own). `getEnrollments`'s manager check was
+deliberately NOT added to the shared `assertCourseManager` helper — that helper is also used by
+`transcriptController`'s grading endpoints, and widening it there would have accidentally handed a
+Registrar grading access, which is out of scope per the roadmap doc. Caught one real gap during
+verification: `GET /api/users` was admin-only, but a Registrar's own offering-creation form needs
+it to populate the teacher picker — fixed by splitting `userRoutes.js`'s single
+`router.use(protect, authorize("admin"))` into per-route authorization, so `GET /` opens to
+`registrar` too while `POST`/`PUT` (create/edit accounts) stay admin-only. `RegistrarDashboard.jsx`
+reuses `AdminCourses.jsx` directly rather than duplicating it — the backend already authorizes
+`registrar` on every endpoint that page calls, so nothing there silently 403s.
+
+**Department Head (`hod`)** — "sees department-level reporting," own department only. New
+`GET /api/departments/:id/report` (Admin, or the HOD whose own `User.department` equals `:id` —
+checked inline, a different department id is a 403) returns every catalog course tagged to that
+department, every `CourseOffering` of those courses with enrollment counts, and a department-wide
+average of every finalized `Grade` in it — reusing the `Grade` model from Phase 2 rather than a
+parallel aggregation. `HodDashboard.jsx`'s one nav item, "Department Report," reads its own
+department id off `GET /api/auth/me` (which now also returns `department`) and requests that
+department's report directly — no department-picker needed, since an HOD only ever has one.
+The roadmap doc's "approves things within one department" was deliberately left unbuilt: there's
+no concrete approval gate anywhere in the app for an HOD to sit in front of (course-offering
+creation isn't gated on approval today), and inventing one wasn't asked for — this pass is
+view-only for HOD, a scoping call worth flagging rather than silently narrowing.
+
+**Advisor** — "sees a specific set of students' registration and degree progress." New
+`AdvisorLink` model, byte-for-byte the same shape as `ParentLink` (admin-managed join collection,
+not an embedded array), admin-managed via `POST/GET/DELETE /api/advisor-links`. `transcriptController`
+was split into `computeTranscriptForStudent(studentId)` (the pure aggregation, unchanged) and the
+thin `getMyTranscript` wrapper — the same split pattern Phase 2 established for
+`computeAnalyticsForStudent`/parent — so `advisorLinkController.getAdviseeTranscript`
+(`GET /api/advisor-links/:studentId/transcript`, advisor-only) can check `AdvisorLink.exists()`
+BEFORE calling that exact same function, never a parallel implementation. `getAdviseeRegistration`
+(`GET /api/advisor-links/:studentId/registration`) covers the "registration" half — every
+`CourseOffering` a linked advisee is currently enrolled in. "Degree progress" (the roadmap
+doc's phrase) is covered by the transcript endpoint, since a full degree-audit (roadmap item 8,
+unbuilt) doesn't exist yet to give a narrower or more literal answer. `AdvisorDashboard.jsx`'s "My
+Advisees" reuses `ParentDashboard.jsx`'s child-picker pattern (renamed to an advisee picker) —
+GPA/credit-hour stat cards, current registration, full transcript-by-term — for whichever advisee
+is selected.
+
+Verified end-to-end via direct API calls (not just the happy path — every 403 boundary tested by
+actually logging in as each new role, not proxied through an admin token): a Registrar created a
+real term and offering, saw all offerings app-wide, and was correctly blocked from creating user
+accounts and from fee-challans data; a `hod` account correctly saw a real department report
+(1 catalog course, 1 offering, accurate enrollment count) for its own department and got a 403 for
+a second, different department, plus 403s on creating offerings/departments; an `advisor` account
+linked to Ali Raza got back a transcript response byte-identical to Ali's own `GET /transcript/me`,
+a correct 5-offering registration list, a 403 for an unlinked student, and a 403 on the admin-only
+full link listing. Followed by a Playwright pass logging into all three new dashboards plus the
+two new Admin nav items ("Departments," "Advisor Links") and the conditional HOD department-picker
+on the Create User form — all rendering real data, zero console errors.
 
 ---
 

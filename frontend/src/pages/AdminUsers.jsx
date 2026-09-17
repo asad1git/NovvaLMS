@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { IconUser } from "@tabler/icons-react";
 import api from "../api/axios";
 import { listUsers, createUser, updateUser } from "../api/users";
+import { listDepartments } from "../api/departments";
 import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
 
 const ROLE_BADGE_VARIANT = {
@@ -9,6 +10,9 @@ const ROLE_BADGE_VARIANT = {
   teacher: "blue",
   student: "amber",
   parent: "gray",
+  registrar: "blue",
+  hod: "gray",
+  advisor: "amber",
 };
 
 const inputClass =
@@ -23,8 +27,9 @@ export default function AdminUsers() {
   const [notice, setNotice] = useState("");
   const [currentUserId, setCurrentUserId] = useState(null);
 
-  const [form, setForm] = useState({ name: "", email: "", role: "student" });
+  const [form, setForm] = useState({ name: "", email: "", role: "student", departmentId: "" });
   const [creating, setCreating] = useState(false);
+  const [departments, setDepartments] = useState([]);
 
   async function refresh(role) {
     setLoading(true);
@@ -39,6 +44,7 @@ export default function AdminUsers() {
 
   useEffect(() => {
     api.get("/auth/me").then((r) => setCurrentUserId(r.data.data._id));
+    listDepartments().then(setDepartments);
     refresh("");
   }, []);
 
@@ -58,7 +64,7 @@ export default function AdminUsers() {
       setNotice(
         `${user.name} created. A temporary password was emailed to them (or logged to the server console if SMTP isn't configured yet).`
       );
-      setForm({ name: "", email: "", role: "student" });
+      setForm({ name: "", email: "", role: "student", departmentId: "" });
       await refresh(roleFilter);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create user");
@@ -126,9 +132,30 @@ export default function AdminUsers() {
               <option value="student">Student</option>
               <option value="teacher">Teacher</option>
               <option value="parent">Parent</option>
+              <option value="advisor">Advisor</option>
+              <option value="registrar">Registrar</option>
+              <option value="hod">Department Head</option>
               <option value="admin">Admin</option>
             </select>
           </div>
+          {form.role === "hod" && (
+            <div>
+              <label className="block text-[11px] text-text-muted mb-1">Heads Department</label>
+              <select
+                className={`w-full bg-white ${inputClass}`}
+                value={form.departmentId}
+                onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
+                required
+              >
+                <option value="">Select department…</option>
+                {departments.map((d) => (
+                  <option key={d._id} value={d._id}>
+                    {d.code} — {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <Button type="submit" disabled={creating} className="sm:col-span-3 w-fit">
             {creating ? "Creating…" : "Create User"}
           </Button>
@@ -151,6 +178,9 @@ export default function AdminUsers() {
             <option value="teacher">Teacher</option>
             <option value="student">Student</option>
             <option value="parent">Parent</option>
+            <option value="advisor">Advisor</option>
+            <option value="registrar">Registrar</option>
+            <option value="hod">Department Head</option>
           </select>
         </div>
 

@@ -1,8 +1,11 @@
 const asyncHandler = require("express-async-handler");
 const crypto = require("crypto");
 const User = require("../models/User");
+const Department = require("../models/Department");
 const generateToken = require("../utils/generateToken");
 const sendEmail = require("../utils/sendEmail");
+
+const VALID_ROLES = ["admin", "teacher", "student", "parent", "registrar", "hod", "advisor"];
 
 /**
  * US-02 — POST /api/auth/login
@@ -61,6 +64,7 @@ const getMe = asyncHandler(async (req, res) => {
       email: req.user.email,
       role: req.user.role,
       isActive: req.user.isActive,
+      department: req.user.department,
     },
   });
 });
@@ -74,16 +78,16 @@ const getMe = asyncHandler(async (req, res) => {
  * this matches "automated credential delivery via email" from the SDS.
  */
 const createUser = asyncHandler(async (req, res) => {
-  const { name, email, role } = req.body;
+  const { name, email, role, departmentId } = req.body;
 
   if (!name || !email || !role) {
     res.status(400);
     throw new Error("Name, email, and role are required");
   }
 
-  if (!["admin", "teacher", "student", "parent"].includes(role)) {
+  if (!VALID_ROLES.includes(role)) {
     res.status(400);
-    throw new Error("Role must be admin, teacher, student, or parent");
+    throw new Error(`Role must be one of: ${VALID_ROLES.join(", ")}`);
   }
 
   const existing = await User.findOne({ email: email.toLowerCase() });
@@ -92,9 +96,20 @@ const createUser = asyncHandler(async (req, res) => {
     throw new Error("Email already registered");
   }
 
+  // departmentId is only meaningful for an HOD — it's the department they
+  // head, which scopes their department-report view.
+  let department = null;
+  if (role === "hod" && departmentId) {
+    department = await Department.findById(departmentId);
+    if (!department) {
+      res.status(400);
+      throw new Error("departmentId must belong to an existing department");
+    }
+  }
+
   const tempPassword = crypto.randomBytes(6).toString("base64url"); // e.g. "Xk9pQr2b"
 
-  const user = new User({ name, email: email.toLowerCase(), role });
+  const user = new User({ name, email: email.toLowerCase(), role, department: department?._id || null });
   await user.setPassword(tempPassword);
   await user.save();
 

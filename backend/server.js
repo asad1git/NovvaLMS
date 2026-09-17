@@ -23,6 +23,8 @@ const termRoutes = require("./routes/termRoutes");
 const offeringRoutes = require("./routes/offeringRoutes");
 const transcriptRoutes = require("./routes/transcriptRoutes");
 const registrationRoutes = require("./routes/registrationRoutes");
+const departmentRoutes = require("./routes/departmentRoutes");
+const advisorLinkRoutes = require("./routes/advisorLinkRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -63,6 +65,8 @@ app.use("/api/terms", termRoutes);
 app.use("/api/offerings", offeringRoutes);
 app.use("/api/transcript", transcriptRoutes);
 app.use("/api/registration", registrationRoutes);
+app.use("/api/departments", departmentRoutes);
+app.use("/api/advisor-links", advisorLinkRoutes);
 
 // ─── Error handling (must be last) ───
 app.use(notFound);

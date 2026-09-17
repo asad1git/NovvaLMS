@@ -152,14 +152,22 @@ honest that full generality on items 6 and 8 isn't worth chasing.
 
 ## Where this was left
 
-**Update:** the user decided to proceed. **Items 1, 2, 3, 4, and 7 are done** — the Course/
-CourseOffering split, Term, self-service registration, GPA/transcripts, and fee automation — see
-CLAUDE.md's "University-oriented Phase 1/2/3" and "item 7 (fee automation)" entries for the full
-writeups. Notably, item 3's flagged technical blocker (seat-capacity races) turned out to be
-solvable *without* the multi-document transactions this doc originally assumed were necessary —
-a single atomic conditional update on one document's own two fields (`enrolledCount` vs
-`capacity`) is simpler and more portable, working even on standalone MongoDB, not just Atlas.
-Item 7 turned out exactly as low-medium-risk as originally assessed above — the new
-`FeeStructure` model and bulk-generate endpoint reuse the existing `FeeChallan`/PDF pipeline
-unchanged, just with a computed amount instead of a typed one. Items 5, 6, and 8 (narrower roles,
-scheduling, degree audit) are still just this planning discussion.
+**Update:** the user decided to proceed. **Items 1, 2, 3, 4, 5, and 7 are done** — the Course/
+CourseOffering split, Term, self-service registration, GPA/transcripts, narrower roles, and fee
+automation — see CLAUDE.md's "University-oriented Phase 1/2/3", "item 5 (roles narrower than
+admin)", and "item 7 (fee automation)" entries for the full writeups. Notably, item 3's flagged
+technical blocker (seat-capacity races) turned out to be solvable *without* the multi-document
+transactions this doc originally assumed were necessary — a single atomic conditional update on
+one document's own two fields (`enrolledCount` vs `capacity`) is simpler and more portable,
+working even on standalone MongoDB, not just Atlas. Item 7 turned out exactly as low-medium-risk
+as originally assessed above — the new `FeeStructure` model and bulk-generate endpoint reuse the
+existing `FeeChallan`/PDF pipeline unchanged, just with a computed amount instead of a typed one.
+Item 5 also turned out exactly as low-risk as assessed — `authorize()` needed no changes, and the
+`hod`/`advisor` scoping patterns reused `ParentLink`'s existing shape almost directly, though one
+real gap surfaced only during verification: `GET /api/users` had been admin-only, and a Registrar
+creating an offering needs it to populate the teacher picker — fixed by splitting that route's
+authorization per-HTTP-method instead of gating the whole router. Item 5's "HOD approves things
+within one department" was deliberately left unbuilt (view-only report instead) — there's no
+existing approval gate for course-offering creation to hang an HOD's approval off, and building
+one wasn't asked for. Items 6 and 8 (scheduling, degree audit) are still just this planning
+discussion.

@@ -140,15 +140,17 @@ const finalizeGrade = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /api/transcript/me (Student only)
- * Every finalized grade this student has, grouped by term, with a
+ * Every finalized grade a student has, grouped by term, with a
  * credit-hour-weighted GPA per term and cumulative across all terms.
  * Deliberately reads ONLY finalized Grade documents — never the computed
  * draft — same HITL boundary as everywhere else in this project: a
- * student sees the teacher's decision, not the system's guess.
+ * student (or their advisor) sees the teacher's decision, not the
+ * system's guess. Factored out of getMyTranscript so advisorLinkController
+ * can reuse the exact same aggregation for a linked advisee, the same
+ * split pattern computeAnalyticsForStudent uses for the parent portal.
  */
-const getMyTranscript = asyncHandler(async (req, res) => {
-  const grades = await Grade.find({ student: req.user._id })
+async function computeTranscriptForStudent(studentId) {
+  const grades = await Grade.find({ student: studentId })
     .populate({
       path: "courseOffering",
       populate: [
@@ -197,14 +199,26 @@ const getMyTranscript = asyncHandler(async (req, res) => {
     0
   );
 
-  res.status(200).json({
-    success: true,
-    data: {
-      terms,
-      cumulativeGpa: cumulativeCredits > 0 ? Math.round((cumulativePoints / cumulativeCredits) * 100) / 100 : null,
-      cumulativeCredits,
-    },
-  });
+  return {
+    terms,
+    cumulativeGpa: cumulativeCredits > 0 ? Math.round((cumulativePoints / cumulativeCredits) * 100) / 100 : null,
+    cumulativeCredits,
+  };
+}
+
+/**
+ * GET /api/transcript/me (Student only) — thin wrapper around
+ * computeTranscriptForStudent for the logged-in student themselves.
+ */
+const getMyTranscript = asyncHandler(async (req, res) => {
+  const data = await computeTranscriptForStudent(req.user._id);
+  res.status(200).json({ success: true, data });
 });
 
-module.exports = { computeOfferingPercentage, getOfferingGrades, finalizeGrade, getMyTranscript };
+module.exports = {
+  computeOfferingPercentage,
+  computeTranscriptForStudent,
+  getOfferingGrades,
+  finalizeGrade,
+  getMyTranscript,
+};

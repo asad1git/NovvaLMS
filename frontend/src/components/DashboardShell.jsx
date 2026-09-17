@@ -20,6 +20,9 @@ import {
   IconX,
   IconFileCertificate,
   IconClipboardCheck,
+  IconBuildingBank,
+  IconUserCheck,
+  IconReportAnalytics,
 } from "@tabler/icons-react";
 import NotificationBell from "./NotificationBell";
 
@@ -33,6 +36,10 @@ const NAV_ICONS = {
   "Grade Approvals": IconChecklist,
   "Manage Users": IconUsers,
   "Parent Links": IconLink,
+  "Advisor Links": IconUserCheck,
+  Departments: IconBuildingBank,
+  "Department Report": IconReportAnalytics,
+  "My Advisees": IconUsers,
   "Fee Challans": IconReceipt2,
   "Salary Slips": IconCash,
   "My Results": IconClipboardList,

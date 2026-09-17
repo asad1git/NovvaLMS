@@ -4,7 +4,7 @@ const Course = require("../models/Course");
 const CourseOffering = require("../models/CourseOffering");
 const Enrollment = require("../models/Enrollment");
 const User = require("../models/User");
-const { assertCourseAccess, assertCourseManager } = require("../utils/courseAccess");
+const { assertCourseAccess } = require("../utils/courseAccess");
 const { flattenOffering } = require("./offeringController");
 
 /**
@@ -14,7 +14,7 @@ const { flattenOffering } = require("./offeringController");
  * teacher+term is the separate POST /api/offerings step.
  */
 const createCourse = asyncHandler(async (req, res) => {
-  const { title, code, description, creditHours, prerequisites } = req.body;
+  const { title, code, description, creditHours, prerequisites, departmentId } = req.body;
 
   if (!title || !code) {
     res.status(400);
@@ -27,6 +27,7 @@ const createCourse = asyncHandler(async (req, res) => {
     description,
     creditHours: creditHours ? Number(creditHours) : undefined,
     prerequisites: prerequisites || [],
+    department: departmentId || null,
   });
   res.status(201).json({ success: true, data: course });
 });
@@ -50,12 +51,14 @@ const listCatalogCourses = asyncHandler(async (req, res) => {
  * offerings they're enrolled in — just backed by CourseOffering now
  * instead of Course directly, flattened back into the same shape every
  * existing frontend caller already expects (see flattenOffering's own
- * comment for why).
+ * comment for why). A Registrar sees every offering too, same as an
+ * Admin — they manage registration/offerings across the board, not one
+ * teacher's own courses.
  */
 const getCourses = asyncHandler(async (req, res) => {
   let offerings;
 
-  if (req.user.role === "admin") {
+  if (req.user.role === "admin" || req.user.role === "registrar") {
     offerings = await CourseOffering.find()
       .populate("course", "title code description")
       .populate("teacher", "name email")
@@ -153,8 +156,12 @@ const bulkEnrollFromCSV = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/courses/:id/enrollments — class roster. :id is a CourseOffering
- * id. Deliberately admin/owning-teacher only (assertCourseManager, not
- * assertCourseAccess) — a Student must never see their classmates' info.
+ * id. Deliberately admin/registrar/owning-teacher only — a Student must
+ * never see their classmates' info. Checked inline rather than via the
+ * shared assertCourseManager (used by grading too) specifically so
+ * widening this to Registrar doesn't also widen grading access, which is
+ * out of a Registrar's scope per the roadmap doc ("owns terms, offerings,
+ * registration rules" — not grading).
  */
 const getEnrollments = asyncHandler(async (req, res) => {
   const offering = await CourseOffering.findById(req.params.id);
@@ -162,7 +169,11 @@ const getEnrollments = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Course not found");
   }
-  assertCourseManager(req.user, res, offering);
+  const isOwningTeacher = req.user.role === "teacher" && String(offering.teacher) === String(req.user._id);
+  if (!["admin", "registrar"].includes(req.user.role) && !isOwningTeacher) {
+    res.status(403);
+    throw new Error("Only an admin, registrar, or the course's teacher can view this roster");
+  }
 
   const enrollments = await Enrollment.find({ courseOffering: offering._id })
     .populate("student", "name email")

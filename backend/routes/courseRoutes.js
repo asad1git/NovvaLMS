@@ -24,15 +24,15 @@ const router = express.Router();
 // can read courses, just different slices of them).
 router.use(protect);
 
-router.post("/", authorize("admin"), createCourse);
+router.post("/", authorize("admin", "registrar"), createCourse);
 router.get("/", getCourses);
 // Must be registered before "/:id" — otherwise "catalog" itself would be
 // captured as an :id value by the wildcard route below.
-router.get("/catalog", authorize("admin"), listCatalogCourses);
+router.get("/catalog", authorize("admin", "registrar"), listCatalogCourses);
 router.get("/:id", getCourseById);
 
-router.post("/:id/enroll/csv", authorize("admin"), uploadCSV.single("file"), bulkEnrollFromCSV);
-router.get("/:id/enrollments", authorize("admin", "teacher"), getEnrollments);
+router.post("/:id/enroll/csv", authorize("admin", "registrar"), uploadCSV.single("file"), bulkEnrollFromCSV);
+router.get("/:id/enrollments", authorize("admin", "teacher", "registrar"), getEnrollments);
 
 router.post(
   "/:id/materials",

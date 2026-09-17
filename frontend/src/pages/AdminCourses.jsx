@@ -11,6 +11,7 @@ import {
   bulkEnrollCSV,
   getEnrollments,
 } from "../api/courses";
+import { listDepartments } from "../api/departments";
 import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
 
 const inputClass =
@@ -22,6 +23,7 @@ export default function AdminCourses() {
   const [catalog, setCatalog] = useState([]);
   const [terms, setTerms] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -40,6 +42,7 @@ export default function AdminCourses() {
     description: "",
     creditHours: 3,
     prerequisites: [],
+    departmentId: "",
   });
   const [creatingCatalog, setCreatingCatalog] = useState(false);
 
@@ -59,11 +62,18 @@ export default function AdminCourses() {
   const [enrolling, setEnrolling] = useState(false);
 
   async function refreshAll() {
-    const [o, c, t, teach] = await Promise.all([listCourses(), listCatalogCourses(), listTerms(), listTeachers()]);
+    const [o, c, t, teach, dept] = await Promise.all([
+      listCourses(),
+      listCatalogCourses(),
+      listTerms(),
+      listTeachers(),
+      listDepartments(),
+    ]);
     setOfferings(o);
     setCatalog(c);
     setTerms(t);
     setTeachers(teach);
+    setDepartments(dept);
   }
 
   useEffect(() => {
@@ -99,7 +109,7 @@ export default function AdminCourses() {
     setError("");
     try {
       await createCourse(catalogForm);
-      setCatalogForm({ title: "", code: "", description: "", creditHours: 3, prerequisites: [] });
+      setCatalogForm({ title: "", code: "", description: "", creditHours: 3, prerequisites: [], departmentId: "" });
       setCatalog(await listCatalogCourses());
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create catalog course");
@@ -277,6 +287,21 @@ export default function AdminCourses() {
               onChange={(e) => setCatalogForm({ ...catalogForm, creditHours: e.target.value })}
               required
             />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Department (optional)</label>
+            <select
+              className={`w-full bg-white ${inputClass}`}
+              value={catalogForm.departmentId}
+              onChange={(e) => setCatalogForm({ ...catalogForm, departmentId: e.target.value })}
+            >
+              <option value="">No department</option>
+              {departments.map((d) => (
+                <option key={d._id} value={d._id}>
+                  {d.code} — {d.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="sm:col-span-2">
             <label className="block text-[11px] text-text-muted mb-1">

@@ -9,6 +9,9 @@ import AdminDashboard from "./pages/AdminDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import ParentDashboard from "./pages/ParentDashboard";
+import RegistrarDashboard from "./pages/RegistrarDashboard";
+import HodDashboard from "./pages/HodDashboard";
+import AdvisorDashboard from "./pages/AdvisorDashboard";
 import QuizAttempt from "./pages/QuizAttempt";
 
 function RootRedirect() {
@@ -56,6 +59,30 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["parent"]}>
                 <ParentDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/registrar"
+            element={
+              <ProtectedRoute allowedRoles={["registrar"]}>
+                <RegistrarDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/hod"
+            element={
+              <ProtectedRoute allowedRoles={["hod"]}>
+                <HodDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/advisor"
+            element={
+              <ProtectedRoute allowedRoles={["advisor"]}>
+                <AdvisorDashboard />
               </ProtectedRoute>
             }
           />

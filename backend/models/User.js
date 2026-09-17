@@ -25,10 +25,18 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: {
-        values: ["admin", "teacher", "student", "parent"],
-        message: "Role must be admin, teacher, student, or parent",
+        values: ["admin", "teacher", "student", "parent", "registrar", "hod", "advisor"],
+        message: "Role must be admin, teacher, student, parent, registrar, hod, or advisor",
       },
       required: true,
+    },
+    // Only meaningful for role "hod" — which Department this user heads,
+    // scoping their department-report view. Admin-assigned at user-creation
+    // time (see authController.createUser); null for every other role.
+    department: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Department",
+      default: null,
     },
     isActive: {
       type: Boolean,

@@ -7,15 +7,20 @@ const { authorize } = require("../middleware/rbacMiddleware");
 
 const router = express.Router();
 
-// All routes below require a valid JWT AND the admin role.
-router.use(protect, authorize("admin"));
+router.use(protect);
 
 // US-01 — Admin creates a user account.
-router.post("/", createUser);
+router.post("/", authorize("admin"), createUser);
 
 // GET /api/users?role=student — list users, optionally filtered by role.
+// Also open to a Registrar: they need this to populate the teacher picker
+// when creating a CourseOffering (see AdminCourses.jsx, reused by
+// RegistrarDashboard) — narrower than full admin power (no create/edit
+// below), matching the roadmap doc's "none of these need full admin
+// power" framing.
 router.get(
   "/",
+  authorize("admin", "registrar"),
   asyncHandler(async (req, res) => {
     const filter = {};
     if (req.query.role) filter.role = req.query.role;
@@ -25,9 +30,10 @@ router.get(
   })
 );
 
-// PUT /api/users/:id — update name / active status.
+// PUT /api/users/:id — update name / active status. Admin only.
 router.put(
   "/:id",
+  authorize("admin"),
   asyncHandler(async (req, res) => {
     const { name, isActive } = req.body;
 

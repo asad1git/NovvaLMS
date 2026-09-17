@@ -48,6 +48,14 @@ const courseSchema = new mongoose.Schema(
         ref: "Course",
       },
     ],
+    // Optional — nullable so every pre-existing catalog course (created
+    // before Departments existed) stays valid unchanged. Powers a
+    // Department Head's department-scoped report.
+    department: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Department",
+      default: null,
+    },
     isActive: {
       type: Boolean,
       default: true,

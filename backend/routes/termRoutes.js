@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/", authorize("admin"), createTerm);
+router.post("/", authorize("admin", "registrar"), createTerm);
 router.get("/", getTerms);
 
 module.exports = router;

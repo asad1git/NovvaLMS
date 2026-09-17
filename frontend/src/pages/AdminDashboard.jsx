@@ -7,12 +7,16 @@ import AdminSalarySlips from "./AdminSalarySlips";
 import AdminOverview from "./AdminOverview";
 import AccountSettings from "./AccountSettings";
 import AdminParentLinks from "./AdminParentLinks";
+import AdminAdvisorLinks from "./AdminAdvisorLinks";
+import AdminDepartments from "./AdminDepartments";
 
 const NAV_ITEMS = [
   "Dashboard",
   "Manage Users",
   "Manage Courses",
+  "Departments",
   "Parent Links",
+  "Advisor Links",
   "Fee Challans",
   "Salary Slips",
   "Account Settings",
@@ -27,8 +31,12 @@ export default function AdminDashboard() {
         <AdminCourses />
       ) : activeNav === "Manage Users" ? (
         <AdminUsers />
+      ) : activeNav === "Departments" ? (
+        <AdminDepartments />
       ) : activeNav === "Parent Links" ? (
         <AdminParentLinks />
+      ) : activeNav === "Advisor Links" ? (
+        <AdminAdvisorLinks />
       ) : activeNav === "Fee Challans" ? (
         <AdminFeeChallans />
       ) : activeNav === "Salary Slips" ? (
