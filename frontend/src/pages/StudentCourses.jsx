@@ -8,7 +8,7 @@ import {
   downloadAssignmentFile,
   submitAssignment as apiSubmitAssignment,
 } from "../api/assignments";
-import { Card, Button, Badge, EmptyState, LoadingState, CourseCard, Tabs } from "../components/ui";
+import { Card, Button, Badge, EmptyState, LoadingState, CourseCard, Tabs, SearchInput } from "../components/ui";
 
 const TABS = ["Materials", "Assignments", "Quizzes"];
 
@@ -25,6 +25,8 @@ export default function StudentCourses() {
   const [assignments, setAssignments] = useState([]);
   const [submitFile, setSubmitFile] = useState({});
   const [submittingId, setSubmittingId] = useState(null);
+  const [materialSearch, setMaterialSearch] = useState("");
+  const [assignmentSearch, setAssignmentSearch] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -42,6 +44,8 @@ export default function StudentCourses() {
     setSelectedCourse(course);
     setActiveTab("Materials");
     setError("");
+    setMaterialSearch("");
+    setAssignmentSearch("");
     setMaterials([]); // clear immediately so a course switch never shows the previous course's list
     setQuizzes([]);
     setAssignments([]);
@@ -67,6 +71,9 @@ export default function StudentCourses() {
   }
 
   if (loading) return <LoadingState label="Loading courses…" />;
+
+  const filteredMaterials = materials.filter((m) => m.title.toLowerCase().includes(materialSearch.trim().toLowerCase()));
+  const filteredAssignments = assignments.filter((a) => a.title.toLowerCase().includes(assignmentSearch.trim().toLowerCase()));
 
   const errorBanner = error && (
     <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-input px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
@@ -140,8 +147,12 @@ export default function StudentCourses() {
 
       {activeTab === "Materials" && (
         <Card>
+          {materials.length > 0 && (
+            <SearchInput value={materialSearch} onChange={setMaterialSearch} placeholder="Search materials…" className="w-56 mb-3" />
+          )}
           <div className="space-y-1">
-            {materials.map((m) => (
+            {materials.length > 0 && filteredMaterials.length === 0 && <EmptyState icon={<IconFileText size={32} className="text-text-muted" />} title="No matches." />}
+            {filteredMaterials.map((m) => (
               <div
                 key={m._id}
                 className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
@@ -167,8 +178,14 @@ export default function StudentCourses() {
 
       {activeTab === "Assignments" && (
         <Card>
+          {assignments.length > 0 && (
+            <SearchInput value={assignmentSearch} onChange={setAssignmentSearch} placeholder="Search assignments…" className="w-56 mb-3" />
+          )}
           <div className="space-y-3">
-            {assignments.map((a) => {
+            {assignments.length > 0 && filteredAssignments.length === 0 && (
+              <EmptyState icon={<IconClipboardList size={32} className="text-text-muted" />} title="No matches." />
+            )}
+            {filteredAssignments.map((a) => {
               const sub = a.mySubmission;
               const locked = sub && sub.gradeStatus === "graded";
               return (

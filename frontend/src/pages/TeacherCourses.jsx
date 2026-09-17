@@ -41,7 +41,7 @@ import {
   downloadSubmissionFile,
 } from "../api/assignments";
 import { getOfferingGrades, finalizeGrade as apiFinalizeGrade } from "../api/courses";
-import { Card, Button, IconButton, Badge, EmptyState, LoadingState, CourseCard, Tabs } from "../components/ui";
+import { Card, Button, IconButton, Badge, EmptyState, LoadingState, CourseCard, Tabs, SearchInput } from "../components/ui";
 
 const inputClass =
   "border-[1.5px] border-line rounded-input px-3 py-2 text-[13px] transition-colors duration-150 " +
@@ -95,6 +95,7 @@ export default function TeacherCourses() {
   const [uploadWarning, setUploadWarning] = useState("");
   const [replacingId, setReplacingId] = useState(null);
   const [dragActive, setDragActive] = useState(false);
+  const [materialSearch, setMaterialSearch] = useState("");
 
   const [quizzes, setQuizzes] = useState([]);
   const [showQuizForm, setShowQuizForm] = useState(false);
@@ -120,8 +121,10 @@ export default function TeacherCourses() {
   const [markingSession, setMarkingSession] = useState(null);
   const [markingRecords, setMarkingRecords] = useState([]);
   const [savingMarks, setSavingMarks] = useState(false);
+  const [markingSearch, setMarkingSearch] = useState("");
 
   const [assignments, setAssignments] = useState([]);
+  const [assignmentSearch, setAssignmentSearch] = useState("");
   const [showAssignmentForm, setShowAssignmentForm] = useState(false);
   const [assignmentTitle, setAssignmentTitle] = useState("");
   const [assignmentDescription, setAssignmentDescription] = useState("");
@@ -141,6 +144,7 @@ export default function TeacherCourses() {
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [finalGradeInputs, setFinalGradeInputs] = useState({});
   const [savingFinalGradeId, setSavingFinalGradeId] = useState(null);
+  const [gradesSearch, setGradesSearch] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -480,6 +484,17 @@ export default function TeacherCourses() {
 
   if (loading) return <LoadingState label="Loading courses…" />;
 
+  const filteredMaterials = materials.filter((m) => m.title.toLowerCase().includes(materialSearch.trim().toLowerCase()));
+  const filteredAssignments = assignments.filter((a) => a.title.toLowerCase().includes(assignmentSearch.trim().toLowerCase()));
+  const filteredMarkingRecords = markingRecords.filter((r) =>
+    r.student.name.toLowerCase().includes(markingSearch.trim().toLowerCase())
+  );
+  const filteredOfferingGrades = offeringGrades.filter((g) => {
+    const q = gradesSearch.trim().toLowerCase();
+    if (!q) return true;
+    return g.student.name.toLowerCase().includes(q) || g.student.email.toLowerCase().includes(q);
+  });
+
   const errorBanner = error && (
     <div className="bg-badge-red-bg text-badge-red-text text-xs rounded-input px-4 py-2 animate-[fadeIn_0.15s_ease-in]">
       {error}
@@ -593,11 +608,19 @@ export default function TeacherCourses() {
             </div>
           )}
 
+          {materials.length > 0 && (
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+              <div className="text-[11px] text-text-muted">{filteredMaterials.length} of {materials.length} shown</div>
+              <SearchInput value={materialSearch} onChange={setMaterialSearch} placeholder="Search materials…" className="w-56" />
+            </div>
+          )}
           {materials.length === 0 ? (
             <EmptyState icon="📄" title="No materials uploaded yet." />
+          ) : filteredMaterials.length === 0 ? (
+            <EmptyState icon="🔍" title="No matches." />
           ) : (
             <div>
-              {materials.map((m) => {
+              {filteredMaterials.map((m) => {
                 const chip = FILE_CHIP[m.fileType] || FILE_CHIP.pdf;
                 const ChipIcon = chip.icon;
                 return (
@@ -863,11 +886,19 @@ export default function TeacherCourses() {
               </form>
             )}
 
+            {assignments.length > 0 && (
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <div className="text-[11px] text-text-muted">{filteredAssignments.length} of {assignments.length} shown</div>
+                <SearchInput value={assignmentSearch} onChange={setAssignmentSearch} placeholder="Search assignments…" className="w-56" />
+              </div>
+            )}
             {assignments.length === 0 ? (
               <EmptyState icon="📋" title="No assignments posted yet." />
+            ) : filteredAssignments.length === 0 ? (
+              <EmptyState icon="🔍" title="No matches." />
             ) : (
               <div className="space-y-2">
-                {assignments.map((a) => (
+                {filteredAssignments.map((a) => (
                   <div
                     key={a._id}
                     onClick={() => handleViewSubmissions(a)}
@@ -1233,8 +1264,17 @@ export default function TeacherCourses() {
                   Close
                 </button>
               </div>
+              {markingRecords.length > 5 && (
+                <SearchInput
+                  value={markingSearch}
+                  onChange={setMarkingSearch}
+                  placeholder="Search student…"
+                  className="w-56 mb-2"
+                />
+              )}
               <div className="space-y-1 mb-3">
-                {markingRecords.map((r) => (
+                {filteredMarkingRecords.length === 0 && <EmptyState icon="🔍" title="No matches." />}
+                {filteredMarkingRecords.map((r) => (
                   <div key={r._id} className="flex items-center justify-between text-[13px] border-b border-[#f1f3f6] py-1.5">
                     <span className="text-text-main">{r.student.name}</span>
                     <select
@@ -1382,10 +1422,18 @@ export default function TeacherCourses() {
 
       {activeTab === "Grades" && (
         <Card>
+          {!loadingGrades && offeringGrades.length > 0 && (
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+              <div className="text-[11px] text-text-muted">{filteredOfferingGrades.length} of {offeringGrades.length} shown</div>
+              <SearchInput value={gradesSearch} onChange={setGradesSearch} placeholder="Search student…" className="w-56" />
+            </div>
+          )}
           {loadingGrades ? (
             <LoadingState label="Loading grades…" />
           ) : offeringGrades.length === 0 ? (
             <EmptyState icon="🎓" title="No enrolled students yet." />
+          ) : filteredOfferingGrades.length === 0 ? (
+            <EmptyState icon="🔍" title="No matches." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
@@ -1406,7 +1454,7 @@ export default function TeacherCourses() {
                   </tr>
                 </thead>
                 <tbody>
-                  {offeringGrades.map((g) => {
+                  {filteredOfferingGrades.map((g) => {
                     const inputValue =
                       finalGradeInputs[g.student._id] ?? (g.finalPercentage ?? g.computedPercentage ?? "");
                     return (

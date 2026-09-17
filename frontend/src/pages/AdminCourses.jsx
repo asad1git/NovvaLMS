@@ -12,7 +12,7 @@ import {
   getEnrollments,
 } from "../api/courses";
 import { listDepartments } from "../api/departments";
-import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
+import { Card, Button, Badge, EmptyState, LoadingState, SearchInput } from "../components/ui";
 
 const inputClass =
   "border border-line rounded px-3 py-2 text-xs transition-colors duration-150 " +
@@ -32,6 +32,7 @@ export default function AdminCourses() {
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [offeringSearch, setOfferingSearch] = useState("");
 
   const [termForm, setTermForm] = useState({
     name: "",
@@ -181,6 +182,16 @@ export default function AdminCourses() {
       setEnrolling(false);
     }
   }
+
+  const filteredOfferings = offerings.filter((o) => {
+    const q = offeringSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      o.code?.toLowerCase().includes(q) ||
+      o.title?.toLowerCase().includes(q) ||
+      o.teacher?.name?.toLowerCase().includes(q)
+    );
+  });
 
   if (loading) return <LoadingState label="Loading courses…" />;
 
@@ -497,12 +508,18 @@ export default function AdminCourses() {
           </Button>
         </form>
 
-        <h3 className="text-[13px] font-semibold text-text-main mb-2">All Offerings</h3>
+        <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+          <h3 className="text-[13px] font-semibold text-text-main">All Offerings ({filteredOfferings.length})</h3>
+          <SearchInput value={offeringSearch} onChange={setOfferingSearch} placeholder="Search code, title, or teacher…" className="w-64" />
+        </div>
         <div className="space-y-2">
-          {offerings.length === 0 && (
-            <EmptyState icon={<IconBooks size={32} className="text-text-muted" />} title="No offerings yet." />
+          {filteredOfferings.length === 0 && (
+            <EmptyState
+              icon={<IconBooks size={32} className="text-text-muted" />}
+              title={offerings.length === 0 ? "No offerings yet." : "No matches."}
+            />
           )}
-          {offerings.map((o) => (
+          {filteredOfferings.map((o) => (
             <div
               key={o._id}
               onClick={() => openOffering(o)}

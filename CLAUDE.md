@@ -1646,6 +1646,50 @@ a single plain sentence with zero padding. Verified through the real streaming e
 arrive immediately, persisted content matches the streamed text exactly) and a Playwright pass on
 the actual Parent Dashboard — zero console errors.
 
+**Live client-side search added across every list that actually grows, post-backlog.** Surveyed
+every list-heavy page in the app first — the right call for each list depended on how it actually
+grows: Manage Users (24+ accounts and counting with every enrollment), Grade Approvals (pending
+answers span every course a teacher owns), Fee Challans/Salary Slips (one row per student/employee
+per billing cycle, genuinely unbounded), Course Offerings (Admin/Registrar), and per-course
+Materials/Assignments/Attendance-marking/Grades rosters (Teacher & Student) all clearly grow
+without bound. Parent Links/Advisor Links/Departments/Programs/the course-switcher sidebars were
+deliberately left alone — these stay small by real-world cardinality (a handful of departments, a
+student has a handful of courses per term), and adding a search box to a 5-10 item list would just
+be UI clutter for a problem that doesn't exist.
+
+New shared `components/ui/SearchInput.jsx` — a plain controlled text input with a search icon and
+a clear (Γ—) button, added to the `ui/` barrel alongside the project's other shared primitives.
+Every one of these lists is small-to-medium (dozens to low hundreds of rows), so a **client-side
+live filter** (typing narrows the already-loaded array in React state) is the right-sized fix
+everywhere — none of these realistically need a backend search endpoint or index, which would be
+solving a scale problem this project doesn't have. Each page's filter predicate is a plain
+case-insensitive substring match against whichever fields make sense for that list (name/email for
+Users, student/quiz/course for Grade Approvals, student name/challan number for Fee Challans,
+employee name/month for Salary Slips, code/title/teacher for Offerings, title for Materials/
+Assignments, student name for Attendance-marking/Grades rosters).
+
+Covered: `AdminUsers.jsx`, `GradeApprovals.jsx`, `AdminFeeChallans.jsx`, `AdminSalarySlips.jsx`,
+`AdminCourses.jsx`'s offerings list, and `TeacherCourses.jsx`'s Materials/Assignments/Attendance-
+marking/Grades tabs, plus `StudentCourses.jsx`'s Materials/Assignments tabs for the same reason on
+the student side. The attendance-marking list's search box only appears once a session has more
+than 5 students — a small class doesn't need it cluttering the screen.
+
+**Caught the exact same Vite stale-cache class of issue this file already documents twice before**
+— after adding `SearchInput` to `ui/index.js`'s barrel export, the dev server kept serving a
+cached transform of that file missing the new export line, throwing "does not provide an export
+named 'SearchInput'" and breaking the entire app (even the login page failed to render, since the
+whole module graph fails to resolve when one barrel export is missing). Same fix as before:
+killing and restarting the Vite dev server (this time also clearing `node_modules/.vite` for good
+measure) resolved it immediately — not a code bug, a dev-server caching quirk this project keeps
+running into when a *new* file gets referenced by an existing barrel file.
+
+Verified via Playwright across all three roles and every location above: confirmed each search box
+actually narrows the visible list (Manage Users 19β†’4, Fee Challans 9β†’7, Offerings 11β†’2, etc.),
+confirmed a genuinely coincidental substring match works correctly and case-insensitively (typing
+"ali" correctly matched both "Ali Raza" directly AND "Sana **Mali**k" / "Norm**ali**zation Test
+User" as substrings — real proof the filter is doing plain substring matching, not name-tokenizing
+or something fancier), and confirmed zero console errors throughout.
+
 ---
 
 ## Sprint Plan (2 weeks each)

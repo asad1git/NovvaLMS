@@ -4,7 +4,7 @@ import api from "../api/axios";
 import { listUsers, createUser, updateUser } from "../api/users";
 import { listDepartments } from "../api/departments";
 import { listPrograms } from "../api/programs";
-import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
+import { Card, Button, Badge, EmptyState, LoadingState, SearchInput } from "../components/ui";
 
 const ROLE_BADGE_VARIANT = {
   admin: "gray",
@@ -23,6 +23,7 @@ const inputClass =
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [roleFilter, setRoleFilter] = useState("");
+  const [userSearch, setUserSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -99,6 +100,12 @@ export default function AdminUsers() {
       setAssigningProgramId(null);
     }
   }
+
+  const filteredUsers = users.filter((u) => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return true;
+    return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
 
   if (loading) return <LoadingState label="Loading users…" />;
 
@@ -200,27 +207,30 @@ export default function AdminUsers() {
       </Card>
 
       <Card>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[13px] font-bold text-navy">All Users ({users.length})</h2>
-          <select
-            className={`bg-white ${inputClass} py-1`}
-            value={roleFilter}
-            onChange={(e) => handleFilterChange(e.target.value)}
-          >
-            <option value="">All roles</option>
-            <option value="admin">Admin</option>
-            <option value="teacher">Teacher</option>
-            <option value="student">Student</option>
-            <option value="parent">Parent</option>
-            <option value="advisor">Advisor</option>
-            <option value="registrar">Registrar</option>
-            <option value="hod">Department Head</option>
-          </select>
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <h2 className="text-[13px] font-bold text-navy">All Users ({filteredUsers.length})</h2>
+          <div className="flex items-center gap-2">
+            <SearchInput value={userSearch} onChange={setUserSearch} placeholder="Search name or email…" className="w-52" />
+            <select
+              className={`bg-white ${inputClass} py-1`}
+              value={roleFilter}
+              onChange={(e) => handleFilterChange(e.target.value)}
+            >
+              <option value="">All roles</option>
+              <option value="admin">Admin</option>
+              <option value="teacher">Teacher</option>
+              <option value="student">Student</option>
+              <option value="parent">Parent</option>
+              <option value="advisor">Advisor</option>
+              <option value="registrar">Registrar</option>
+              <option value="hod">Department Head</option>
+            </select>
+          </div>
         </div>
 
         <div className="space-y-1">
-          {users.length === 0 && <EmptyState icon={<IconUser size={32} className="text-text-muted" />} title="No users found." />}
-          {users.map((u) => (
+          {filteredUsers.length === 0 && <EmptyState icon={<IconUser size={32} className="text-text-muted" />} title="No users found." />}
+          {filteredUsers.map((u) => (
             <div
               key={u._id}
               className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { IconClipboardCheck, IconQuestionMark, IconMessage2, IconRobot, IconCircleCheck } from "@tabler/icons-react";
 import { getPendingGrades, gradeAnswer } from "../api/quizzes";
-import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
+import { Card, Button, Badge, EmptyState, LoadingState, SearchInput } from "../components/ui";
 
 const inputClass =
   "border-[1.5px] border-line rounded-input px-3 py-2 text-[13px] transition-colors duration-150 " +
@@ -23,6 +23,7 @@ export default function GradeApprovals() {
   const [drafts, setDrafts] = useState({}); // answerId -> { score, feedback }
   const [savingId, setSavingId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [search, setSearch] = useState("");
 
   async function refresh() {
     try {
@@ -63,6 +64,16 @@ export default function GradeApprovals() {
 
   if (loading) return <LoadingState label="Loading pending grades…" />;
 
+  const filteredPending = pending.filter((a) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      a.studentName?.toLowerCase().includes(q) ||
+      a.quizTitle?.toLowerCase().includes(q) ||
+      a.courseCode?.toLowerCase().includes(q)
+    );
+  });
+
   const selected = pending.find((a) => a._id === selectedId) || null;
   const draft = selected ? drafts[selected._id] || {} : {};
   const scoreValue = selected ? resolveField(draft, "score", selected, "aiDraftScore") : "";
@@ -76,18 +87,25 @@ export default function GradeApprovals() {
         </div>
       )}
 
-      <div className="text-xs font-semibold text-text-muted uppercase tracking-wide">
-        Pending Submissions ({pending.length})
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-xs font-semibold text-text-muted uppercase tracking-wide">
+          Pending Submissions ({filteredPending.length})
+        </div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search student, quiz, or course…" className="w-64" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 flex-1 min-h-0">
         <div className="max-h-[300px] lg:max-h-none overflow-y-auto flex flex-col gap-2 pr-1">
-          {pending.length === 0 && (
+          {filteredPending.length === 0 && (
             <Card>
-              <EmptyState icon={<IconClipboardCheck size={32} className="text-success" />} title="Nothing pending" subtitle="All subjective answers are graded." />
+              <EmptyState
+                icon={<IconClipboardCheck size={32} className="text-success" />}
+                title={pending.length === 0 ? "Nothing pending" : "No matches"}
+                subtitle={pending.length === 0 ? "All subjective answers are graded." : "Try a different search."}
+              />
             </Card>
           )}
-          {pending.map((a) => (
+          {filteredPending.map((a) => (
             <div
               key={a._id}
               onClick={() => setSelectedId(a._id)}

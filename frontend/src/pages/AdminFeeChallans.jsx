@@ -11,7 +11,7 @@ import {
   generateChallans,
 } from "../api/finance";
 import { listTerms } from "../api/courses";
-import { Card, Button, Badge, EmptyState, LoadingState } from "../components/ui";
+import { Card, Button, Badge, EmptyState, LoadingState, SearchInput } from "../components/ui";
 
 const inputClass =
   "border border-line rounded px-3 py-2 text-xs transition-colors duration-150 " +
@@ -26,6 +26,7 @@ export default function AdminFeeChallans() {
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ studentId: "", amount: "", dueDate: "", description: "" });
+  const [challanSearch, setChallanSearch] = useState("");
 
   const [structureForm, setStructureForm] = useState({ termId: "", perCreditHourRate: "", fixedFees: "" });
   const [savingStructure, setSavingStructure] = useState(false);
@@ -114,6 +115,12 @@ export default function AdminFeeChallans() {
       setError(err.response?.data?.message || "Failed to update status");
     }
   }
+
+  const filteredChallans = challans.filter((c) => {
+    const q = challanSearch.trim().toLowerCase();
+    if (!q) return true;
+    return c.challanNumber.toLowerCase().includes(q) || c.student?.name?.toLowerCase().includes(q);
+  });
 
   if (loading) return <LoadingState label="Loading fee challans…" />;
 
@@ -309,10 +316,18 @@ export default function AdminFeeChallans() {
       </Card>
 
       <Card>
-        <h2 className="text-[13px] font-bold text-navy mb-3">All Fee Challans ({challans.length})</h2>
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <h2 className="text-[13px] font-bold text-navy">All Fee Challans ({filteredChallans.length})</h2>
+          <SearchInput value={challanSearch} onChange={setChallanSearch} placeholder="Search student or challan #…" className="w-64" />
+        </div>
         <div className="space-y-1">
-          {challans.length === 0 && <EmptyState icon={<IconReceipt2 size={32} className="text-text-muted" />} title="No fee challans yet." />}
-          {challans.map((c) => (
+          {filteredChallans.length === 0 && (
+            <EmptyState
+              icon={<IconReceipt2 size={32} className="text-text-muted" />}
+              title={challans.length === 0 ? "No fee challans yet." : "No matches."}
+            />
+          )}
+          {filteredChallans.map((c) => (
             <div
               key={c._id}
               className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"

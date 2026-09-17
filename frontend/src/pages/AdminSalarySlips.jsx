@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { IconCash } from "@tabler/icons-react";
 import { listTeachers } from "../api/courses";
 import { listSalarySlips, createSalarySlip, downloadSalarySlipPdf } from "../api/finance";
-import { Card, Button, EmptyState, LoadingState } from "../components/ui";
+import { Card, Button, EmptyState, LoadingState, SearchInput } from "../components/ui";
 
 const inputClass =
   "border border-line rounded px-3 py-2 text-xs transition-colors duration-150 " +
@@ -15,6 +15,7 @@ export default function AdminSalarySlips() {
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ employeeId: "", month: "", basicSalary: "", allowances: "", deductions: "" });
+  const [slipSearch, setSlipSearch] = useState("");
 
   async function refresh() {
     setSlips(await listSalarySlips());
@@ -52,6 +53,12 @@ export default function AdminSalarySlips() {
       setCreating(false);
     }
   }
+
+  const filteredSlips = slips.filter((s) => {
+    const q = slipSearch.trim().toLowerCase();
+    if (!q) return true;
+    return s.employee?.name?.toLowerCase().includes(q) || s.month.toLowerCase().includes(q);
+  });
 
   if (loading) return <LoadingState label="Loading salary slips…" />;
 
@@ -133,10 +140,15 @@ export default function AdminSalarySlips() {
       </Card>
 
       <Card>
-        <h2 className="text-[13px] font-bold text-navy mb-3">All Salary Slips ({slips.length})</h2>
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <h2 className="text-[13px] font-bold text-navy">All Salary Slips ({filteredSlips.length})</h2>
+          <SearchInput value={slipSearch} onChange={setSlipSearch} placeholder="Search employee or month…" className="w-64" />
+        </div>
         <div className="space-y-1">
-          {slips.length === 0 && <EmptyState icon={<IconCash size={32} className="text-text-muted" />} title="No salary slips yet." />}
-          {slips.map((s) => (
+          {filteredSlips.length === 0 && (
+            <EmptyState icon={<IconCash size={32} className="text-text-muted" />} title={slips.length === 0 ? "No salary slips yet." : "No matches."} />
+          )}
+          {filteredSlips.map((s) => (
             <div
               key={s._id}
               className="flex items-center justify-between text-xs border-b border-line py-2 transition-colors duration-150 hover:bg-bg-page -mx-2 px-2 rounded"
