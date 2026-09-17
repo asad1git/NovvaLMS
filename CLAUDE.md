@@ -83,12 +83,12 @@ to OpenAI/Gemini. Only academic content goes in the prompt.
 
 ---
 
-## Database — 22 MongoDB Collections
+## Database — 23 MongoDB Collections
 
 `Users, Courses, Terms, CourseOfferings, Enrollments, Materials, Quizzes, Questions, QuizAttempts,
 Answers, ChatSessions, Messages, FeeChallans, SalarySlips, ParentLinks,
 ParentChatSessions, ParentMessages, Notifications, AttendanceSessions, AttendanceRecords,
-Assignments, AssignmentSubmissions`
+Assignments, AssignmentSubmissions, Grades`
 
 **`Courses` is a pure catalog now** (title/code/description — no `teacher`); **`CourseOfferings`**
 (course + term + teacher + sectionLabel) is the actual taught instance everything else attaches
@@ -1024,6 +1024,56 @@ errors, **plus the RBAC boundary this migration was riskiest for, tested directl
 a teacher who doesn't teach a given offering gets 403 on both its roster (`assertCourseManager`)
 and its materials (`assertCourseAccess`), and an unauthenticated request gets 401 — confirming the
 rewritten gate actually holds, not just that the happy path works.
+
+**University-oriented Phase 2 — GPA / transcripts, post-backlog.** Item 4 from
+`docs/university-oriented-lms-roadmap.md`, the direct payoff of Phase 1: `Term` and
+`CourseOffering` existed structurally but changed nothing visible yet — this is what makes that
+split actually matter to a student or teacher looking at the screen.
+
+`Course` gained `creditHours` (required, default 3) — the one additive field Phase 1 deliberately
+deferred, since it wasn't needed for the structural split itself. A GPA needs a fixed grading
+scale to map a percentage onto: `utils/gradeScale.js` implements the standard 4.0-scale table
+(A=4.0 down to F=0.0, in the usual 90/80/70/60 bands), pure and stateless, not configurable
+per-institution in this pass.
+
+**New `Grade` model, one per (student, courseOffering) — same HITL shape this project already
+uses everywhere else** (`Answer`'s `aiDraftScore` vs `score`, `AssignmentSubmission`'s same
+pair): a system-computed draft the teacher reviews, and a separately-finalized value that's the
+only thing a transcript ever reads. The "system" here is a deterministic percentage aggregation
+(`transcriptController.computeOfferingPercentage`) — no AI call, no cost, no latency, recomputed
+fresh on every read rather than cached. It sums every **fully-settled** quiz attempt
+(`submittedAt` set AND `gradingComplete: true`) and graded assignment submission
+(`gradeStatus: "graded"`) for that student in that offering into one earned/possible points
+total — deliberately excluding anything still mid-HITL-review, so a computed draft never reflects
+a grade that could still change underneath it. `GET /api/courses/:id/grades` (Admin/owning
+Teacher only, same as the enrollment roster) returns this draft for every enrolled student
+alongside whatever's already finalized; `PUT /api/courses/:id/grades/:studentId` is the actual
+finalize/override step — the frontend pre-fills from the computed draft, but whatever percentage
+the Teacher submits becomes the final grade, accepted as-is or overridden, exactly the same
+boundary as `gradingController.gradeAnswer`.
+
+`GET /api/transcript/me` (Student only, new `transcriptRoutes.js`) reads ONLY finalized `Grade`
+documents — never the computed draft, same HITL principle as everywhere else: a student sees the
+teacher's decision, not the system's guess. Groups every finalized grade by `Term`, computes a
+credit-hour-weighted GPA per term and cumulative across all terms. New "Transcript" nav item for
+students (`Transcript.jsx`) — a Cumulative GPA / Total Credit Hours stat row, then one card per
+term with a course/credit-hours/grade/percentage table. `TeacherCourses.jsx` gained a matching
+"Grades" tab alongside Materials/Assignments/Quizzes/Attendance/Results, showing the same roster
+with an editable finalize-percentage input per student.
+
+Caught one real data gotcha specific to this addition: the three catalog courses reseeded during
+Phase 1 predate the new `creditHours` field entirely (created via a plain object literal, not
+through the real `Course` model), so they were simply missing it — not defaulting to anything,
+since Mongoose's schema default only applies on `.create()`/`.save()` of a NEW document, never
+retroactively to documents already in the collection. Backfilled with a direct `updateMany` on
+both the local dev DB and the Render/Atlas demo DB (`{ creditHours: { $exists: false } }` →
+`{ $set: { creditHours: 3 } }`), rather than re-running the whole reseed a second time.
+
+Verified end-to-end via Playwright: a teacher finalizing a student's grade at 85% in `Grades`
+correctly shows `B (85%)`; that same student's `Transcript` page correctly shows it under "Fall
+2026" with a term GPA of 3.00 (B → 3.0 grade points × 3 credit hours ÷ 3 credit hours) and a
+matching cumulative GPA — the actual GPA math confirmed correct, not just that the page renders.
+Zero console errors throughout.
 
 ---
 

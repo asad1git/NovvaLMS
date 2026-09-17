@@ -28,7 +28,7 @@ export default function AdminCourses() {
   const [termForm, setTermForm] = useState({ name: "", startDate: "", endDate: "" });
   const [creatingTerm, setCreatingTerm] = useState(false);
 
-  const [catalogForm, setCatalogForm] = useState({ title: "", code: "", description: "" });
+  const [catalogForm, setCatalogForm] = useState({ title: "", code: "", description: "", creditHours: 3 });
   const [creatingCatalog, setCreatingCatalog] = useState(false);
 
   const [offeringForm, setOfferingForm] = useState({ courseId: "", termId: "", teacherId: "", sectionLabel: "A" });
@@ -81,7 +81,7 @@ export default function AdminCourses() {
     setError("");
     try {
       await createCourse(catalogForm);
-      setCatalogForm({ title: "", code: "", description: "" });
+      setCatalogForm({ title: "", code: "", description: "", creditHours: 3 });
       setCatalog(await listCatalogCourses());
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create catalog course");
@@ -225,6 +225,17 @@ export default function AdminCourses() {
               placeholder="Description"
               value={catalogForm.description}
               onChange={(e) => setCatalogForm({ ...catalogForm, description: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1">Credit Hours</label>
+            <input
+              type="number"
+              min="1"
+              className={inputClass}
+              value={catalogForm.creditHours}
+              onChange={(e) => setCatalogForm({ ...catalogForm, creditHours: e.target.value })}
+              required
             />
           </div>
           <Button type="submit" disabled={creatingCatalog} className="sm:col-span-3 w-fit">

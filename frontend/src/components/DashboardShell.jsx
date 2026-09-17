@@ -18,6 +18,7 @@ import {
   IconSchool,
   IconMenu2,
   IconX,
+  IconFileCertificate,
 } from "@tabler/icons-react";
 import NotificationBell from "./NotificationBell";
 
@@ -36,6 +37,7 @@ const NAV_ICONS = {
   "My Results": IconClipboardList,
   Analytics: IconChartBar,
   Attendance: IconCalendarStats,
+  Transcript: IconFileCertificate,
   "Novva Assistant": IconRobot,
   "AI Assistant": IconRobot,
   "Account Settings": IconSettings,

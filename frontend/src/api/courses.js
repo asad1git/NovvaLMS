@@ -84,3 +84,11 @@ export async function downloadMaterial(materialId, fileName) {
 export function listTeachers() {
   return api.get("/users?role=teacher").then((r) => r.data.data);
 }
+
+export function getOfferingGrades(offeringId) {
+  return api.get(`/courses/${offeringId}/grades`).then((r) => r.data.data);
+}
+
+export function finalizeGrade(offeringId, studentId, percentage) {
+  return api.put(`/courses/${offeringId}/grades/${studentId}`, { percentage }).then((r) => r.data.data);
+}

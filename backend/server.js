@@ -21,6 +21,7 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 const assignmentRoutes = require("./routes/assignmentRoutes");
 const termRoutes = require("./routes/termRoutes");
 const offeringRoutes = require("./routes/offeringRoutes");
+const transcriptRoutes = require("./routes/transcriptRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -59,6 +60,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/terms", termRoutes);
 app.use("/api/offerings", offeringRoutes);
+app.use("/api/transcript", transcriptRoutes);
 
 // ─── Error handling (must be last) ───
 app.use(notFound);

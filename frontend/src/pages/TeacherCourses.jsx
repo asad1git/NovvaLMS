@@ -40,13 +40,14 @@ import {
   gradeSubmission as apiGradeSubmission,
   downloadSubmissionFile,
 } from "../api/assignments";
+import { getOfferingGrades, finalizeGrade as apiFinalizeGrade } from "../api/courses";
 import { Card, Button, IconButton, Badge, EmptyState, LoadingState, CourseCard, Tabs } from "../components/ui";
 
 const inputClass =
   "border-[1.5px] border-line rounded-input px-3 py-2 text-[13px] transition-colors duration-150 " +
   "focus:outline-none focus:border-navy-light";
 
-const TABS = ["Materials", "Assignments", "Quizzes", "Attendance", "Results"];
+const TABS = ["Materials", "Assignments", "Quizzes", "Attendance", "Results", "Grades"];
 
 // Same "AI draft pre-fills, teacher's actual submit wins" resolution as
 // GradeApprovals.jsx's resolveField — kept local since this screen doesn't
@@ -130,6 +131,11 @@ export default function TeacherCourses() {
   const [gradeDrafts, setGradeDrafts] = useState({});
   const [savingGradeId, setSavingGradeId] = useState(null);
 
+  const [offeringGrades, setOfferingGrades] = useState([]);
+  const [loadingGrades, setLoadingGrades] = useState(false);
+  const [finalGradeInputs, setFinalGradeInputs] = useState({});
+  const [savingFinalGradeId, setSavingFinalGradeId] = useState(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -182,6 +188,37 @@ export default function TeacherCourses() {
     setActiveTab(tab);
     if (tab === "Results" && !resultsQuizId && quizzes.length > 0) {
       loadResults(quizzes[0]._id);
+    }
+    if (tab === "Grades") {
+      loadGrades();
+    }
+  }
+
+  async function loadGrades() {
+    setLoadingGrades(true);
+    setError("");
+    try {
+      setOfferingGrades(await getOfferingGrades(selectedCourse._id));
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load grades");
+    } finally {
+      setLoadingGrades(false);
+    }
+  }
+
+  async function handleFinalizeGrade(studentId) {
+    const row = offeringGrades.find((g) => g.student._id === studentId);
+    const percentage = finalGradeInputs[studentId] ?? row?.finalPercentage ?? row?.computedPercentage;
+    if (percentage === null || percentage === undefined || percentage === "") return;
+    setSavingFinalGradeId(studentId);
+    setError("");
+    try {
+      await apiFinalizeGrade(selectedCourse._id, studentId, Number(percentage));
+      await loadGrades();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to finalize grade");
+    } finally {
+      setSavingFinalGradeId(null);
     }
   }
 
@@ -1253,6 +1290,94 @@ export default function TeacherCourses() {
             )}
           </Card>
         </div>
+      )}
+
+      {activeTab === "Grades" && (
+        <Card>
+          {loadingGrades ? (
+            <LoadingState label="Loading grades…" />
+          ) : offeringGrades.length === 0 ? (
+            <EmptyState icon="🎓" title="No enrolled students yet." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                      Student
+                    </th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                      System-Computed
+                    </th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                      Final Grade
+                    </th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted border-b border-line px-3 py-2">
+                      Finalize (%)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {offeringGrades.map((g) => {
+                    const inputValue =
+                      finalGradeInputs[g.student._id] ?? (g.finalPercentage ?? g.computedPercentage ?? "");
+                    return (
+                      <tr key={g.student._id} className="hover:bg-bg-page">
+                        <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                          <div className="font-semibold text-text-main">{g.student.name}</div>
+                          <div className="text-[11px] text-text-muted">{g.student.email}</div>
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                          {g.computedPercentage !== null ? (
+                            <Badge variant="blue">
+                              {g.computedPercentage}% ({g.computedLetter})
+                            </Badge>
+                          ) : (
+                            <span className="text-text-muted text-xs">No settled grades yet</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                          {g.finalLetter ? (
+                            <Badge variant="green">
+                              {g.finalLetter} ({g.finalPercentage}%)
+                            </Badge>
+                          ) : (
+                            <Badge variant="gray">Not finalized</Badge>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-[#f1f3f6]">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              className={`w-20 ${inputClass} px-2 py-1`}
+                              value={inputValue}
+                              onChange={(e) =>
+                                setFinalGradeInputs((prev) => ({ ...prev, [g.student._id]: e.target.value }))
+                              }
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => handleFinalizeGrade(g.student._id)}
+                              disabled={savingFinalGradeId === g.student._id || inputValue === ""}
+                            >
+                              {savingFinalGradeId === g.student._id
+                                ? "Saving…"
+                                : g.finalLetter
+                                ? "Update"
+                                : "Finalize"}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
       )}
     </div>
   );

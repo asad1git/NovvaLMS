@@ -152,11 +152,10 @@ honest that full generality on items 6 and 8 isn't worth chasing.
 
 ## Where this was left
 
-**Update:** the user decided to proceed. **Items 1 and 2 (the Course/CourseOffering split and
-Term) are done** — see CLAUDE.md's "University-oriented Phase 1" entry for the full writeup,
-including the deliberate choice to wipe and reseed existing data fresh rather than migrate it,
-and the RBAC boundary tests that specifically verified the highest-risk item on this list
-(cross-teacher and unauthenticated access both correctly denied after the rewrite, not just the
-happy path working). Items 3 through 8 (self-service registration, GPA/transcripts, narrower
-roles, scheduling, fee automation, degree audit) are still just this planning discussion —
-nothing beyond 1 and 2 has been started.
+**Update:** the user decided to proceed. **Items 1, 2, and 4 are done** — the Course/
+CourseOffering split, Term, and GPA/transcripts — see CLAUDE.md's "University-oriented Phase 1"
+and "Phase 2" entries for the full writeups, including the deliberate choice to wipe and reseed
+existing data fresh rather than migrate it, the RBAC boundary tests that specifically verified
+the highest-risk item on this list, and the actual GPA math confirmed correct end-to-end (not
+just that the page renders). Items 3, 5, 6, 7, and 8 (self-service registration, narrower roles,
+scheduling, fee automation, degree audit) are still just this planning discussion.

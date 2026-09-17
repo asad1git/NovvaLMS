@@ -15,6 +15,7 @@ const { createQuiz, generateQuizQuestions, getQuizzesForCourse } = require("../c
 const { getMessages, sendMessage } = require("../controllers/chatController");
 const { createSession, listSessions } = require("../controllers/attendanceController");
 const { createAssignment, getAssignmentsForCourse } = require("../controllers/assignmentController");
+const { getOfferingGrades, finalizeGrade } = require("../controllers/transcriptController");
 
 const router = express.Router();
 
@@ -58,5 +59,8 @@ router.post(
   createAssignment
 );
 router.get("/:id/assignments", getAssignmentsForCourse);
+
+router.get("/:id/grades", authorize("admin", "teacher"), getOfferingGrades);
+router.put("/:id/grades/:studentId", authorize("admin", "teacher"), finalizeGrade);
 
 module.exports = router;

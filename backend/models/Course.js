@@ -27,6 +27,16 @@ const courseSchema = new mongoose.Schema(
       maxlength: [1000, "Description cannot exceed 1000 characters"],
       default: "",
     },
+    // Powers GPA — a term GPA is the credit-hour-weighted average of every
+    // finalized course grade in it, so this has to exist per catalog course
+    // (not per offering — the same course carries the same credit weight
+    // regardless of who teaches it or when).
+    creditHours: {
+      type: Number,
+      required: [true, "Credit hours is required"],
+      min: [1, "Credit hours must be at least 1"],
+      default: 3,
+    },
     isActive: {
       type: Boolean,
       default: true,
