@@ -7,7 +7,12 @@ const Assignment = require("../models/Assignment");
 const ChatSession = require("../models/ChatSession");
 const Message = require("../models/Message");
 const { MATERIALS_DIR, ASSIGNMENT_QUESTIONS_DIR } = require("../middleware/uploadMiddleware");
-const { extractText, chunkText, selectRelevantChunks, findMentionedMaterials } = require("../services/ragEngine");
+const {
+  extractText,
+  chunkText,
+  selectRelevantChunksSemantic,
+  findMentionedMaterials,
+} = require("../services/ragEngine");
 const { getAIProvider } = require("../services/ai");
 const { computeAnalyticsForStudent } = require("./analyticsController");
 const { formatAnalyticsSummary } = require("../utils/formatAnalyticsSummary");
@@ -40,14 +45,29 @@ async function getOrCreateSession(studentId, offeringId) {
 /**
  * Builds { chunksWithSource } from every material in the course offering —
  * PDF, PPTX, and DOCX all supported via `ragEngine.extractText`'s
- * per-fileType dispatch. Kept simple (re-extracted per request, no caching)
- * — reasonable at this project's scale; see CLAUDE.md for the tradeoff note.
+ * per-fileType dispatch. A material with precomputed embeddings (see
+ * materialController.js's background embedding job) skips extraction
+ * entirely — its stored {text, vector} pairs are used directly, both
+ * faster (no PDF/DOCX parsing on every chat message) and correct (the
+ * vector is only meaningful against the exact chunk text it was computed
+ * from). A material without embeddings yet (uploaded before this feature
+ * existed, or its background job hasn't finished) still gets extracted +
+ * chunked fresh, exactly as before — it just won't have a `.vector`, so
+ * `ragEngine.selectRelevantChunksSemantic` ranks it by keyword overlap
+ * instead of dropping it.
  */
 async function buildCourseChunks(offeringId) {
   const materials = await Material.find({ courseOffering: offeringId });
   const chunksWithSource = [];
 
   for (const material of materials) {
+    if (material.embeddings?.length > 0) {
+      for (const e of material.embeddings) {
+        chunksWithSource.push({ text: e.text, vector: e.vector, materialId: material._id, materialTitle: material.title });
+      }
+      continue;
+    }
+
     const filePath = path.join(MATERIALS_DIR, material.fileUrl);
     let text;
     try {
@@ -85,6 +105,18 @@ async function buildAssignmentChunks(offeringId) {
   const chunksWithSource = [];
 
   for (const assignment of assignments) {
+    if (assignment.embeddings?.length > 0) {
+      for (const e of assignment.embeddings) {
+        chunksWithSource.push({
+          text: e.text,
+          vector: e.vector,
+          assignmentId: assignment._id,
+          assignmentTitle: assignment.title,
+        });
+      }
+      continue;
+    }
+
     const filePath = path.join(ASSIGNMENT_QUESTIONS_DIR, assignment.fileUrl);
     let text;
     try {
@@ -235,11 +267,11 @@ const sendMessage = asyncHandler(async (req, res) => {
     Assignment.find({ courseOffering: offering._id }).select("title dueDate description"),
     computeAnalyticsForStudent(req.user._id, { courseOfferingId: offering._id }),
   ]);
-  const relevant = selectRelevantChunks(chunksWithSource, content, 5);
+  const relevant = await selectRelevantChunksSemantic(chunksWithSource, content, 5);
   const mentionedMaterials = findMentionedMaterials(content, materials);
   const requestedMaterial = buildRequestedMaterialSection(mentionedMaterials, chunksWithSource);
 
-  const relevantAssignmentExcerpts = selectRelevantChunks(assignmentChunksWithSource, content, 3);
+  const relevantAssignmentExcerpts = await selectRelevantChunksSemantic(assignmentChunksWithSource, content, 3);
   const mentionedAssignments = findMentionedMaterials(content, assignments);
   const requestedAssignmentText = buildRequestedAssignmentSection(mentionedAssignments, assignmentChunksWithSource);
 

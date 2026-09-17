@@ -59,6 +59,16 @@ const assignmentSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Same precomputed-embedding shape and rationale as Material.embeddings
+    // — powers semantic ranking of ASSIGNMENT EXCERPTS in the chatbot.
+    embeddings: [
+      {
+        chunkIndex: { type: Number, required: true },
+        text: { type: String, required: true },
+        vector: { type: [Number], required: true },
+        _id: false,
+      },
+    ],
   },
   { timestamps: { createdAt: "createdAt", updatedAt: false } }
 );

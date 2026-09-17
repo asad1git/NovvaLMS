@@ -52,6 +52,23 @@ const materialSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Precomputed at upload/replace time (in the background — see
+    // materialController.js) via Gemini's embedding API, so the chatbot's
+    // retrieval (chatController.buildCourseChunks +
+    // ragEngine.selectRelevantChunksSemantic) can rank chunks by genuine
+    // semantic similarity instead of only keyword overlap, without
+    // re-extracting/re-embedding on every chat message. Empty for every
+    // material uploaded before this feature existed — never backfilled,
+    // same precedent as textExtractionWarning above — so those just keep
+    // using keyword-overlap retrieval until re-uploaded.
+    embeddings: [
+      {
+        chunkIndex: { type: Number, required: true },
+        text: { type: String, required: true },
+        vector: { type: [Number], required: true },
+        _id: false,
+      },
+    ],
   },
   { timestamps: { createdAt: "createdAt", updatedAt: false } }
 );

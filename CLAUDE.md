@@ -1400,6 +1400,72 @@ a Playwright pass capturing the actual visual transition: bouncing dots visible 
 token, then the real streamed answer rendering correctly with its bold-markdown formatting intact
 — zero console errors throughout.
 
+**AI-quality initiative, part 2 — real embedding-based retrieval replaces keyword overlap.**
+The bigger lever on actual answer *quality* (not just perceived speed): `ragEngine.js`'s original
+`selectRelevantChunks` is TF-style keyword overlap, which misses a genuinely relevant chunk the
+moment a question paraphrases it with different words — "how does a routine calling itself work"
+shares zero exact tokens with a chunk that says "a function invokes itself," since nothing in this
+pipeline does stemming. That's now fixed with real semantic search, while keeping the whole thing
+degrade-safe rather than a hard swap.
+
+New `services/ai/embeddings.js` — deliberately **not** part of the `services/ai/index.js` failover
+chain, on purpose: a cosine-similarity comparison is only meaningful between two vectors from the
+same embedding model. If a chunk's vector came from Gemini and a query vector came from a
+different provider after failover, comparing them would silently produce garbage rankings rather
+than a visible error — worse than no fallback. This module always calls Gemini directly via
+`embedTexts`/`embedQuery` (batched through `:batchEmbedContents`, capped at Gemini's 100-request
+batch limit); any failure is caught by every caller and treated as "no embeddings available,"
+never routed to a different provider's embedding space. **Caught a real model-retirement issue
+during verification** — `text-embedding-004` (the initial default) is already unavailable on this
+API key/version ("404: not found... or is not supported for embedContent"), the exact same class
+of issue CLAUDE.md already documents for the chat model. A live `ListModels` call confirmed which
+embedding models this key actually supports; switched the default to `gemini-embedding-001`, kept
+overridable via `GEMINI_EMBEDDING_MODEL`, matching `GEMINI_MODEL`'s own precedent so a future
+retirement is an env var change, not a code change.
+
+`Material` and `Assignment` both gained an `embeddings: [{chunkIndex, text, vector}]` array,
+computed once at upload/replace time — **in the background**, after the HTTP response is already
+sent (`materialController.embedMaterialInBackground` / `assignmentController.
+embedAssignmentInBackground`), same "a slow AI/network call shouldn't make the user wait"
+principle already established for AI grading. `checkExtractability.js` was extended to also
+return the extracted `text` alongside its warning, so materialController/assignmentController
+reuse it for embedding rather than extracting the same file twice. Tolerant of any failure the
+same way `textExtractionWarning` already is: an embedding failure leaves `embeddings: []`, which
+just means that material keeps using keyword-overlap retrieval — it never blocks or fails the
+upload itself. **Deliberately not backfilled** for materials/assignments uploaded before this
+feature existed — same precedent `textExtractionWarning` already set — they keep working via
+keyword overlap until re-uploaded/replaced.
+
+`ragEngine.selectRelevantChunksSemantic` is the new selection function `chatController.sendMessage`
+calls (for both LECTURE EXCERPTS and ASSIGNMENT EXCERPTS) in place of the old
+`selectRelevantChunks`: chunks WITH a precomputed vector are ranked by cosine similarity against
+the embedded query (threshold 0.5, tunable); chunks WITHOUT one (legacy materials) are still
+ranked by keyword overlap rather than dropped, so nothing silently disappears from retrieval. If
+NO chunk in the pool has a vector yet, or embedding the query itself fails at request time (API
+down), the whole thing transparently degrades to the exact pre-upgrade keyword-overlap behavior —
+a pure upgrade with a real safety net, never a regression path. `chatController.buildCourseChunks`
+/`buildAssignmentChunks` also skip re-extraction entirely for a material/assignment that already
+has embeddings — its stored `{text, vector}` pairs are used directly, which is both faster (no
+PDF/DOCX parsing on every chat message) and correct (a vector is only meaningful against the
+exact chunk text it was computed from).
+
+**Verified with a genuinely adversarial test, not a favorable one**: three chunks (recursion,
+stacks, hashing) and a real paraphrase of the recursion chunk written to share ZERO exact tokens
+with it (e.g. "invoke" vs. "invokes," "reduced" vs. "smaller" — this pipeline has no stemming, so
+these count as completely different words). The OLD keyword method returned **zero** results for
+that query — the chatbot would have shown the refusal for a genuinely answerable question. The
+NEW semantic method correctly ranked "Recursion" highest (cosine 0.764) well above the two
+unrelated chunks (0.568, 0.530). Followed by a full real end-to-end HTTP pass — not just the
+isolated function test — through the actual upload endpoint: uploaded a real `.txt` material with
+that exact recursion content, waited for the background embedding job to finish (confirmed via
+the materials list showing `embeddings.length > 0`), then asked the same zero-overlap paraphrase
+as a real enrolled student through the real streaming chat endpoint. It answered correctly,
+grounded in and quoting the uploaded material, with the correct source citation — the exact
+question that would have hit the refusal before this change. A genuinely off-topic control
+question (capital of France) in the same conversation thread still correctly triggered the
+refusal, confirming the upgrade didn't loosen the "never invent an answer" guarantee. Confirmed in
+the real browser via Playwright too — zero console errors, correct citation pill rendered.
+
 ---
 
 ## Sprint Plan (2 weeks each)

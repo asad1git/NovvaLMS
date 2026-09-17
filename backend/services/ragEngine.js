@@ -2,6 +2,7 @@ const fs = require("fs");
 const { PDFParse } = require("pdf-parse");
 const mammoth = require("mammoth");
 const JSZip = require("jszip");
+const { embedTexts, embedQuery, cosineSimilarity } = require("./ai/embeddings");
 
 /**
  * RAG step 1 (per CLAUDE.md) — extract lecture text.
@@ -163,6 +164,77 @@ function selectRelevantChunks(chunksWithSource, query, topK = 5) {
     .slice(0, topK);
 }
 
+/**
+ * Computes {chunkIndex, text, vector} for every chunk of `text`, via
+ * Gemini's embedding API (services/ai/embeddings.js) — the one-time cost
+ * paid at upload/replace time (in the background, so a teacher's upload
+ * response never waits on a network call — see materialController.js),
+ * not on every chat message. Tolerant of any failure (API down, not
+ * configured, rate-limited): returns `[]` rather than throwing, the exact
+ * same philosophy as checkExtractability.js — a missing embedding just
+ * degrades that material's retrieval back to keyword overlap, it never
+ * breaks the upload or the chatbot.
+ */
+async function computeChunkEmbeddings(text) {
+  const chunks = chunkText(text);
+  if (chunks.length === 0) return [];
+
+  try {
+    const vectors = await embedTexts(chunks);
+    return chunks.map((chunkStr, i) => ({ chunkIndex: i, text: chunkStr, vector: vectors[i] }));
+  } catch (err) {
+    console.warn(`[Embeddings] Failed to compute chunk embeddings: ${err.message}`);
+    return [];
+  }
+}
+
+// Cosine-similarity floor for a chunk to count as "relevant" — genuinely
+// on-topic chunks against text-embedding-004 typically score well above
+// this; unrelated content usually falls below it. Deliberately a fixed
+// constant rather than per-course tunable, matching this project's
+// existing "simple, not fully general" scoping calls elsewhere.
+const SEMANTIC_SIMILARITY_THRESHOLD = 0.5;
+
+/**
+ * RAG step 3, upgraded: semantic (embedding cosine-similarity) selection
+ * when precomputed vectors are available, degrading to the original
+ * keyword-overlap `selectRelevantChunks` otherwise — either because no
+ * chunk in this pool has a vector yet (a material uploaded before
+ * embeddings existed, or its background embedding job hasn't finished),
+ * or because embedding the query itself failed at request time (API
+ * down/rate-limited). Chunks WITHOUT a vector are still ranked by keyword
+ * overlap rather than silently dropped, so a legacy material doesn't just
+ * vanish from retrieval until it's re-uploaded.
+ */
+async function selectRelevantChunksSemantic(chunksWithSource, query, topK = 5) {
+  const withVectors = chunksWithSource.filter((c) => c.vector);
+  const withoutVectors = chunksWithSource.filter((c) => !c.vector);
+
+  if (withVectors.length === 0) {
+    return selectRelevantChunks(chunksWithSource, query, topK);
+  }
+
+  let semanticResults;
+  try {
+    const queryVector = await embedQuery(query);
+    semanticResults = withVectors
+      .map((c) => ({ ...c, score: cosineSimilarity(queryVector, c.vector) }))
+      .filter((c) => c.score > SEMANTIC_SIMILARITY_THRESHOLD)
+      .sort((a, b) => b.score - a.score);
+  } catch (err) {
+    // Embedding the query failed at request time — fall back to pure
+    // keyword overlap across EVERY chunk (vectors or not), exactly the
+    // pre-embeddings behavior, so a transient failure never breaks
+    // retrieval outright.
+    console.warn(`[Embeddings] Failed to embed query, falling back to keyword overlap: ${err.message}`);
+    return selectRelevantChunks(chunksWithSource, query, topK);
+  }
+
+  const keywordResults = withoutVectors.length > 0 ? selectRelevantChunks(withoutVectors, query, topK) : [];
+
+  return [...semanticResults, ...keywordResults].slice(0, topK);
+}
+
 // Crude singular/plural normalization ("slides" -> "slide") so a question
 // naming a material doesn't miss it purely over pluralization — good enough
 // at this project's scale without a real stemmer.
@@ -202,5 +274,7 @@ module.exports = {
   extractText,
   chunkText,
   selectRelevantChunks,
+  selectRelevantChunksSemantic,
+  computeChunkEmbeddings,
   findMentionedMaterials,
 };

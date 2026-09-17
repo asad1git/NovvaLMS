@@ -10,7 +10,7 @@ const {
   ASSIGNMENT_QUESTIONS_DIR,
   ASSIGNMENT_SUBMISSIONS_DIR,
 } = require("../middleware/uploadMiddleware");
-const { extractText } = require("../services/ragEngine");
+const { extractText, computeChunkEmbeddings } = require("../services/ragEngine");
 const { verifyFileSignature } = require("../utils/verifyFileSignature");
 const { checkExtractability } = require("../utils/checkExtractability");
 const { getAIProvider } = require("../services/ai");
@@ -44,8 +44,24 @@ async function verifyAndCheckUpload(req, res, dir) {
     throw new Error(signatureMismatch);
   }
 
-  const textExtractionWarning = await checkExtractability(filePath, fileType);
-  return { fileType, textExtractionWarning };
+  const { warning: textExtractionWarning, text } = await checkExtractability(filePath, fileType);
+  return { fileType, textExtractionWarning, text };
+}
+
+/**
+ * Fire-and-forget, same reasoning as materialController's
+ * embedMaterialInBackground — only the question document feeds the
+ * chatbot's ASSIGNMENT EXCERPTS (a submission is never RAG context), so
+ * this is only ever called for a freshly-created Assignment.
+ */
+function embedAssignmentInBackground(assignmentId, text) {
+  computeChunkEmbeddings(text)
+    .then((embeddings) => {
+      if (embeddings.length > 0) {
+        return Assignment.updateOne({ _id: assignmentId }, { embeddings });
+      }
+    })
+    .catch(() => {});
 }
 
 /**
@@ -114,7 +130,7 @@ const createAssignment = asyncHandler(async (req, res) => {
     throw new Error("title, dueDate, and maxScore are required");
   }
 
-  const { fileType, textExtractionWarning } = await verifyAndCheckUpload(req, res, ASSIGNMENT_QUESTIONS_DIR);
+  const { fileType, textExtractionWarning, text } = await verifyAndCheckUpload(req, res, ASSIGNMENT_QUESTIONS_DIR);
 
   const assignment = await Assignment.create({
     courseOffering: offering._id,
@@ -141,6 +157,8 @@ const createAssignment = asyncHandler(async (req, res) => {
   );
 
   res.status(201).json({ success: true, data: assignment });
+
+  embedAssignmentInBackground(assignment._id, text);
 });
 
 /**

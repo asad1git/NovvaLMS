@@ -7,6 +7,25 @@ const { assertCourseAccess, assertCourseManager } = require("../utils/courseAcce
 const { MATERIALS_DIR } = require("../middleware/uploadMiddleware");
 const { verifyFileSignature } = require("../utils/verifyFileSignature");
 const { checkExtractability } = require("../utils/checkExtractability");
+const { computeChunkEmbeddings } = require("../services/ragEngine");
+
+/**
+ * Fire-and-forget — a Gemini embedding call shouldn't make a teacher wait
+ * on the upload/replace response any more than AI grading makes a student
+ * wait on their quiz submission. Any failure is swallowed by
+ * computeChunkEmbeddings itself (returns [], never throws), so this only
+ * ever either sets real embeddings or leaves the material to keyword-
+ * overlap retrieval — never breaks the request that triggered it.
+ */
+function embedMaterialInBackground(materialId, text) {
+  computeChunkEmbeddings(text)
+    .then((embeddings) => {
+      if (embeddings.length > 0) {
+        return Material.updateOne({ _id: materialId }, { embeddings });
+      }
+    })
+    .catch(() => {});
+}
 
 /**
  * US-04 — POST /api/courses/:id/materials (Admin or the course's Teacher)
@@ -38,7 +57,7 @@ const uploadMaterial = asyncHandler(async (req, res) => {
     throw new Error(signatureMismatch);
   }
 
-  const textExtractionWarning = await checkExtractability(filePath, fileType);
+  const { warning: textExtractionWarning, text } = await checkExtractability(filePath, fileType);
 
   const material = await Material.create({
     courseOffering: offering._id,
@@ -52,6 +71,8 @@ const uploadMaterial = asyncHandler(async (req, res) => {
   });
 
   res.status(201).json({ success: true, data: material });
+
+  embedMaterialInBackground(material._id, text);
 });
 
 /**
@@ -117,7 +138,7 @@ const replaceMaterial = asyncHandler(async (req, res) => {
     throw new Error(signatureMismatch);
   }
 
-  const textExtractionWarning = await checkExtractability(filePath, fileType);
+  const { warning: textExtractionWarning, text } = await checkExtractability(filePath, fileType);
 
   const oldFileUrl = material.fileUrl;
 
@@ -126,12 +147,15 @@ const replaceMaterial = asyncHandler(async (req, res) => {
   material.fileType = fileType;
   material.fileSize = req.file.size;
   material.textExtractionWarning = textExtractionWarning;
+  material.embeddings = []; // stale — computed fresh below for the new content, never left pointing at the old file's text
   if (req.body.title) material.title = req.body.title;
   await material.save();
 
   fs.unlink(path.join(MATERIALS_DIR, oldFileUrl), () => {}); // best-effort — only after the new file is safely attached
 
   res.status(200).json({ success: true, data: material });
+
+  embedMaterialInBackground(material._id, text);
 });
 
 /**

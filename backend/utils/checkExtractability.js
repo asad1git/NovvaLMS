@@ -14,17 +14,29 @@ const MIN_EXTRACTABLE_CHARS = 20;
  * an image-heavy file is still worth keeping as-is. Shared by
  * materialController (materials) and assignmentController (question docs
  * and student submissions) — identical check, same reasoning, in every case.
+ *
+ * Also returns the extracted `text` itself (empty string when extraction
+ * failed or the file was too short) — callers that need to compute chunk
+ * embeddings (materialController, assignmentController's createAssignment)
+ * reuse it instead of extracting the same file a second time.
  */
 async function checkExtractability(filePath, fileType) {
   try {
     const text = await extractText(filePath, fileType);
     if (!text || text.trim().length < MIN_EXTRACTABLE_CHARS) {
-      return "This file has little or no extractable text — AI features won't be able to use it. " +
-        "It may be empty, corrupted, or an image-only scan.";
+      return {
+        warning:
+          "This file has little or no extractable text — AI features won't be able to use it. " +
+          "It may be empty, corrupted, or an image-only scan.",
+        text: "",
+      };
     }
-    return null;
+    return { warning: null, text };
   } catch (err) {
-    return `This file could not be read (${err.message}) — AI features won't be able to use it.`;
+    return {
+      warning: `This file could not be read (${err.message}) — AI features won't be able to use it.`,
+      text: "",
+    };
   }
 }
 
