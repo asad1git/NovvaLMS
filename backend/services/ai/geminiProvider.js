@@ -312,7 +312,28 @@ const GRADE_SCHEMA = {
   required: ["score", "justification"],
 };
 
-function buildGradingPrompt(question, maxScore, answer) {
+function buildGradingPrompt(question, maxScore, answer, modelAnswer) {
+  if (modelAnswer) {
+    // Rubric-guided variant — the teacher opted a specific question/
+    // assignment into this via useRubricForGrading, so the model answer is
+    // trusted grading criteria, not just a vague hint. Explicitly told to
+    // grade for matching KEY POINTS, not exact wording — a paraphrase that
+    // covers the same substance should score the same as one that doesn't.
+    return (
+      `You are drafting a grade for a university student's short-answer response, using the\n` +
+      `teacher's own model answer as your grading rubric. A teacher will review this draft\n` +
+      `before it counts as the final grade, so be fair and explain your reasoning.\n\n` +
+      `Question: ${question}\n` +
+      `Maximum possible score: ${maxScore}\n` +
+      `Model answer (the rubric — award credit for genuinely covering these key points, not for ` +
+      `matching its exact wording):\n${modelAnswer}\n\n` +
+      `Student's answer: ${answer || "(no answer provided)"}\n\n` +
+      `Award a score from 0 to ${maxScore} based on how many of the model answer's key points the ` +
+      `student's answer actually covers. Provide a brief (1-2 sentence) justification naming which ` +
+      `key points were or weren't covered.`
+    );
+  }
+
   return (
     `You are drafting a grade for a university student's short-answer response. A teacher\n` +
     `will review this draft before it counts as the final grade, so be fair and explain your reasoning.\n\n` +
@@ -325,12 +346,16 @@ function buildGradingPrompt(question, maxScore, answer) {
 }
 
 /**
- * gradeSubjective({ question, maxScore, answer }) -> { score, justification }
+ * gradeSubjective({ question, maxScore, answer, modelAnswer }) -> { score, justification }
  * Drafts a HITL grade — per CLAUDE.md, this is never the final grade. Called
- * from attemptController.submitAttempt in the background; a Teacher must
- * still review and save a grade via Grade Approvals before it counts.
+ * from attemptController.submitAttempt / assignmentController.
+ * draftAssignmentGradeInBackground in the background; a Teacher must still
+ * review and save a grade via Grade Approvals before it counts.
+ * `modelAnswer` is optional — the caller only passes it when the question/
+ * assignment has useRubricForGrading on AND a real model answer written;
+ * omitting it (the default) grades exactly as before this feature existed.
  */
-async function gradeSubjective({ question, maxScore, answer }) {
+async function gradeSubjective({ question, maxScore, answer, modelAnswer }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("AI generation is not configured — set GEMINI_API_KEY in .env");
@@ -340,7 +365,7 @@ async function gradeSubjective({ question, maxScore, answer }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildGradingPrompt(question, maxScore, answer) }] }],
+      contents: [{ parts: [{ text: buildGradingPrompt(question, maxScore, answer, modelAnswer) }] }],
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: GRADE_SCHEMA,

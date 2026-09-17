@@ -59,6 +59,26 @@ const assignmentSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Same shape and rationale as Question.modelAnswer/useRubricForGrading
+    // — a teacher-written sample answer that can optionally guide
+    // assignmentController's AI grading draft instead of grading "blind."
+    // select:false: getAssignmentsForCourse spreads `...a.toObject()`
+    // straight into the response for BOTH managers and students (unlike
+    // Question, which is queried per-role) — without select:false this
+    // would leak the rubric answer to a student before they've even
+    // submitted, the exact leak Question.modelAnswer's own select:false
+    // already guards against.
+    modelAnswer: {
+      type: String,
+      trim: true,
+      maxlength: [3000, "Model answer cannot exceed 3000 characters"],
+      default: "",
+      select: false,
+    },
+    useRubricForGrading: {
+      type: Boolean,
+      default: false,
+    },
     // Same precomputed-embedding shape and rationale as Material.embeddings
     // — powers semantic ranking of ASSIGNMENT EXCERPTS in the chatbot.
     embeddings: [

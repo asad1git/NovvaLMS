@@ -67,6 +67,7 @@ const BLANK_QUESTION = () => ({
   topic: "",
   explanation: "",
   modelAnswer: "",
+  useRubricForGrading: false,
 });
 
 const FILE_CHIP = {
@@ -127,6 +128,8 @@ export default function TeacherCourses() {
   const [assignmentDueDate, setAssignmentDueDate] = useState("");
   const [assignmentMaxScore, setAssignmentMaxScore] = useState(100);
   const [assignmentFile, setAssignmentFile] = useState(null);
+  const [assignmentModelAnswer, setAssignmentModelAnswer] = useState("");
+  const [assignmentUseRubric, setAssignmentUseRubric] = useState(false);
   const [creatingAssignment, setCreatingAssignment] = useState(false);
   const [viewingAssignment, setViewingAssignment] = useState(null);
   const [submissionsData, setSubmissionsData] = useState(null);
@@ -420,12 +423,16 @@ export default function TeacherCourses() {
         dueDate: assignmentDueDate,
         maxScore: assignmentMaxScore,
         file: assignmentFile,
+        modelAnswer: assignmentModelAnswer,
+        useRubricForGrading: assignmentUseRubric,
       });
       setAssignmentTitle("");
       setAssignmentDescription("");
       setAssignmentDueDate("");
       setAssignmentMaxScore(100);
       setAssignmentFile(null);
+      setAssignmentModelAnswer("");
+      setAssignmentUseRubric(false);
       setShowAssignmentForm(false);
       setAssignments(await listAssignments(selectedCourse._id));
     } catch (err) {
@@ -823,6 +830,33 @@ export default function TeacherCourses() {
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-[11px] text-text-muted mb-1">Model Answer (optional)</label>
+                  <textarea
+                    rows={2}
+                    className={`w-full ${inputClass}`}
+                    placeholder="A sample answer to guide AI grading. Never shown to students before their own submission is graded."
+                    value={assignmentModelAnswer}
+                    onChange={(e) => {
+                      setAssignmentModelAnswer(e.target.value);
+                      if (!e.target.value.trim()) setAssignmentUseRubric(false);
+                    }}
+                    maxLength={3000}
+                  />
+                  <label
+                    className={`flex items-center gap-1.5 text-[11px] mt-1 ${
+                      assignmentModelAnswer.trim() ? "text-text-main" : "text-text-muted"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={assignmentUseRubric}
+                      disabled={!assignmentModelAnswer.trim()}
+                      onChange={(e) => setAssignmentUseRubric(e.target.checked)}
+                    />
+                    Use this model answer as a grading rubric for AI drafts (instead of grading blind)
+                  </label>
+                </div>
                 <Button type="submit" disabled={creatingAssignment}>
                   {creatingAssignment ? "Posting…" : "Post Assignment"}
                 </Button>
@@ -1044,13 +1078,33 @@ export default function TeacherCourses() {
                     )}
 
                     {q.type === "subjective" && (
-                      <textarea
-                        className={`w-full ${inputClass} px-2 py-1.5 text-xs min-h-[60px]`}
-                        placeholder="Model answer (optional) — a sample answer to guide grading. Never shown to the student before submission."
-                        value={q.modelAnswer || ""}
-                        onChange={(e) => updateQuestion(qi, { modelAnswer: e.target.value })}
-                        maxLength={3000}
-                      />
+                      <div className="space-y-1">
+                        <textarea
+                          className={`w-full ${inputClass} px-2 py-1.5 text-xs min-h-[60px]`}
+                          placeholder="Model answer (optional) — a sample answer to guide grading. Never shown to the student before submission."
+                          value={q.modelAnswer || ""}
+                          onChange={(e) =>
+                            updateQuestion(qi, {
+                              modelAnswer: e.target.value,
+                              useRubricForGrading: e.target.value.trim() ? q.useRubricForGrading : false,
+                            })
+                          }
+                          maxLength={3000}
+                        />
+                        <label
+                          className={`flex items-center gap-1.5 text-[11px] ${
+                            (q.modelAnswer || "").trim() ? "text-text-main" : "text-text-muted"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!q.useRubricForGrading}
+                            disabled={!(q.modelAnswer || "").trim()}
+                            onChange={(e) => updateQuestion(qi, { useRubricForGrading: e.target.checked })}
+                          />
+                          Use this model answer as a grading rubric for AI drafts (instead of grading blind)
+                        </label>
+                      </div>
                     )}
 
                     <textarea

@@ -1514,6 +1514,53 @@ builder showing the generated mcq/subjective mix with editable explanation/model
 and the student's expanded "Review My Answers" section with correct green/red highlighting — zero
 console errors.
 
+**AI-quality initiative, part 4 — rubric-guided AI grading, for both quizzes and assignments.**
+Until now, `modelAnswer` (added in part 3) was purely informational — the AI grading draft always
+graded "blind," from the question text alone, never seeing the model answer even when one existed.
+This closes that gap with a teacher-controlled toggle: `useRubricForGrading` on both `Question`
+(subjective quiz questions) and the newly-added `Assignment.modelAnswer`/`useRubricForGrading`
+pair. Off by default, matching every other opt-in AI feature in this project — a model answer
+written just as student-facing study material shouldn't silently start driving grades the moment
+it exists.
+
+`Assignment.modelAnswer` needed the exact same `select: false` treatment `Question.modelAnswer`
+already has, for a real reason specific to Assignments: `getAssignmentsForCourse` spreads
+`...a.toObject()` straight into its response for BOTH managers and students (unlike Question,
+which is always queried per-role) — without `select: false` this would have leaked the rubric
+answer to a student before they'd even submitted, the exact leak `Question.modelAnswer`'s own
+`select: false` was already built to prevent. Every read site that needs the field back — `getAssignmentsForCourse`
+(conditionally, manager-only), `getSubmissionsForAssignment` (always manager-only), and
+`submitAssignment` (needs it to hand to the background grading draft) — now explicitly
+`.select("+modelAnswer")`, mirroring the exact pattern `utils/scoring.js` already established for
+`correctOptionIndex`.
+
+All three AI providers' `gradeSubjective` gained an optional `modelAnswer` param and a genuinely
+different prompt when it's present — not just a sentence tacked onto the existing one. The
+rubric-guided prompt tells the AI to grade for whether the student's answer covers the model
+answer's key points (explicitly *not* exact wording — a paraphrase that hits the same substance
+should score the same as one that doesn't), and to name in its justification which points were or
+weren't covered. Omitting `modelAnswer` (the default, and what every pre-existing question/
+assignment does) grades exactly as before this feature existed — zero behavior change unless a
+teacher explicitly opts a specific question or assignment in.
+
+**Verified with an unambiguous, fabricated-concept test, not a real CS topic** — a real topic risks
+the AI generating plausible-sounding jargon on its own (a first pass using "LIFO/FIFO" showed the
+AI already knew those terms regardless of the rubric, a false-positive signal). Invented a fake
+"Zorblatt normalization" concept with three fake named stages (glinting, tessellation, phase-lock)
+that the AI has zero chance of knowing from training — with the rubric OFF, a real Gemini call
+correctly graded a vague answer generically with no mention of the fake stages; with the SAME
+question/answer and the rubric ON, the AI's justification explicitly named "glinting, tessellation,
+and phase-lock" as the specific points the student missed — a signal that could only have come
+from the injected model answer, not something invented or already known. Confirmed identically for
+both a quiz subjective question and a real Assignment submission, through the real HTTP endpoints
+end-to-end (not just an isolated provider call) — including polling past a slow real Gemini
+response to rule out a timing false-negative. Also confirmed the pre-submission leak boundary
+holds for both: a student's view of the quiz never includes `modelAnswer`, and a student's
+assignment list (`GET /courses/:id/assignments`, the endpoint that spreads every field) never
+includes it either. Followed by a Playwright pass confirming both the quiz question builder's and
+the assignment form's rubric checkboxes render correctly (disabled until a model answer is
+actually typed) with zero console errors.
+
 ---
 
 ## Sprint Plan (2 weeks each)

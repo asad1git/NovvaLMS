@@ -64,6 +64,9 @@ const autosaveAnswer = asyncHandler(async (req, res) => {
  * gradeStatus, so this can safely run after the HTTP response has already
  * been sent. Failures are swallowed: the Teacher just grades manually in
  * Grade Approvals for that answer, exactly as before this feature existed.
+ * `question` must have been fetched with `.select("+modelAnswer")` for the
+ * rubric to actually be usable here — modelAnswer is select:false, so a
+ * plain query would silently give `undefined` regardless of the toggle.
  */
 async function draftGradeInBackground(attemptId, question) {
   try {
@@ -75,6 +78,7 @@ async function draftGradeInBackground(attemptId, question) {
       question: question.text,
       maxScore: question.maxScore,
       answer: answer.textAnswer,
+      modelAnswer: question.useRubricForGrading && question.modelAnswer ? question.modelAnswer : undefined,
     });
 
     answer.aiDraftScore = draft.score;
@@ -101,7 +105,7 @@ async function draftGradeInBackground(attemptId, question) {
 const submitAttempt = asyncHandler(async (req, res) => {
   const attempt = await loadOwnInProgressAttempt(req, res);
 
-  const questions = await Question.find({ quiz: attempt.quiz });
+  const questions = await Question.find({ quiz: attempt.quiz }).select("+modelAnswer");
   const subjectiveQuestions = questions.filter((q) => q.type === "subjective");
 
   for (const q of subjectiveQuestions) {

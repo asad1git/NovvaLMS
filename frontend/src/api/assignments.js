@@ -4,13 +4,15 @@ export function listAssignments(courseId) {
   return api.get(`/courses/${courseId}/assignments`).then((r) => r.data.data);
 }
 
-export function createAssignment(courseId, { title, description, dueDate, maxScore, file }) {
+export function createAssignment(courseId, { title, description, dueDate, maxScore, file, modelAnswer, useRubricForGrading }) {
   const form = new FormData();
   form.append("title", title);
   form.append("description", description || "");
   form.append("dueDate", dueDate);
   form.append("maxScore", maxScore);
   form.append("file", file);
+  form.append("modelAnswer", modelAnswer || "");
+  form.append("useRubricForGrading", useRubricForGrading ? "true" : "false");
   return api.post(`/courses/${courseId}/assignments`, form).then((r) => r.data.data);
 }
 

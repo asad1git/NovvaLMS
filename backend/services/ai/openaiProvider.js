@@ -226,7 +226,23 @@ const GRADE_SCHEMA = {
   additionalProperties: false,
 };
 
-function buildGradingPrompt(question, maxScore, answer) {
+function buildGradingPrompt(question, maxScore, answer, modelAnswer) {
+  if (modelAnswer) {
+    return (
+      `You are drafting a grade for a university student's short-answer response, using the\n` +
+      `teacher's own model answer as your grading rubric. A teacher will review this draft\n` +
+      `before it counts as the final grade, so be fair and explain your reasoning.\n\n` +
+      `Question: ${question}\n` +
+      `Maximum possible score: ${maxScore}\n` +
+      `Model answer (the rubric — award credit for genuinely covering these key points, not for ` +
+      `matching its exact wording):\n${modelAnswer}\n\n` +
+      `Student's answer: ${answer || "(no answer provided)"}\n\n` +
+      `Award a score from 0 to ${maxScore} based on how many of the model answer's key points the ` +
+      `student's answer actually covers. Provide a brief (1-2 sentence) justification naming which ` +
+      `key points were or weren't covered.`
+    );
+  }
+
   return (
     `You are drafting a grade for a university student's short-answer response. A teacher\n` +
     `will review this draft before it counts as the final grade, so be fair and explain your reasoning.\n\n` +
@@ -239,10 +255,11 @@ function buildGradingPrompt(question, maxScore, answer) {
 }
 
 /**
- * gradeSubjective({ question, maxScore, answer }) -> { score, justification }
+ * gradeSubjective({ question, maxScore, answer, modelAnswer }) -> { score, justification }
  * Same contract and HITL caveat as geminiProvider.gradeSubjective.
+ * `modelAnswer` is optional — omitting it grades exactly as before this feature existed.
  */
-async function gradeSubjective({ question, maxScore, answer }) {
+async function gradeSubjective({ question, maxScore, answer, modelAnswer }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("AI generation is not configured — set OPENAI_API_KEY in .env");
@@ -256,7 +273,7 @@ async function gradeSubjective({ question, maxScore, answer }) {
     },
     body: JSON.stringify({
       model: MODEL,
-      messages: [{ role: "user", content: buildGradingPrompt(question, maxScore, answer) }],
+      messages: [{ role: "user", content: buildGradingPrompt(question, maxScore, answer, modelAnswer) }],
       response_format: {
         type: "json_schema",
         json_schema: { name: "grade", schema: GRADE_SCHEMA, strict: true },

@@ -75,7 +75,9 @@ function embedAssignmentInBackground(assignmentId, text) {
  * provider method needed, since "grade this free text against this
  * question, out of this max score" is exactly that contract already.
  * Failures are swallowed: the teacher just grades manually, same as before
- * this feature existed.
+ * this feature existed. `assignment` must have been fetched with
+ * `.select("+modelAnswer")` for the rubric toggle to actually work here —
+ * same select:false caveat as attemptController.draftGradeInBackground.
  */
 async function draftAssignmentGradeInBackground(assignment, submissionId) {
   try {
@@ -100,6 +102,7 @@ async function draftAssignmentGradeInBackground(assignment, submissionId) {
       question,
       maxScore: assignment.maxScore,
       answer: answerText.slice(0, MAX_GRADING_CONTEXT_CHARS),
+      modelAnswer: assignment.useRubricForGrading && assignment.modelAnswer ? assignment.modelAnswer : undefined,
     });
 
     submission.aiDraftScore = draft.score;
@@ -124,7 +127,7 @@ const createAssignment = asyncHandler(async (req, res) => {
   }
   assertCourseManager(req.user, res, offering);
 
-  const { title, description, dueDate, maxScore } = req.body;
+  const { title, description, dueDate, maxScore, modelAnswer, useRubricForGrading } = req.body;
   if (!title || !dueDate || !maxScore) {
     res.status(400);
     throw new Error("title, dueDate, and maxScore are required");
@@ -139,6 +142,10 @@ const createAssignment = asyncHandler(async (req, res) => {
     description: description || "",
     dueDate,
     maxScore: Number(maxScore),
+    modelAnswer: modelAnswer || "",
+    // FormData sends booleans as the strings "true"/"false" — a bare
+    // truthiness check would treat "false" as truthy, so compare explicitly.
+    useRubricForGrading: useRubricForGrading === "true" || useRubricForGrading === true,
     fileName: req.file.originalname,
     fileUrl: req.file.filename,
     fileType,
@@ -174,8 +181,14 @@ const createAssignment = asyncHandler(async (req, res) => {
  */
 const getAssignmentsForCourse = asyncHandler(async (req, res) => {
   const offering = await assertCourseAccess(req.user, res, req.params.id);
-  const assignments = await Assignment.find({ courseOffering: offering._id }).sort({ dueDate: -1 });
   const isManager = req.user.role === "admin" || String(offering.teacher) === String(req.user._id);
+  // Only a manager gets modelAnswer re-selected — this response spreads
+  // `...a.toObject()` for BOTH roles below, so leaving it select:false by
+  // default for a student is what actually keeps the rubric answer from
+  // leaking before they've even submitted.
+  const assignments = await Assignment.find({ courseOffering: offering._id })
+    .select(isManager ? "+modelAnswer" : "")
+    .sort({ dueDate: -1 });
   const now = new Date();
 
   if (isManager) {
@@ -240,7 +253,11 @@ const downloadAssignmentFile = asyncHandler(async (req, res) => {
  * teacher's decision is the final word.
  */
 const submitAssignment = asyncHandler(async (req, res) => {
-  const assignment = await Assignment.findById(req.params.id);
+  // +modelAnswer: this `assignment` doc is passed to
+  // draftAssignmentGradeInBackground below, which needs it for the rubric
+  // toggle to actually do anything — select:false means a plain findById
+  // would silently give `undefined` regardless of useRubricForGrading.
+  const assignment = await Assignment.findById(req.params.id).select("+modelAnswer");
   if (!assignment) {
     res.status(404);
     throw new Error("Assignment not found");
@@ -301,7 +318,10 @@ const submitAssignment = asyncHandler(async (req, res) => {
  * visibility, so a teacher can see gaps, not just what exists.
  */
 const getSubmissionsForAssignment = asyncHandler(async (req, res) => {
-  const assignment = await Assignment.findById(req.params.id);
+  // +modelAnswer: this endpoint is manager-only (assertCourseManager right
+  // below), so the teacher/admin viewing this roster should see the rubric
+  // answer they wrote, not have it silently hidden by select:false.
+  const assignment = await Assignment.findById(req.params.id).select("+modelAnswer");
   if (!assignment) {
     res.status(404);
     throw new Error("Assignment not found");

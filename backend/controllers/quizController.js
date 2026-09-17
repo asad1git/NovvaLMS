@@ -64,6 +64,7 @@ const createQuiz = asyncHandler(async (req, res) => {
         topic: q.topic || "",
         explanation: q.explanation || "",
         modelAnswer: q.type === "subjective" ? q.modelAnswer || "" : "",
+        useRubricForGrading: q.type === "subjective" ? !!q.useRubricForGrading : false,
       })),
       { ordered: true }
     );
@@ -313,6 +314,10 @@ const generateQuizQuestions = asyncHandler(async (req, res) => {
       topic: typeof q.topic === "string" ? q.topic.trim().slice(0, 60) : "",
       explanation: typeof q.explanation === "string" ? q.explanation.trim().slice(0, 800) : "",
       modelAnswer: q.type === "subjective" && typeof q.modelAnswer === "string" ? q.modelAnswer.trim().slice(0, 3000) : "",
+      // Always false on a fresh AI draft — the teacher opts a subjective
+      // question INTO rubric grading explicitly in the question builder
+      // after reviewing the AI's suggested model answer, never automatically.
+      useRubricForGrading: false,
     }));
 
   if (questions.length === 0) {

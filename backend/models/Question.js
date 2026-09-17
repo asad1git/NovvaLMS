@@ -92,6 +92,19 @@ const questionSchema = new mongoose.Schema({
     default: "",
     select: false,
   },
+  // Teacher-controlled toggle: when true AND modelAnswer is non-empty, the
+  // AI grading draft (attemptController.draftGradeInBackground) is told to
+  // grade against modelAnswer as a rubric instead of grading "blind" from
+  // the question text alone. Off by default — matches every other AI
+  // feature's opt-in-not-opt-out default in this project, and a model
+  // answer written just as student-facing study material (not yet trusted
+  // as binding grading criteria) shouldn't silently start driving grades.
+  // Not select:false — unlike modelAnswer itself, this boolean reveals
+  // nothing about the answer, so there's no leak risk in a student seeing it.
+  useRubricForGrading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 module.exports = mongoose.model("Question", questionSchema);
